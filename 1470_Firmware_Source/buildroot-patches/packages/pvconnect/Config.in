@@ -1,0 +1,7 @@
+config BR2_PACKAGE_PVCONNECT
+	bool "Natively compiled pre-built pvconnect"
+    default n
+    depends on BR2_arm926t
+	help
+		Pre-compiled binary PVConnect installation 
+

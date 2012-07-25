@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# oxnas user recovery hotplug agent
+#
+#       ACTION=offline
+#
+
+# dd operations are in byte mode so that this module doesnot care about the
+# upgrade flag Second byte of 288th sector (512 bytes per sector)
+RECOVERY_FLAG_OFFSET=147457
+BS=1
+# check this flag as well in oxnas.h of u-boot
+RECOVERY_FLAG=1
+
+cd /etc/hotplug
+. ./hotplug.functions
+
+# this function is used to acknowledge the user of the recovery activity
+# system degraded state is used on a temporary basis
+acknowledgeUser()
+{
+    # Put into ATTENTION state
+    $(echo -n 6 > /sys/class/leds/oxnas-leds\:state/brightness)
+}
+
+debug_mesg oxnas user recovery
+case $ACTION in
+
+offline)
+# offline implies that the recovery flag is set and no more the button press is monitored
+    debug_mesg oxnas user recovery add flag event
+    $(echo -n $RECOVERY_FLAG | dd of=/dev/sda seek=${RECOVERY_FLAG_OFFSET} bs=${BS})
+    sync         
+    acknowledgeUser                                                               
+    ;;
+                                                                                                              
+*)                                                                              
+    debug_mesg oxnas user recovery $ACTION event not supported                  
+    exit 1                                                                      
+    ;;                                                                          
+                                                                                
+esac      

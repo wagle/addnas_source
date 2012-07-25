@@ -1,0 +1,10 @@
+# standard crontab format for busybox cron daemon.
+# fields may be lists
+# min    hour day month wd  command
+#  *      *    *   *     *   dosomething
+
+# save the date every day at midnight
+0   0    *   *     *   date +%m%d%H%M%Y.%S > /var/lib/now
+
+# See if we should attempt to get an IP address via DHCP
+* * * * * /etc/init.d/dhcpc.sh

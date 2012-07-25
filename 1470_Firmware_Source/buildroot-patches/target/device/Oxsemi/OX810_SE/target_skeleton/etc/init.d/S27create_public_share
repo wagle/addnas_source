@@ -1,0 +1,32 @@
+#!/bin/sh
+PUBLIC_SHARE_DIR=/shares/internal/PUBLIC
+SHARES_INC=/var/oxsemi/shares.inc
+
+if [ ! -e "/shares/internal/PUBLIC" ]; then
+	mkdir /shares/internal/PUBLIC
+	chown www-data:www-data /shares/internal/PUBLIC
+	chmod u+rwx $PUBLIC_SHARE_DIR
+	chmod og-rwx $PUBLIC_SHARE_DIR
+fi
+
+if [ ! -e "/var/oxsemi/shares.inc" ]; then
+	touch /var/oxsemi/shares.inc
+	echo "[PUBLIC]" > $SHARES_INC
+	echo "path=/shares/internal/PUBLIC" >> $SHARES_INC
+	echo "force user=www-data" >> $SHARES_INC
+	echo "valid users=www-data" >> $SHARES_INC
+	echo "write list=www-data" >> $SHARES_INC
+	echo "guest ok=Yes" >> $SHARES_INC
+	echo "preallocate=Yes" >> $SHARES_INC
+fi
+
+if [ ! -e "/var/private/smbpasswd" ]; then
+	touch /var/private/smbpasswd
+	/usr/local/samba/bin/smbpasswd -c /etc/smb.conf -L -a -s www-data << EOF
+	www-data
+	www-data
+EOF
+fi
+
+# Set readahead on the user data partition
+blockdev --setra 4096 /dev/sda4

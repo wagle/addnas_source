@@ -1,0 +1,7 @@
+config BR2_PACKAGE_NATIVE_SAMBA
+	bool "Natively compiled pre-built samba"
+    default y
+	help
+		Pre-compiled binary SAMBA installation
+	
+

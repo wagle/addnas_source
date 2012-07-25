@@ -1,0 +1,6 @@
+config BR2_PACKAGE_BONNIE
+	bool "bonnie"
+	default n
+	help
+        Disk performance tool
+        

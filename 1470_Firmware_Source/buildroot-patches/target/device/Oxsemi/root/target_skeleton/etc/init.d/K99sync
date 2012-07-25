@@ -1,0 +1,6 @@
+#!/bin/sh
+
+sync 
+sync
+sync
+sleep 1

@@ -1,0 +1,100 @@
+#!/bin/sh
+#
+#
+# Copyright (C) 2006 Oxford Semiconductor Inc.
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+# 
+
+# This script should cleanup any "stray" directories in the /shares/external
+# directory that got left behind by devices breaking or being unplugged during
+# power off.
+# 
+# It removes directories in /shares/external that are not mentioned in mtab 
+# 
+# As a safety preaction it shouldn't delete any directories containing "real"
+# files, (but will probably delete links and device files etc.)  
+# 
+
+MTAB=/proc/mounts
+LOCKFILE=/tmp/mount-external-drive
+
+. /etc/hotplug/semaphore
+
+################################################################################
+cleanup() {
+    cleanuplocks "$LOCKFILE"
+        
+    # don't run if there isn't a readable MTAB file
+    [ -r $MTAB ] || return 1;
+    
+    down "$LOCKFILE"
+
+    # search through /shares/external
+    for dir in /shares/external/*
+    do
+        # make sure it's a directory
+        if [ -d "$dir" ]
+        then
+            grep -q -G "$dir/" $MTAB
+            if [ $? != 0 ]
+            then
+                # when here, we know it's not mounted so is probably a stray 
+                # directory. If it doesn't contain any files, then delete it
+                if [ -z `find "$dir" -type f` ]
+                then
+                    find "$dir" -type d -exec rm -rf "{}" \;
+                fi
+            fi
+        fi
+    done
+
+    up "$LOCKFILE"
+
+    # remove external shares
+    su -c "/usr/bin/perl -I /usr/www/lib /usr/www/lib/removeExternalShares.pl" www-data
+
+}
+
+start() {
+    echo "External share housekeeping."
+    cleanup
+}
+
+stop() {
+    echo -n
+}
+
+restart() {
+        stop
+        start
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart|reload)
+        restart
+        ;;
+  *)
+        echo $"Usage: $0 {start|stop|restart}"
+        exit 1
+esac
+
+exit $?

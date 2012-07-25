@@ -1,0 +1,46 @@
+#!/bin/sh
+
+# this script should execute once and then delete itself
+
+# restore from backup after upgrade
+
+case "$1" in
+    start)
+	# only perform duties if can delete self
+	if rm $0 ; then
+		echo "LATCH 1 deleted"
+        	# wait for usb disk to mount
+        	sleep 10
+		# check to see if archiver is working 
+		if /etc/init.d/tsi-archiver /shares/external/* list ; then
+			# find most recent backup
+			ID=$(/etc/init.d/tsi-archiver /shares/external/* list | tail -1 | cut -f 1)
+			if [ ! -z "$ID" ] ; then
+                                echo "LATCH 1: ID $ID found"
+				# restore if there's a last ID
+				/etc/init.d/tsi-archiver /shares/external/* restore $ID
+				# should reboot, hard, shouldn't return
+				reboot -f
+			else
+				echo "LATCH 1: ID not found"
+			fi
+		else
+			echo "LATCH 1: couldn't list"
+		fi
+	else
+		echo "LATCH 1 not deleted"
+	fi
+	;;
+
+    stop)
+	;;
+
+    restart|reload)
+	;;
+
+    *)
+	echo $"Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?

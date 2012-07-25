@@ -1,0 +1,10 @@
+--- package/fuse/libfuse.mk.orig	2008-06-19 16:02:19.000000000 +0100
++++ package/fuse/libfuse.mk	2008-06-19 16:02:34.000000000 +0100
+@@ -30,7 +30,6 @@
+ 		--program-prefix="" \
+ 		--disable-nls \
+ 		--disable-example \
+-		--enable-kernel-module \
+ 		--enable-lib \
+ 		--enable-util \
+ 		--with-kernel="$(LINUX_DIR)" \

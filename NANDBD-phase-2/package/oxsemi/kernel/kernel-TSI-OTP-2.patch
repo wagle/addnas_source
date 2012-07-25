@@ -1,0 +1,11 @@
+diff -Naur linux-kernel+OTP/arch/arm/configs/ox7821_defconfig linux-kernel+OTP+CONFIG/arch/arm/configs/ox7821_defconfig
+--- linux-kernel+OTP/arch/arm/configs/ox7821_defconfig	2012-01-09 21:59:59.000000000 -0700
++++ linux-kernel+OTP+CONFIG/arch/arm/configs/ox7821_defconfig	2012-02-06 21:17:58.000000000 -0700
+@@ -216,6 +216,7 @@
+ # CONFIG_DO_MEM_TEST is not set
+ CONFIG_DESCRIPTORS_PAGES=6
+ CONFIG_ARCH_OXNAS_MAX_SATA_SG_ENTRIES=64
++CONFIG_OX820_OTP=y
+ # CONFIG_TACHO_THERM_AND_FAN_820 is not set
+ # CONFIG_OXNAS_RTC is not set
+ # CONFIG_I2S is not set

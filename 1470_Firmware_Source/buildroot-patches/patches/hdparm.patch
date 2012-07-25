@@ -1,0 +1,17 @@
+--- package/hdparm.orig/hdparm-1.patch	1970-01-01 01:00:00.000000000 +0100
++++ package/hdparm/hdparm-1.patch	2009-09-29 10:05:04.000000000 +0100
+@@ -0,0 +1,14 @@
++--- hdparm-7.7/sgio.c.orig	2009-09-25 09:38:55.000000000 +0100
+++++ hdparm-7.7/sgio.c	2009-09-25 09:33:02.000000000 +0100
++@@ -10,6 +10,11 @@
++ #include <sys/types.h>
++ 
++ #include <linux/fs.h>
+++
+++#ifndef u8
+++#define u8 unsigned char
+++#endif
+++
++ #include <scsi/scsi.h>
++ #include <scsi/sg.h>
++ 

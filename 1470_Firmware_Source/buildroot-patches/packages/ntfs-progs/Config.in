@@ -1,0 +1,8 @@
+config BR2_PACKAGE_NTFS-PROGS
+	bool "Natively compiled pre-built ntfs utilities"
+    default y
+#    depends on BR2_arm926t
+	help
+		Pre-compiled binary ntfs-progs installation
+	
+

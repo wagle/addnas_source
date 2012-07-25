@@ -1,0 +1,26 @@
+#!/bin/sh
+
+cd /etc/hotplug
+. ./hotplug.functions
+
+setpoweroff()
+{
+# busy box function to poweroff the system is invoked
+    poweroff
+}
+
+debug_mesg oxnas power button
+
+case $ACTION in
+
+offline)
+    debug_mesg oxnas power buton power off request
+    setpoweroff                                                               
+    ;;
+                                                                                                              
+*)                                                                              
+    debug_mesg oxnas user recovery $ACTION event not supported                  
+    exit 1                                                                      
+    ;;                                                                          
+                                                                                
+esac      

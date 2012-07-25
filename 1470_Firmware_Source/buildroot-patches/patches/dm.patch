@@ -1,0 +1,16 @@
+diff -urN package/dm.orig/libdevmapper.h-perms.patch package/dm/libdevmapper.h-perms.patch
+--- package/dm.orig/libdevmapper.h-perms.patch	1970-01-01 01:00:00.000000000 +0100
++++ package/dm/libdevmapper.h-perms.patch	2008-06-19 17:39:16.000000000 +0100
+@@ -0,0 +1,12 @@
++diff -urN device-mapper.1.02.22.orig/lib/Makefile.in device-mapper.1.02.22/lib/Makefile.in
++--- device-mapper.1.02.22.orig/lib/Makefile.in	2007-08-21 17:26:06.000000000 +0100
+++++ device-mapper.1.02.22/lib/Makefile.in	2008-06-19 17:36:46.000000000 +0100
++@@ -64,7 +64,7 @@
++ install: $(INSTALL_TYPE) install_include
++ 
++ install_include:
++-	$(INSTALL) -D $(OWNER) $(GROUP) -m 444 libdevmapper.h \
+++	$(INSTALL) -D $(OWNER) $(GROUP) -m 644 libdevmapper.h \
++ 		$(includedir)/libdevmapper.h
++ 
++ install_dynamic: install_@interface@

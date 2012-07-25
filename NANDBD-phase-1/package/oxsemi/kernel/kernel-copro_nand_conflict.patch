@@ -1,0 +1,16 @@
+Index: linux-kernel/drivers/mtd/nand/ox820_nand.c
+===================================================================
+--- linux-kernel/drivers/mtd/nand/ox820_nand.c	(revision 4669)
++++ linux-kernel/drivers/mtd/nand/ox820_nand.c	(working copy)
+@@ -151,8 +151,8 @@
+ 	writel(readl(SYSCTRL_MFA_SECSEL_CTRL) | STATIC_NAND_ENABLE0, SYSCTRL_MFA_SECSEL_CTRL);
+ 
+ 	/* enable clock and release static block reset */
+-	writel(SYS_CTRL_CKEN_STATIC_BIT, SYS_CTRL_CKEN_SET_CTRL);
+-	writel(SYS_CTRL_RSTEN_STATIC_BIT, SYS_CTRL_RSTEN_CLR_CTRL);
++	writel(1 << SYS_CTRL_CKEN_STATIC_BIT, SYS_CTRL_CKEN_SET_CTRL);
++	writel(1 << SYS_CTRL_RSTEN_STATIC_BIT, SYS_CTRL_RSTEN_CLR_CTRL);
+ 	spin_unlock(&oxnas_gpio_spinlock);
+ 
+ 	// reset
+

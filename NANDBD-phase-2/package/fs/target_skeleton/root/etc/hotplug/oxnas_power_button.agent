@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# oxnas power button hotplug agent
+#
+#       ACTION=offline implies power off of the device
+#
+
+# dd operations are in byte mode so that this module doesnot care about the
+# upgrade and recovery flag. 3rd byte of 288th sector (512 bytes per sector)
+# check u-boot and init scripts for these values as well
+POWER_DOWN_FLAG_OFFSET=147458
+BS=1
+# check this flag as well in oxnas.h of u-boot
+POWER_DOWN_FLAG=1
+
+cd /etc/hotplug
+. ./hotplug.functions
+
+# this function sets the hdd flag for powerdown
+# this flag is used on reboot of the system to retain the system state
+sethddflag()
+{
+    $(echo -n $POWER_DOWN_FLAG | dd of=/dev/sda seek=${POWER_DOWN_FLAG_OFFSET} bs=${BS})
+    sync
+}
+
+# this function is used to poweroff the system which in turn takes care
+# of making the coproc to monitor the power button on
+setpoweroff()
+{
+# busy box function to poweroff the system is invoked
+    poweroff
+}
+
+debug_mesg oxnas power button
+
+case $ACTION in
+
+offline)
+# offline implies that user has requested power down of the system
+# set the power down on disk flag and call power off
+    debug_mesg oxnas power buton power off request
+
+    sethddflag
+    setpoweroff                                                               
+    ;;
+                                                                                                              
+*)                                                                              
+    debug_mesg oxnas user recovery $ACTION event not supported                  
+    exit 1                                                                      
+    ;;                                                                          
+                                                                                
+esac      

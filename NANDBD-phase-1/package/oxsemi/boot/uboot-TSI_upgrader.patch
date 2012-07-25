@@ -1,0 +1,13 @@
+--- u-boot/include/configs/ox820.h.ORIG	2011-07-15 14:17:42.000000000 -0600
++++ u-boot/include/configs/ox820.h	2011-07-15 14:16:10.000000000 -0600
+@@ -354,7 +354,9 @@
+ #define UPGRADE_KERNEL_LOCATION 0x60800000
+ 
+ #elif defined(SDK_BUILD_NAND_BOOT)
+-#define CONFIG_BOOTARGS "root=ubi0:rootfs ubi.mtd=2,512 rootfstype=ubifs" COMMON_BOOTARGS
++// WAGLE 2011-07-15 boot from external usb disk
++//#define CONFIG_BOOTARGS "root=ubi0:rootfs ubi.mtd=2,512 rootfstype=ubifs" COMMON_BOOTARGS
++#define CONFIG_BOOTARGS "root=/dev/sda1 rootwait init=/opt/upgrader/sbin/init-phase-2" COMMON_BOOTARGS
+ #define CONFIG_BOOTDELAY    2
+ #define CONFIG_BOOTCOMMAND  "run extinguishled boot_nand"
+ #define CONFIG_EXTRA_ENV_SETTINGS \

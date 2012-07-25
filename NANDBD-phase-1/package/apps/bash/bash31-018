@@ -1,0 +1,12 @@
+diff -urN bash-3.1.orig/builtins/Makefile.in bash-3.1/builtins/Makefile.in
+--- bash-3.1.orig/builtins/Makefile.in	2008-06-30 13:45:08.000000000 +0100
++++ bash-3.1/builtins/Makefile.in	2008-06-30 13:13:38.000000000 +0100
+@@ -63,7 +63,7 @@
+ 
+ LIBS = @LIBS@
+ LDFLAGS = @LDFLAGS@ $(LOCAL_LDFLAGS) $(CFLAGS)
+-LDFLAGS_FOR_BUILD = $(LDFLAGS)
++LDFLAGS_FOR_BUILD = 
+ LOCAL_LDFLAGS = @LOCAL_LDFLAGS@
+ #LIBS_FOR_BUILD =
+ LIBS_FOR_BUILD =

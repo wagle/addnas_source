@@ -1,0 +1,26 @@
+diff -urN package/e2fsprogs.orig/e2fsprogs.mk package/e2fsprogs/e2fsprogs.mk
+--- package/e2fsprogs.orig/e2fsprogs.mk	2008-07-18 13:06:40.000000000 +0100
++++ package/e2fsprogs/e2fsprogs.mk	2008-07-18 13:04:52.000000000 +0100
+@@ -116,11 +116,22 @@
+ 	rm -rf $(TARGET_DIR)/usr/share/doc
+ 	touch -c $@
+ 
++e2fsprogs-libs: $(TARGET_DIR)/$(E2FSPROGS_TARGET_BINARY)
++	$(MAKE1) PATH=$(TARGET_PATH) DESTDIR=$(TARGET_DIR) LDCONFIG=true \
++		-C $(E2FSPROGS_DIR) install-libs
++	chmod 644 $(TARGET_DIR)/lib/libuuid.a
++	cp -a $(TARGET_DIR)/lib/libuuid* $(STAGING_DIR)/lib
++	cp -a $(TARGET_DIR)/usr/include/uuid $(STAGING_DIR)/usr/include/
++
+ e2fsprogs: uclibc $(TARGET_DIR)/$(E2FSPROGS_TARGET_BINARY)
+ 
+ e2fsprogs-clean:
+ 	$(MAKE1) DESTDIR=$(TARGET_DIR) CC=$(TARGET_CC) -C $(E2FSPROGS_DIR) uninstall
+ 	-$(MAKE1) -C $(E2FSPROGS_DIR) clean
++	rm $(TARGET_DIR)/lib/libuuid.a
++	rm -rf $(TARGET_DIR)/usr/include/uuid
++	rm $(STAGING_DIR)/lib/libuuid*
++	rm -rf $(STAGING_DIR)/usr/include/uuid
+ 
+ e2fsprogs-dirclean:
+ 	rm -rf $(E2FSPROGS_DIR)

@@ -1,0 +1,18 @@
+diff -urN package/tftpd.orig/tftpd.mk package/tftpd/tftpd.mk
+--- package/tftpd.orig/tftpd.mk	2008-06-20 08:16:12.000000000 +0100
++++ package/tftpd/tftpd.mk	2008-06-20 16:29:20.000000000 +0100
+@@ -57,14 +57,10 @@
+ 	    set -x; \
+ 	    rm -f $(TARGET_DIR)/$(TFTP_HPA_TARGET_BINARY); \
+ 	    cp -a $(TFTP_HPA_DIR)/$(TFTP_HPA_BINARY) $(TARGET_DIR)/$(TFTP_HPA_TARGET_BINARY); fi
+-	@if [ ! -f $(TARGET_DIR)/etc/init.d/S80tftpd-hpa ]; then \
+-		$(INSTALL) -m 0755 package/tftpd/S80tftpd-hpa $(TARGET_DIR)/etc/init.d; \
+-	fi
+ 
+ tftpd: uclibc $(TARGET_DIR)/$(TFTP_HPA_TARGET_BINARY)
+ 
+ tftpd-clean:
+-	rm -f $(TARGET_DIR)/etc/init.d/S80tftpd-hpa
+ 	rm -f $(TARGET_DIR)/usr/sbin/in.tftpd
+ 	-$(MAKE) -C $(TFTP_HPA_DIR) clean
+ 

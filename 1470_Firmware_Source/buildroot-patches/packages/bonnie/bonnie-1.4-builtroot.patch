@@ -1,0 +1,1939 @@
+diff -purN bonnie/bonnie.c /usr/local/ARMLinux/trunk/vendor/buildroot/build_arm_nofpu/obonnie/bonnie.c
+--- bonnie/bonnie.c	1970-01-01 01:00:00.000000000 +0100
++++ /usr/local/ARMLinux/trunk/vendor/buildroot/build_arm_nofpu/obonnie/bonnie.c	2006-01-03 17:22:40.000000000 +0000
+@@ -0,0 +1,910 @@
++/*
++ * This is a file system benchmark which attempts to study bottlenecks -
++ * it is named 'Bonnie' after Bonnie Raitt, who knows how to use one.
++ * 
++ * Modified, 02/04/04, Kurt Garloff <garloff@suse.de>
++ * Compile fix (Direct_IO related) for non-Linux platforms
++ * Use small chunks (16k) in seek test to reproduce pre-1.3 results.
++ * 
++ * Modified, 02/02/20, Kurt Garloff <garloff@suse.de>
++ * Fix HTML formatting bug (thanks to Rupert Kolb)
++ * Support for Direct-IO (thanks to Chris Mason & Andrea Arcangeli)
++ * 
++ * Modified, 00/09/09, Kurt Garloff <garloff@suse.de>
++ * Put under CVS. Proper srand init for seeker processes.
++ * Fixed SEGV on cmd line parsing.
++ * 
++ * Modified, 00/08/30, Kurt Garloff <garloff@suse.de>
++ * -u enables the use of the putc/getc_unlocked versions
++ * machine name defaults to hostname now.
++ * 
++ * Modified, 00/01/26, Kurt Garloff <garloff@suse.de>
++ * -p sets number of seeker processes (SeekProcCount),
++ * -S the number of seeks. Optional -y causes data to be fsync()ed.
++ * 
++ * Modified, 00/01/15, Kurt Garloff <garloff@suse.de>:
++ * Report results immediately; warn if phys ram > test sz
++ * Tolerate optargs w/o space
++ * 
++ * Modified, 99/07/20, Kurt Garloff <garloff@suse.de>:
++ * Delete files when interrupted: delfiles(); breakhandler();
++ *
++ * Modified version of 25/4/99, by Jelle Foks:
++ * This version supports multiple volumes benchmarking, allowing for
++ * >2GB benchmarks on 32-bit operating systems. Use the '-v' option
++ * for this feature.
++ *
++ * Commentary on Bonnie's operations may be found at 
++ * http://www.textuality.com/bonnie/intro.html
++ *
++ * COPYRIGHT NOTICE: 
++ * Copyright (c) Tim Bray, 1990-1996.
++ * Copyright (c) Kurt Garloff, 1999-2002.
++ *
++ * Everybody is hereby granted rights to use, copy, and modify this program, 
++ *  provided only that this copyright notice and the disclaimer below
++ *  are preserved without change.
++ * DISCLAIMER:
++ * This program is provided AS IS with no warranty of any kind, and
++ * The author makes no representation with respect to the adequacy of this
++ *  program for any particular purpose or with respect to its adequacy to 
++ *  produce any particular result, and
++ * The author shall not be liable for loss or damage arising out of
++ *  the use of this program regardless of how sustained, and
++ * In no event shall the author be liable for special, direct, indirect
++ *  or consequential damage, loss, costs or fees or expenses of any
++ *  nature or kind.
++ */
++/* $Id: Bonnie.c,v 1.6 2002/04/04 12:59:46 garloff Exp $ */
++
++#include <unistd.h>
++#include <stdio.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <sys/types.h>
++#include <sys/time.h>
++#include <string.h>
++#if defined(SysV)
++#include <limits.h>
++#include <sys/times.h>
++#else
++#include <sys/resource.h>
++#endif
++
++/* these includes can safely be left out in many cases. 
++ * Included for less warnings with CFLAGS = -Wall */
++#include <sys/types.h>
++#include <sys/wait.h>
++#include <stdlib.h>
++
++#ifdef __linux__
++/* for o_direct */
++#include <asm/page.h>
++#endif
++
++#ifdef unix
++#include <signal.h>
++#endif
++
++#define IntSize (sizeof(int))
++
++/*
++ * N.B. in seeker_reports, CPU appears and Start/End time, but not Elapsed,
++ *  so position 1 is re-used; icky data coupling.
++ */
++#define CPU (0)
++#define Elapsed (1)
++#define StartTime (1)
++#define EndTime (2)
++//#define Seeks (4000)
++unsigned Seeks = 4000;
++#define UpdateSeek (10)
++//#define SeekProcCount (3)
++unsigned SeekProcCount = 3;
++#define Chunk (1<<20)
++#define SmallChunk (8192)
++#define SeekChunk (16384)
++
++#if defined(__linux__)
++//# include <asm/fcntl.h>
++# if !defined(O_DIRECT) && (defined(__alpha__) || defined(__i386__))
++#  define O_DIRECT 040000 /* direct disk access */
++# endif
++# ifdef O_DIRECT
++#  define SUPPORT_DIO
++# endif
++#endif
++
++/* labels for the tests, used as an array index */
++typedef enum
++{
++  Putc, ReWrite, FastWrite, Getc, FastRead, Lseek, TestCount
++} tests_t;
++
++static double cpu_so_far();
++static void   doseek(off_t where, int fd, int update);
++static void   get_delta_t(tests_t test);
++static void   io_error(char * message);
++static void   newfile(char * name, int * fd, FILE * * stream, int create, int volcnt, int o_dio);
++static void   delfiles ();
++#ifdef unix
++static void   breakhandler (int);
++#endif
++
++#if defined(SysV)
++/* System V wrappers for randomizers */
++static long   random();
++static void   srandom(int seed);
++#endif
++
++static void   report(char * machine, off_t size, int volumes);
++static void   write_html(char * machine, off_t size, int volumes);
++static double time_so_far();
++static void   timestamp();
++static void   usage();
++
++/* 
++ * Housekeeping variables to build up timestamps for the tests;
++ *  global to make it easy to keep track of the progress of time.
++ * all of this could have been done with non-global variables,
++ *  but the code is easier to read this way and I don't anticipate
++ *  much software engineering down the road 
++ */
++static int    basetime;                  /* when we started */
++static double delta[(int) TestCount][2]; /* array of DeltaT values */
++static double last_cpustamp = 0.0;       /* for computing delta-t */
++static double last_timestamp = 0.0;      /* for computing delta-t */
++
++static const char * version = "1.4";
++
++#define MAXVOLUMES 512
++
++char	name[SmallChunk];
++int	volumes = 1; /* number of volumes to work on */
++char 	dosync  = 0;
++char	useunlock = 0;
++char	doflshbf = 0;
++#ifdef SUPPORT_DIO
++char	o_direct = 0;
++#else 
++#define o_direct 0
++#endif
++
++int main(
++  int    argc,
++  char * argv[])
++{
++  char   *__buf ;
++  int    *buf ;
++  int    bufindex;
++  int    chars[256];
++  int    child;
++  char * dir;
++  int    html = 0;
++  int    fd[MAXVOLUMES];
++  double first_start = 0.0;
++  double last_stop = 0.0;
++  int    lseek_count = 0;
++  char   machine[64];
++  int    next;
++  int    seek_control[2];
++  int    seek_feedback[2];
++  char   *seek_tickets;
++  double seeker_report[3];
++  off_t  size;
++  int    memsz;
++  FILE * stream[MAXVOLUMES];
++  int	 volcnt;
++  register off_t  words;
++
++  __buf = malloc(Chunk + ~PAGE_MASK);
++  if (!__buf) 
++  {
++    fprintf(stderr, "unable to malloc %d bytes\n", Chunk + ~PAGE_MASK);
++    exit(1) ;
++  }
++  buf = (int *)((unsigned long)(__buf + ~PAGE_MASK) & PAGE_MASK);
++
++  basetime = (int) time((time_t *) NULL);
++  size = 100;
++  dir = ".";
++  gethostname (machine, 63);
++
++  /* pick apart args */
++  for (next = 1; next < argc; next++) {
++    int notyetparsed = 1;
++    if (next < argc - 1) {
++	notyetparsed = 0;
++	if (memcmp(argv[next], "-d", 2) == 0)
++		dir = (argv[next][2]? &argv[next][2]: argv[++next]);
++	else if (memcmp(argv[next], "-s", 2) == 0)
++		size = atol(argv[next][2]? &argv[next][2]: argv[++next]);
++	else if (memcmp(argv[next], "-v", 2) == 0)
++		volumes = atol(argv[next][2]? &argv[next][2]: argv[++next]);
++	else if (memcmp(argv[next], "-m", 2) == 0)
++		strncpy (machine, argv[next][2]? &argv[next][2]: argv[++next], 63);
++	else if (memcmp(argv[next], "-p", 2) == 0)
++		SeekProcCount = atol(argv[next][2]? &argv[next][2]: argv[++next]);
++	else if (memcmp(argv[next], "-S", 2) == 0)
++		Seeks = atol(argv[next][2]? &argv[next][2]: argv[++next]);
++	else notyetparsed = 1;
++    }
++    if (notyetparsed) {
++	if (memcmp(argv[next], "-y", 2) == 0)
++		dosync = 1;
++#if 0 //def __linux__
++	else if (memcmp(argv[next], "-Y", 2) == 0)
++		doflshbf = 1;
++#endif
++#if defined(__GLIBC__) && __GLIBC__ >= 2
++	else if (memcmp(argv[next], "-u", 2) == 0)
++		useunlock = 1;
++#endif
++	else if (strcmp(argv[next], "-html") == 0)
++		html = 1;
++#ifdef SUPPORT_DIO
++	else if (strcmp(argv[next], "-o_direct") == 0)
++		o_direct = 1;
++#endif	    
++	else
++		usage();
++    }
++  }
++
++  if (size < 1 || SeekProcCount < 1 || Seeks < 1000)
++    usage();
++  if (SeekProcCount > 128) SeekProcCount = 128;
++
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    fd[volcnt] = -1;
++
++#if defined(_SC_PHYS_PAGES)
++  memsz = sysconf (_SC_PHYS_PAGES);
++  memsz *= sysconf (_SC_PAGESIZE);
++  if (1024*1024*size <= memsz)
++  {
++	fprintf (stderr, "Bonnie: Warning: You have %iMB RAM, but you test with only %iMB datasize!\n",
++		memsz/(1024*1024), size);
++	fprintf (stderr, "Bonnie:          This might yield unrealistically good results,\n");
++	fprintf (stderr, "Bonnie:          for reading and seeking%s.\n",
++		 (dosync? "": " and writing"));
++  }
++#endif
++  /* sanity check - 32-bit machines can't handle more than 2047 Mb */
++  if (sizeof(off_t) <= 4 && size > 2047)
++  {
++    fprintf(stderr, "File too large for 32-bit machine, sorry\n");
++    fprintf(stderr, "Use multiple volumes instead (option -v)\n");
++    free(__buf) ;
++    exit(1);
++  }
++
++  /* sanity check on number of volumes */
++  if ((volumes > MAXVOLUMES)||(volumes < 1))
++  {
++   fprintf(stderr, "Volume count (%d) > %u or < 1, cannot work\n",volumes,MAXVOLUMES);
++  }
++
++  sync ();
++  sprintf(name, "%s/Bonnie.%d", dir, getpid());
++
++  /* size is in meg, rounded down to multiple of Chunk */
++  size *= (1024 * 1024);
++  size = Chunk * (size / Chunk);
++  fprintf(stderr, "Bonnie %s: File '%s', size: %ld, volumes: %d\n", version, name, size, volumes);
++  if (o_direct)
++    fprintf(stderr, "Using O_DIRECT for block based I/O\n");
++  sleep (1); sync ();
++
++  /* Install signal handlers */
++#ifdef unix
++  signal (SIGINT, breakhandler);
++  signal (SIGTERM, breakhandler);
++  signal (SIGHUP, breakhandler);
++  signal (SIGIO, breakhandler);
++#endif	
++  /* Fill up a file, writing it a char at a time with the stdio putc() call */
++#if defined(__GLIBC__) && __GLIBC__ >= 2
++  if (useunlock) 
++	fprintf(stderr, "Writing with putc_unlocked()...");
++  else
++#endif
++	fprintf(stderr, "Writing with putc()...         ");
++  fflush(stderr);
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    newfile(name, &fd[volcnt], &stream[volcnt], 1, volcnt, 0);
++
++  timestamp();
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++#if defined(__GLIBC__) && __GLIBC__ >= 2
++    if (useunlock)
++    {
++      for (words = 0; words < size; words++)
++        if (putc_unlocked(words & 0x7f, stream[volcnt]) == EOF)
++          io_error("putc_unlocked");
++    }
++    else 
++#endif
++    {
++      for (words = 0; words < size; words++)
++        if (putc(words & 0x7f, stream[volcnt]) == EOF)
++          io_error("putc");
++    }
++
++  /*
++   * note that we always close the file before measuring time, in an
++   *  effort to force as much of the I/O out as we can
++   */
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++  {
++    if (dosync || o_direct) 
++      fsync (fileno (stream[volcnt]));
++    if (fclose(stream[volcnt]) == -1)
++      io_error("fclose after putc");
++  }
++  get_delta_t(Putc);
++  fprintf(stderr, "done: %6d kB/s %5.1f %%CPU\n",
++	(int) (((double) size * (double) volumes) / (delta[(int) Putc][Elapsed] * 1024.0)),
++	delta[(int) Putc][CPU] / delta[(int) Putc][Elapsed] * 100.0);
++
++  /* Now read & rewrite it using block I/O.  Dirty one word in each block */
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    newfile(name, &fd[volcnt], &stream[volcnt], 0, volcnt, o_direct);
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    if (lseek(fd[volcnt], (off_t) 0, 0) == (off_t) -1)
++      io_error("lseek(2) before rewrite");
++  fprintf(stderr, "Rewriting... "); fflush(stderr);
++  timestamp();
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++  {
++    bufindex = 0;
++    if ((words = read(fd[volcnt], (char *) buf, Chunk)) == -1)
++      io_error("rewrite read");
++    while (words == Chunk)
++    { /* while we can read a block */
++      if (bufindex == Chunk / IntSize)
++        bufindex = 0;
++      buf[bufindex++]++;
++      if (lseek(fd[volcnt], (off_t) -words, 1) == -1)
++        io_error("relative lseek(2)");
++      if (write(fd[volcnt], (char *) buf, words) == -1)
++        io_error("re write(2)");
++      if ((words = read(fd[volcnt], (char *) buf, Chunk)) == -1)
++        io_error("rwrite read");
++    } /* while we can read a block */
++  }
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++  {
++    if (dosync) fsync (fd[volcnt]);
++    if (close(fd[volcnt]) == -1)
++      io_error("close after rewrite");
++  }
++  get_delta_t(ReWrite);
++  fprintf(stderr, "                  done: %6d kB/s %5.1f %%CPU\n",
++	(int) (((double) size * (double) volumes) / (delta[(int) ReWrite][Elapsed] * 1024.0)),
++	delta[(int) ReWrite][CPU] / delta[(int) ReWrite][Elapsed] * 100.0);
++
++  /* Write the whole file from scratch, again, with block I/O */
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    newfile(name, &fd[volcnt], &stream[volcnt], 1, volcnt, o_direct);
++  fprintf(stderr, "Writing intelligently... "); fflush(stderr);
++  for (words = 0; words < Chunk / IntSize; words++)
++    buf[words] = 0;
++  timestamp();
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    for (words = bufindex = 0; words < (size / Chunk); words++)
++    { /* for each word */
++      if (bufindex == (Chunk / IntSize))
++        bufindex = 0;
++      buf[bufindex++]++;
++      if (write(fd[volcnt], (char *) buf, Chunk) == -1)
++        io_error("write(2)");
++    } /* for each word */
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++  {
++    if (dosync) fsync (fd[volcnt]);
++    if (close(fd[volcnt]) == -1)
++      io_error("close after fast write");
++  }
++  get_delta_t(FastWrite);
++  fprintf(stderr, "      done: %6d kB/s %5.1f %%CPU\n",
++	(int) (((double) size * (double) volumes) / (delta[(int) FastWrite][Elapsed] * 1024.0)),
++	delta[(int) FastWrite][CPU] / delta[(int) FastWrite][Elapsed] * 100.0);
++
++  /* read them all back with getc() */
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    newfile(name, &fd[volcnt], &stream[volcnt], 0, volcnt, o_direct);
++  for (words = 0; words < 256; words++)
++    chars[words] = 0;
++#if defined(__GLIBC__) && __GLIBC__ >= 2
++  if (useunlock) 
++	fprintf(stderr, "Reading with getc_unlocked()...");
++  else  
++#endif
++	fprintf(stderr, "Reading with getc()...         ");
++  fflush(stderr);
++  timestamp();
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++#if defined(__GLIBC__) && __GLIBC__ >= 2
++    if (useunlock) 
++    {
++      for (words = 0; words < size; words++)
++      { /* for each byte */
++        if ((next = getc_unlocked(stream[volcnt])) == EOF)
++          io_error("getc_unlocked(3)");
++
++        /* just to fool optimizers */
++        chars[next]++;
++      } /* for each byte */
++    }
++    else
++#endif
++    {
++      for (words = 0; words < size; words++)
++      { /* for each byte */
++        if ((next = getc(stream[volcnt])) == EOF)
++          io_error("getc(3)");
++
++        /* just to fool optimizers */
++        chars[next]++;
++      } /* for each byte */
++    }
++		    
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    if (fclose(stream[volcnt]) == -1)
++      io_error("fclose after getc");
++  get_delta_t(Getc);
++  fprintf(stderr, "done: %6d kB/s %5.1f %%CPU\n",
++	(int) (((double) size * (double) volumes) / (delta[(int) Getc][Elapsed] * 1024.0)),
++	delta[(int) Getc][CPU] / delta[(int) Getc][Elapsed] * 100.0);
++
++  /* use the frequency count */
++  for (words = 0; words < 256; words++)
++    sprintf((char *) buf, "%d", chars[words]);
++
++  /* Now suck it in, Chunk at a time, as fast as we can */
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    newfile(name, &fd[volcnt], &stream[volcnt], 0, volcnt, o_direct);
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    if (lseek(fd[volcnt], (off_t) 0, 0) == -1)
++      io_error("lseek before read");
++  fprintf(stderr, "Reading intelligently... "); fflush(stderr);
++  timestamp();
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    do
++    { /* per block */
++      if ((words = read(fd[volcnt], (char *) buf, Chunk)) == -1)
++        io_error("read(2)");
++      chars[buf[abs(buf[0]) % (Chunk / IntSize)] & 0x7f]++;
++    } /* per block */
++    while (words);
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++    if (close(fd[volcnt]) == -1)
++      io_error("close after read");
++  get_delta_t(FastRead);
++  fprintf(stderr, "      done: %6d kB/s %5.1f %%CPU\n",
++	(int) (((double) size * (double) volumes) / (delta[(int) FastRead][Elapsed] * 1024.0)),
++	delta[(int) FastRead][CPU] / delta[(int) FastRead][Elapsed] * 100.0);
++
++  /* use the frequency count */
++  for (words = 0; words < 256; words++)
++    sprintf((char *) buf, "%d", chars[words]);
++
++  if (volumes != 1) 
++    fprintf(stderr,"Seek numbers calculated on first volume only\n");
++
++  /*
++   * Now test random seeks; first, set up for communicating with children.
++   * The object of the game is to do "Seeks" lseek() calls as quickly
++   *  as possible.  So we'll farm them out among SeekProcCount processes.
++   *  We'll control them by writing 1-byte tickets down a pipe which
++   *  the children all read.  We write "Seeks" bytes with val 1, whichever
++   *  child happens to get them does it and the right number of seeks get
++   *  done.
++   * The idea is that since the write() of the tickets is probably
++   *  atomic, the parent process likely won't get scheduled while the
++   *  children are seeking away.  If you draw a picture of the likely
++   *  timelines for three children, it seems likely that the seeks will
++   *  overlap very nicely with the process scheduling with the effect
++   *  that there will *always* be a seek() outstanding on the file.
++   * Question: should the file be opened *before* the fork, so that
++   *  all the children are lseeking on the same underlying file object?
++   */
++  seek_tickets = malloc (Seeks + SeekProcCount);
++  if (!seek_tickets) { 
++	fprintf (stderr, "No mem for tickets!\n"); 
++	delfiles (); free(__buf) ; exit (1); 
++  }
++  if (pipe(seek_feedback) == -1 || pipe(seek_control) == -1)
++    io_error("pipe");
++  for (next = 0; next < Seeks; next++)
++    seek_tickets[next] = 1;
++  for ( ; next < (Seeks + SeekProcCount); next++)
++    seek_tickets[next] = 0;
++
++  /* launch some parallel seek processes */
++  for (next = 0; next < SeekProcCount; next++)
++  { /* for each seek proc */
++    if ((child = fork()) == -1)
++      io_error("fork");
++    else if (child == 0)
++    { /* child process */
++
++      /* set up and wait for the go-ahead */
++      close(seek_feedback[0]);
++      close(seek_control[1]);
++      /* don't bother with direct io here */
++      newfile(name, &fd[0], &stream[0], 0, 0, 0);
++      srandom(getpid() ^ (int) time((time_t *) 0));
++      fprintf(stderr, "Seeker %d...", next + 1);
++
++      /* wait for the go-ahead */
++      if (read(seek_control[0], seek_tickets, 1) != 1)
++	io_error("read ticket");
++      timestamp();
++      seeker_report[StartTime] = time_so_far();
++
++      /* loop until we read a 0 ticket back from our parent */
++      while(seek_tickets[0])
++      { /* until Mom says stop */
++        doseek((long) (random() % (size / SeekChunk)), fd[0],
++	  ((lseek_count++ % UpdateSeek) == 0));
++	if (read(seek_control[0], seek_tickets, 1) != 1)
++	  io_error("read ticket");
++      } /* until Mom says stop */
++      if (close(fd[0]) == -1)
++        io_error("close after seek");
++
++      /* report to parent */
++      get_delta_t(Lseek);
++      seeker_report[EndTime] = time_so_far();
++      seeker_report[CPU] = delta[(int) Lseek][CPU];
++      if (write(seek_feedback[1], seeker_report, sizeof(seeker_report))
++          != sizeof(seeker_report))
++        io_error("pipe write");
++      exit(0);
++    } /* child process */
++  } /* for each seek proc */
++
++  /*
++   * Back in the parent; in an effort to ensure the children get an even
++   *  start, wait a few seconds for them to get scheduled, open their
++   *  files & so on.
++   */
++  close(seek_feedback[1]);
++  close(seek_control[0]);
++  sleep(2+(SeekProcCount+4)/8);
++  fprintf(stderr, "start 'em...");
++  if (write(seek_control[1], seek_tickets, (Seeks+SeekProcCount)) 
++      != (Seeks+SeekProcCount))
++    io_error("write tickets");
++  
++  /* read back from children */
++  for (next = 0; next < SeekProcCount; next++)
++  { /* for each child */
++    if (read(seek_feedback[0], (char *) seeker_report, sizeof(seeker_report))
++        != sizeof(seeker_report))
++      io_error("pipe read");
++
++    /*
++     * each child writes back its CPU, start & end times.  The elapsed time 
++     *  to do all the seeks is the time the first child started until the 
++     *  time the last child stopped
++     */
++    delta[(int) Lseek][CPU] += seeker_report[CPU];
++    if (next == 0)
++    { /* first time */
++      first_start = seeker_report[StartTime];
++      last_stop = seeker_report[EndTime];
++    } /* first time */
++    else
++    { /* not first time */
++      first_start = (first_start < seeker_report[StartTime]) ?
++	first_start : seeker_report[StartTime]; 
++      last_stop = (last_stop > seeker_report[EndTime]) ?
++	last_stop : seeker_report[EndTime]; 
++    } /* not first time */
++    if (wait(&child) == -1)
++      io_error("wait");
++    fprintf(stderr, "done...");
++  } /* for each child */
++  delta[(int) Lseek][Elapsed] = last_stop - first_start;
++  fprintf(stderr, "\n");
++
++  if (html)
++    write_html(machine, size, volumes);
++  else
++    report(machine, size, volumes);
++
++  delfiles ();
++  free(__buf) ;
++  return(0);
++}
++
++#define FLTBUFS 8
++char fltidx = 0;
++char fltbuf[8][FLTBUFS];
++char * cpupc (const int idx)
++{
++	double p = 100.0 * (double)delta[idx][CPU] / (double)delta[idx][Elapsed];
++	fltidx++; fltidx %= FLTBUFS;
++	if (p >= 99.95) sprintf (fltbuf[fltidx], "%4.0f", p);
++		else    sprintf (fltbuf[fltidx], "%4.1f", p);
++	return fltbuf[fltidx];
++}
++
++static void
++write_html(
++  char * machine,
++  off_t  size,
++  int volumes)
++{
++  printf("<TR><TD>%s</TD><TD>%ld * %d</TD>", machine, size / (1024 * 1024), volumes);
++  printf("<TD>%d</TD><TD>%s</TD><TD>%d</TD><TD>%s</TD><TD>%d</TD><TD>%s</TD>",
++    (int) (((double) size * (double) volumes) / (delta[(int) Putc][Elapsed] * 1024.0)),
++    cpupc(Putc),
++    (int) (((double) size * (double) volumes) / (delta[(int) FastWrite][Elapsed] * 1024.0)),
++    cpupc(FastWrite),
++    (int) (((double) size * (double) volumes) / (delta[(int) ReWrite][Elapsed] * 1024.0)),
++    cpupc(ReWrite));
++  printf("<TD>%d</TD><TD>%s</TD><TD>%d</TD><TD>%s</TD>",
++    (int) (((double) size * (double) volumes) / (delta[(int) Getc][Elapsed] * 1024.0)),
++    cpupc(Getc),
++    (int) (((double) size * (double) volumes) / (delta[(int) FastRead][Elapsed] * 1024.0)),
++    cpupc(FastRead));
++  printf("<TD>%6.1f</TD><TD>%s</TD></TR>\n",
++    ((double) Seeks) / delta[(int) Lseek][Elapsed],
++    cpupc(Lseek));
++}
++
++static void
++report(
++  char * machine,
++  off_t  size,
++  int volumes)
++{
++  printf("              ");
++  printf(
++    "---Sequential Output %s--- ---Sequential Input-- --Rnd Seek-\n",
++    (dosync? "(sync)--": "(nosync)"));
++  printf("              ");
++  if (o_direct && useunlock)
++  printf(
++    "-CharUnlk- -DIOBlock- -DRewrite- -CharUnlk- -DIOBlock- --%02ik (%02i)-\n",
++    (Seeks+500)/1000, SeekProcCount);
++  else if (o_direct && !useunlock)
++  printf(
++    "-Per Char- -DIOBlock- -DRewrite- -Per Char- -DIOBlock- --%02ik (%02i)-\n",
++    (Seeks+500)/1000, SeekProcCount);
++  else if (!o_direct && useunlock)
++  printf(
++    "-CharUnlk- --Block--- -Rewrite-- -CharUnlk- --Block--- --%02ik (%02i)-\n",
++    (Seeks+500)/1000, SeekProcCount);
++  else if (!o_direct && !useunlock)
++  printf(
++    "-Per Char- --Block--- -Rewrite-- -Per Char- --Block--- --%02ik (%02i)-\n",
++    (Seeks+500)/1000, SeekProcCount);
++	
++  printf("Machine    MB ");
++  printf("K/sec %%CPU K/sec %%CPU K/sec %%CPU K/sec %%CPU K/sec ");
++  printf("%%CPU   /sec %%CPU\n");
++
++  printf("%-6.6s %d*%4ld ", machine, volumes, size / (1024 * 1024));
++  printf("%5d %s%6d %s %5d %s ",
++    (int) (((double) size * (double) volumes) / (delta[(int) Putc][Elapsed] * 1024.0)),
++    cpupc(Putc),
++    (int) (((double) size * (double) volumes) / (delta[(int) FastWrite][Elapsed] * 1024.0)),
++    cpupc(FastWrite),
++    (int) (((double) size * (double) volumes) / (delta[(int) ReWrite][Elapsed] * 1024.0)),
++    cpupc(ReWrite));
++  printf("%5d %s%6d %s ",
++    (int) (((double) size * (double) volumes) / (delta[(int) Getc][Elapsed] * 1024.0)),
++    cpupc(Getc),
++    (int) (((double) size * (double) volumes) / (delta[(int) FastRead][Elapsed] * 1024.0)),
++    cpupc(FastRead));
++  printf("%6.1f %s\n",
++    ((double) Seeks) / delta[(int) Lseek][Elapsed],
++    cpupc(Lseek));
++}
++
++static void
++newfile(
++  char *   name,
++  int *    fd,
++  FILE * * stream,
++  int      create,
++  int      volcnt,
++  int	   o_dio)
++{
++  char fullname[SmallChunk];
++#ifdef SUPPORT_DIO	
++  int d_mask = o_dio ? O_DIRECT : 0;
++#else
++  int d_mask = 0;
++#endif
++  sprintf(fullname,"%s.%d",name,volcnt);
++  if (create)
++  { /* create from scratch */
++    if (unlink(fullname) == -1 && *fd != -1)
++      io_error("unlink");
++    *fd = open(fullname, O_RDWR | O_CREAT | O_EXCL | d_mask, 0777);
++  } /* create from scratch */
++  else
++    *fd = open(fullname, O_RDWR | d_mask, 0777);
++
++  if (*fd == -1)
++    io_error(fullname);
++  *stream = fdopen(*fd, "r+");
++  if (*stream == NULL)
++    io_error("fdopen");
++}
++
++static void
++usage()
++{
++  fprintf(stderr, "Bonnie %s: USAGE:\n", version);
++  fprintf(stderr,
++    "bonnie [-d scratch-dir] [-s size-in-Mb] [-v number-of-volumes] [-html]\n"
++    " [-m machine-label] [-p number-of-seekers] [-S seeks] [-y (=fsync)]\n"
++    " [-u (=unlocked)]");
++#ifdef SUPPORT_DIO
++  fprintf (stderr, " [-o_direct]\n");
++#else	
++  fprintf (stderr, "\n");
++#endif	
++  exit(1);
++}
++
++static void
++timestamp()
++{
++  last_timestamp = time_so_far();
++  last_cpustamp = cpu_so_far();
++}
++
++static void 
++get_delta_t(test)
++  tests_t test;
++{
++  int which = (int) test;
++
++  delta[which][Elapsed] = time_so_far() - last_timestamp;
++  delta[which][CPU] = cpu_so_far() - last_cpustamp;
++}
++
++static double 
++cpu_so_far()
++{
++#if defined(SysV)
++  struct tms tms;
++
++  if (times(&tms) == -1)
++    io_error("times");
++  return ((double) tms.tms_utime) / ((double) sysconf(_SC_CLK_TCK)) +
++    ((double) tms.tms_stime) / ((double) sysconf(_SC_CLK_TCK));
++
++#else
++  struct rusage rusage;
++
++  getrusage(RUSAGE_SELF, &rusage);
++  return
++    ((double) rusage.ru_utime.tv_sec) +
++      (((double) rusage.ru_utime.tv_usec) / 1000000.0) +
++        ((double) rusage.ru_stime.tv_sec) +
++          (((double) rusage.ru_stime.tv_usec) / 1000000.0);
++#endif
++}
++
++static double
++time_so_far()
++{
++#if defined(SysV)
++  int        val;
++  struct tms tms;
++
++  if ((val = times(&tms)) == -1)
++    io_error("times");
++
++  return ((double) val) / ((double) sysconf(_SC_CLK_TCK));
++
++#else
++  struct timeval tp;
++
++  if (gettimeofday(&tp, (struct timezone *) NULL) == -1)
++    io_error("gettimeofday");
++  return ((double) (tp.tv_sec - basetime)) +
++    (((double) tp.tv_usec) / 1000000.0);
++#endif
++}
++
++static void
++delfiles ()
++{
++  int volcnt;
++  for(volcnt = 0; volcnt < volumes; volcnt++)
++  {
++    char fullname[SmallChunk];
++    sprintf(fullname,"%s.%d",name,volcnt);
++    unlink(fullname);
++  }
++}
++
++
++static void
++io_error(char * message)
++{
++  char buf[SmallChunk];
++
++  delfiles ();
++  sprintf(buf, "Bonnie: drastic I/O error (%s)", message);
++  perror(buf);
++  exit(1);
++}
++
++#ifdef unix
++static void
++breakhandler (int sig)
++{
++  signal (sig, SIG_DFL);
++  delfiles ();
++  raise (sig);
++}
++#endif
++
++/*
++ * Do a typical-of-something random I/O.  Any serious application that
++ *  has a random I/O bottleneck is going to be smart enough to operate
++ *  in a page mode, and not stupidly pull individual words out at
++ *  odd offsets.  
++ * The 'where' argument is used as a chunk number
++ * To keep the cache from getting too clever, some pages must be updated.  
++ *  However an application that updated each of many random pages that 
++ *  it looked at is hard to imagine.  
++ * However, it would be wrong to put the update percentage in as a
++ *  parameter - the effect is too nonlinear.
++ */
++static void 
++doseek(
++  off_t where,
++  int   fd,
++  int   update)
++{
++  int   buf[Chunk / IntSize];
++  off_t probe;
++  off_t size;
++
++  probe = where * SeekChunk;
++  if (lseek(fd, probe, 0) != probe)
++    io_error("lseek in doseek");
++  if ((size = read(fd, (char *) buf, SeekChunk)) == -1)
++    io_error("read in doseek");
++
++  /* every so often, update a block */
++  if (update)
++  { /* update this block */
++
++    /* touch a word */
++    buf[((int) random() % (size/IntSize - 2)) + 1]--;
++    if (lseek(fd, (long) probe, 0) != probe)
++      io_error("lseek in doseek update");
++    if (write(fd, (char *) buf, size) == -1)
++      io_error("write in doseek");
++  } /* update this block */
++}
++  
++#if defined(SysV)
++static char randseed[32];
++
++static void
++srandom(int seed)
++{
++  sprintf(randseed, "%06d", seed);
++}
++
++static long
++random()
++{
++  return nrand48(randseed);
++}
++#endif
++
+diff -purN bonnie/Bonnie.c /usr/local/ARMLinux/trunk/vendor/buildroot/build_arm_nofpu/obonnie/Bonnie.c
+--- bonnie/Bonnie.c	2002-04-04 13:59:46.000000000 +0100
++++ /usr/local/ARMLinux/trunk/vendor/buildroot/build_arm_nofpu/obonnie/Bonnie.c	1970-01-01 01:00:00.000000000 +0100
+@@ -1,910 +0,0 @@
+-/*
+- * This is a file system benchmark which attempts to study bottlenecks -
+- * it is named 'Bonnie' after Bonnie Raitt, who knows how to use one.
+- * 
+- * Modified, 02/04/04, Kurt Garloff <garloff@suse.de>
+- * Compile fix (Direct_IO related) for non-Linux platforms
+- * Use small chunks (16k) in seek test to reproduce pre-1.3 results.
+- * 
+- * Modified, 02/02/20, Kurt Garloff <garloff@suse.de>
+- * Fix HTML formatting bug (thanks to Rupert Kolb)
+- * Support for Direct-IO (thanks to Chris Mason & Andrea Arcangeli)
+- * 
+- * Modified, 00/09/09, Kurt Garloff <garloff@suse.de>
+- * Put under CVS. Proper srand init for seeker processes.
+- * Fixed SEGV on cmd line parsing.
+- * 
+- * Modified, 00/08/30, Kurt Garloff <garloff@suse.de>
+- * -u enables the use of the putc/getc_unlocked versions
+- * machine name defaults to hostname now.
+- * 
+- * Modified, 00/01/26, Kurt Garloff <garloff@suse.de>
+- * -p sets number of seeker processes (SeekProcCount),
+- * -S the number of seeks. Optional -y causes data to be fsync()ed.
+- * 
+- * Modified, 00/01/15, Kurt Garloff <garloff@suse.de>:
+- * Report results immediately; warn if phys ram > test sz
+- * Tolerate optargs w/o space
+- * 
+- * Modified, 99/07/20, Kurt Garloff <garloff@suse.de>:
+- * Delete files when interrupted: delfiles(); breakhandler();
+- *
+- * Modified version of 25/4/99, by Jelle Foks:
+- * This version supports multiple volumes benchmarking, allowing for
+- * >2GB benchmarks on 32-bit operating systems. Use the '-v' option
+- * for this feature.
+- *
+- * Commentary on Bonnie's operations may be found at 
+- * http://www.textuality.com/bonnie/intro.html
+- *
+- * COPYRIGHT NOTICE: 
+- * Copyright (c) Tim Bray, 1990-1996.
+- * Copyright (c) Kurt Garloff, 1999-2002.
+- *
+- * Everybody is hereby granted rights to use, copy, and modify this program, 
+- *  provided only that this copyright notice and the disclaimer below
+- *  are preserved without change.
+- * DISCLAIMER:
+- * This program is provided AS IS with no warranty of any kind, and
+- * The author makes no representation with respect to the adequacy of this
+- *  program for any particular purpose or with respect to its adequacy to 
+- *  produce any particular result, and
+- * The author shall not be liable for loss or damage arising out of
+- *  the use of this program regardless of how sustained, and
+- * In no event shall the author be liable for special, direct, indirect
+- *  or consequential damage, loss, costs or fees or expenses of any
+- *  nature or kind.
+- */
+-/* $Id: Bonnie.c,v 1.6 2002/04/04 12:59:46 garloff Exp $ */
+-
+-#include <unistd.h>
+-#include <stdio.h>
+-#include <errno.h>
+-#include <fcntl.h>
+-#include <sys/types.h>
+-#include <sys/time.h>
+-#include <string.h>
+-#if defined(SysV)
+-#include <limits.h>
+-#include <sys/times.h>
+-#else
+-#include <sys/resource.h>
+-#endif
+-
+-/* these includes can safely be left out in many cases. 
+- * Included for less warnings with CFLAGS = -Wall */
+-#include <sys/types.h>
+-#include <sys/wait.h>
+-#include <stdlib.h>
+-
+-#ifdef __linux__
+-/* for o_direct */
+-#include <asm/page.h>
+-#endif
+-
+-#ifdef unix
+-#include <signal.h>
+-#endif
+-
+-#define IntSize (sizeof(int))
+-
+-/*
+- * N.B. in seeker_reports, CPU appears and Start/End time, but not Elapsed,
+- *  so position 1 is re-used; icky data coupling.
+- */
+-#define CPU (0)
+-#define Elapsed (1)
+-#define StartTime (1)
+-#define EndTime (2)
+-//#define Seeks (4000)
+-unsigned Seeks = 4000;
+-#define UpdateSeek (10)
+-//#define SeekProcCount (3)
+-unsigned SeekProcCount = 3;
+-#define Chunk (1<<20)
+-#define SmallChunk (8192)
+-#define SeekChunk (16384)
+-
+-#if defined(__linux__)
+-//# include <asm/fcntl.h>
+-# if !defined(O_DIRECT) && (defined(__alpha__) || defined(__i386__))
+-#  define O_DIRECT 040000 /* direct disk access */
+-# endif
+-# ifdef O_DIRECT
+-#  define SUPPORT_DIO
+-# endif
+-#endif
+-
+-/* labels for the tests, used as an array index */
+-typedef enum
+-{
+-  Putc, ReWrite, FastWrite, Getc, FastRead, Lseek, TestCount
+-} tests_t;
+-
+-static double cpu_so_far();
+-static void   doseek(off_t where, int fd, int update);
+-static void   get_delta_t(tests_t test);
+-static void   io_error(char * message);
+-static void   newfile(char * name, int * fd, FILE * * stream, int create, int volcnt, int o_dio);
+-static void   delfiles ();
+-#ifdef unix
+-static void   breakhandler (int);
+-#endif
+-
+-#if defined(SysV)
+-/* System V wrappers for randomizers */
+-static long   random();
+-static void   srandom(int seed);
+-#endif
+-
+-static void   report(char * machine, off_t size, int volumes);
+-static void   write_html(char * machine, off_t size, int volumes);
+-static double time_so_far();
+-static void   timestamp();
+-static void   usage();
+-
+-/* 
+- * Housekeeping variables to build up timestamps for the tests;
+- *  global to make it easy to keep track of the progress of time.
+- * all of this could have been done with non-global variables,
+- *  but the code is easier to read this way and I don't anticipate
+- *  much software engineering down the road 
+- */
+-static int    basetime;                  /* when we started */
+-static double delta[(int) TestCount][2]; /* array of DeltaT values */
+-static double last_cpustamp = 0.0;       /* for computing delta-t */
+-static double last_timestamp = 0.0;      /* for computing delta-t */
+-
+-static const char * version = "1.4";
+-
+-#define MAXVOLUMES 512
+-
+-char	name[SmallChunk];
+-int	volumes = 1; /* number of volumes to work on */
+-char 	dosync  = 0;
+-char	useunlock = 0;
+-char	doflshbf = 0;
+-#ifdef SUPPORT_DIO
+-char	o_direct = 0;
+-#else 
+-#define o_direct 0
+-#endif
+-
+-int main(
+-  int    argc,
+-  char * argv[])
+-{
+-  char   *__buf ;
+-  int    *buf ;
+-  int    bufindex;
+-  int    chars[256];
+-  int    child;
+-  char * dir;
+-  int    html = 0;
+-  int    fd[MAXVOLUMES];
+-  double first_start = 0.0;
+-  double last_stop = 0.0;
+-  int    lseek_count = 0;
+-  char   machine[64];
+-  int    next;
+-  int    seek_control[2];
+-  int    seek_feedback[2];
+-  char   *seek_tickets;
+-  double seeker_report[3];
+-  off_t  size;
+-  int    memsz;
+-  FILE * stream[MAXVOLUMES];
+-  int	 volcnt;
+-  register off_t  words;
+-
+-  __buf = malloc(Chunk + ~PAGE_MASK);
+-  if (!__buf) 
+-  {
+-    fprintf(stderr, "unable to malloc %d bytes\n", Chunk + ~PAGE_MASK);
+-    exit(1) ;
+-  }
+-  buf = (int *)((unsigned long)(__buf + ~PAGE_MASK) & PAGE_MASK);
+-
+-  basetime = (int) time((time_t *) NULL);
+-  size = 100;
+-  dir = ".";
+-  gethostname (machine, 63);
+-
+-  /* pick apart args */
+-  for (next = 1; next < argc; next++) {
+-    int notyetparsed = 1;
+-    if (next < argc - 1) {
+-	notyetparsed = 0;
+-	if (memcmp(argv[next], "-d", 2) == 0)
+-		dir = (argv[next][2]? &argv[next][2]: argv[++next]);
+-	else if (memcmp(argv[next], "-s", 2) == 0)
+-		size = atol(argv[next][2]? &argv[next][2]: argv[++next]);
+-	else if (memcmp(argv[next], "-v", 2) == 0)
+-		volumes = atol(argv[next][2]? &argv[next][2]: argv[++next]);
+-	else if (memcmp(argv[next], "-m", 2) == 0)
+-		strncpy (machine, argv[next][2]? &argv[next][2]: argv[++next], 63);
+-	else if (memcmp(argv[next], "-p", 2) == 0)
+-		SeekProcCount = atol(argv[next][2]? &argv[next][2]: argv[++next]);
+-	else if (memcmp(argv[next], "-S", 2) == 0)
+-		Seeks = atol(argv[next][2]? &argv[next][2]: argv[++next]);
+-	else notyetparsed = 1;
+-    }
+-    if (notyetparsed) {
+-	if (memcmp(argv[next], "-y", 2) == 0)
+-		dosync = 1;
+-#if 0 //def __linux__
+-	else if (memcmp(argv[next], "-Y", 2) == 0)
+-		doflshbf = 1;
+-#endif
+-#if defined(__GLIBC__) && __GLIBC__ >= 2
+-	else if (memcmp(argv[next], "-u", 2) == 0)
+-		useunlock = 1;
+-#endif
+-	else if (strcmp(argv[next], "-html") == 0)
+-		html = 1;
+-#ifdef SUPPORT_DIO
+-	else if (strcmp(argv[next], "-o_direct") == 0)
+-		o_direct = 1;
+-#endif	    
+-	else
+-		usage();
+-    }
+-  }
+-
+-  if (size < 1 || SeekProcCount < 1 || Seeks < 1000)
+-    usage();
+-  if (SeekProcCount > 128) SeekProcCount = 128;
+-
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    fd[volcnt] = -1;
+-
+-#if defined(_SC_PHYS_PAGES)
+-  memsz = sysconf (_SC_PHYS_PAGES);
+-  memsz *= sysconf (_SC_PAGESIZE);
+-  if (1024*1024*size <= memsz)
+-  {
+-	fprintf (stderr, "Bonnie: Warning: You have %iMB RAM, but you test with only %iMB datasize!\n",
+-		memsz/(1024*1024), size);
+-	fprintf (stderr, "Bonnie:          This might yield unrealistically good results,\n");
+-	fprintf (stderr, "Bonnie:          for reading and seeking%s.\n",
+-		 (dosync? "": " and writing"));
+-  }
+-#endif
+-  /* sanity check - 32-bit machines can't handle more than 2047 Mb */
+-  if (sizeof(off_t) <= 4 && size > 2047)
+-  {
+-    fprintf(stderr, "File too large for 32-bit machine, sorry\n");
+-    fprintf(stderr, "Use multiple volumes instead (option -v)\n");
+-    free(__buf) ;
+-    exit(1);
+-  }
+-
+-  /* sanity check on number of volumes */
+-  if ((volumes > MAXVOLUMES)||(volumes < 1))
+-  {
+-   fprintf(stderr, "Volume count (%d) > %u or < 1, cannot work\n",volumes,MAXVOLUMES);
+-  }
+-
+-  sync ();
+-  sprintf(name, "%s/Bonnie.%d", dir, getpid());
+-
+-  /* size is in meg, rounded down to multiple of Chunk */
+-  size *= (1024 * 1024);
+-  size = Chunk * (size / Chunk);
+-  fprintf(stderr, "Bonnie %s: File '%s', size: %ld, volumes: %d\n", version, name, size, volumes);
+-  if (o_direct)
+-    fprintf(stderr, "Using O_DIRECT for block based I/O\n");
+-  sleep (1); sync ();
+-
+-  /* Install signal handlers */
+-#ifdef unix
+-  signal (SIGINT, breakhandler);
+-  signal (SIGTERM, breakhandler);
+-  signal (SIGHUP, breakhandler);
+-  signal (SIGIO, breakhandler);
+-#endif	
+-  /* Fill up a file, writing it a char at a time with the stdio putc() call */
+-#if defined(__GLIBC__) && __GLIBC__ >= 2
+-  if (useunlock) 
+-	fprintf(stderr, "Writing with putc_unlocked()...");
+-  else
+-#endif
+-	fprintf(stderr, "Writing with putc()...         ");
+-  fflush(stderr);
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    newfile(name, &fd[volcnt], &stream[volcnt], 1, volcnt, 0);
+-
+-  timestamp();
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-#if defined(__GLIBC__) && __GLIBC__ >= 2
+-    if (useunlock)
+-    {
+-      for (words = 0; words < size; words++)
+-        if (putc_unlocked(words & 0x7f, stream[volcnt]) == EOF)
+-          io_error("putc_unlocked");
+-    }
+-    else 
+-#endif
+-    {
+-      for (words = 0; words < size; words++)
+-        if (putc(words & 0x7f, stream[volcnt]) == EOF)
+-          io_error("putc");
+-    }
+-
+-  /*
+-   * note that we always close the file before measuring time, in an
+-   *  effort to force as much of the I/O out as we can
+-   */
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-  {
+-    if (dosync || o_direct) 
+-      fsync (fileno (stream[volcnt]));
+-    if (fclose(stream[volcnt]) == -1)
+-      io_error("fclose after putc");
+-  }
+-  get_delta_t(Putc);
+-  fprintf(stderr, "done: %6d kB/s %5.1f %%CPU\n",
+-	(int) (((double) size * (double) volumes) / (delta[(int) Putc][Elapsed] * 1024.0)),
+-	delta[(int) Putc][CPU] / delta[(int) Putc][Elapsed] * 100.0);
+-
+-  /* Now read & rewrite it using block I/O.  Dirty one word in each block */
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    newfile(name, &fd[volcnt], &stream[volcnt], 0, volcnt, o_direct);
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    if (lseek(fd[volcnt], (off_t) 0, 0) == (off_t) -1)
+-      io_error("lseek(2) before rewrite");
+-  fprintf(stderr, "Rewriting... "); fflush(stderr);
+-  timestamp();
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-  {
+-    bufindex = 0;
+-    if ((words = read(fd[volcnt], (char *) buf, Chunk)) == -1)
+-      io_error("rewrite read");
+-    while (words == Chunk)
+-    { /* while we can read a block */
+-      if (bufindex == Chunk / IntSize)
+-        bufindex = 0;
+-      buf[bufindex++]++;
+-      if (lseek(fd[volcnt], (off_t) -words, 1) == -1)
+-        io_error("relative lseek(2)");
+-      if (write(fd[volcnt], (char *) buf, words) == -1)
+-        io_error("re write(2)");
+-      if ((words = read(fd[volcnt], (char *) buf, Chunk)) == -1)
+-        io_error("rwrite read");
+-    } /* while we can read a block */
+-  }
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-  {
+-    if (dosync) fsync (fd[volcnt]);
+-    if (close(fd[volcnt]) == -1)
+-      io_error("close after rewrite");
+-  }
+-  get_delta_t(ReWrite);
+-  fprintf(stderr, "                  done: %6d kB/s %5.1f %%CPU\n",
+-	(int) (((double) size * (double) volumes) / (delta[(int) ReWrite][Elapsed] * 1024.0)),
+-	delta[(int) ReWrite][CPU] / delta[(int) ReWrite][Elapsed] * 100.0);
+-
+-  /* Write the whole file from scratch, again, with block I/O */
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    newfile(name, &fd[volcnt], &stream[volcnt], 1, volcnt, o_direct);
+-  fprintf(stderr, "Writing intelligently... "); fflush(stderr);
+-  for (words = 0; words < Chunk / IntSize; words++)
+-    buf[words] = 0;
+-  timestamp();
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    for (words = bufindex = 0; words < (size / Chunk); words++)
+-    { /* for each word */
+-      if (bufindex == (Chunk / IntSize))
+-        bufindex = 0;
+-      buf[bufindex++]++;
+-      if (write(fd[volcnt], (char *) buf, Chunk) == -1)
+-        io_error("write(2)");
+-    } /* for each word */
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-  {
+-    if (dosync) fsync (fd[volcnt]);
+-    if (close(fd[volcnt]) == -1)
+-      io_error("close after fast write");
+-  }
+-  get_delta_t(FastWrite);
+-  fprintf(stderr, "      done: %6d kB/s %5.1f %%CPU\n",
+-	(int) (((double) size * (double) volumes) / (delta[(int) FastWrite][Elapsed] * 1024.0)),
+-	delta[(int) FastWrite][CPU] / delta[(int) FastWrite][Elapsed] * 100.0);
+-
+-  /* read them all back with getc() */
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    newfile(name, &fd[volcnt], &stream[volcnt], 0, volcnt, o_direct);
+-  for (words = 0; words < 256; words++)
+-    chars[words] = 0;
+-#if defined(__GLIBC__) && __GLIBC__ >= 2
+-  if (useunlock) 
+-	fprintf(stderr, "Reading with getc_unlocked()...");
+-  else  
+-#endif
+-	fprintf(stderr, "Reading with getc()...         ");
+-  fflush(stderr);
+-  timestamp();
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-#if defined(__GLIBC__) && __GLIBC__ >= 2
+-    if (useunlock) 
+-    {
+-      for (words = 0; words < size; words++)
+-      { /* for each byte */
+-        if ((next = getc_unlocked(stream[volcnt])) == EOF)
+-          io_error("getc_unlocked(3)");
+-
+-        /* just to fool optimizers */
+-        chars[next]++;
+-      } /* for each byte */
+-    }
+-    else
+-#endif
+-    {
+-      for (words = 0; words < size; words++)
+-      { /* for each byte */
+-        if ((next = getc(stream[volcnt])) == EOF)
+-          io_error("getc(3)");
+-
+-        /* just to fool optimizers */
+-        chars[next]++;
+-      } /* for each byte */
+-    }
+-		    
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    if (fclose(stream[volcnt]) == -1)
+-      io_error("fclose after getc");
+-  get_delta_t(Getc);
+-  fprintf(stderr, "done: %6d kB/s %5.1f %%CPU\n",
+-	(int) (((double) size * (double) volumes) / (delta[(int) Getc][Elapsed] * 1024.0)),
+-	delta[(int) Getc][CPU] / delta[(int) Getc][Elapsed] * 100.0);
+-
+-  /* use the frequency count */
+-  for (words = 0; words < 256; words++)
+-    sprintf((char *) buf, "%d", chars[words]);
+-
+-  /* Now suck it in, Chunk at a time, as fast as we can */
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    newfile(name, &fd[volcnt], &stream[volcnt], 0, volcnt, o_direct);
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    if (lseek(fd[volcnt], (off_t) 0, 0) == -1)
+-      io_error("lseek before read");
+-  fprintf(stderr, "Reading intelligently... "); fflush(stderr);
+-  timestamp();
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    do
+-    { /* per block */
+-      if ((words = read(fd[volcnt], (char *) buf, Chunk)) == -1)
+-        io_error("read(2)");
+-      chars[buf[abs(buf[0]) % (Chunk / IntSize)] & 0x7f]++;
+-    } /* per block */
+-    while (words);
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-    if (close(fd[volcnt]) == -1)
+-      io_error("close after read");
+-  get_delta_t(FastRead);
+-  fprintf(stderr, "      done: %6d kB/s %5.1f %%CPU\n",
+-	(int) (((double) size * (double) volumes) / (delta[(int) FastRead][Elapsed] * 1024.0)),
+-	delta[(int) FastRead][CPU] / delta[(int) FastRead][Elapsed] * 100.0);
+-
+-  /* use the frequency count */
+-  for (words = 0; words < 256; words++)
+-    sprintf((char *) buf, "%d", chars[words]);
+-
+-  if (volumes != 1) 
+-    fprintf(stderr,"Seek numbers calculated on first volume only\n");
+-
+-  /*
+-   * Now test random seeks; first, set up for communicating with children.
+-   * The object of the game is to do "Seeks" lseek() calls as quickly
+-   *  as possible.  So we'll farm them out among SeekProcCount processes.
+-   *  We'll control them by writing 1-byte tickets down a pipe which
+-   *  the children all read.  We write "Seeks" bytes with val 1, whichever
+-   *  child happens to get them does it and the right number of seeks get
+-   *  done.
+-   * The idea is that since the write() of the tickets is probably
+-   *  atomic, the parent process likely won't get scheduled while the
+-   *  children are seeking away.  If you draw a picture of the likely
+-   *  timelines for three children, it seems likely that the seeks will
+-   *  overlap very nicely with the process scheduling with the effect
+-   *  that there will *always* be a seek() outstanding on the file.
+-   * Question: should the file be opened *before* the fork, so that
+-   *  all the children are lseeking on the same underlying file object?
+-   */
+-  seek_tickets = malloc (Seeks + SeekProcCount);
+-  if (!seek_tickets) { 
+-	fprintf (stderr, "No mem for tickets!\n"); 
+-	delfiles (); free(__buf) ; exit (1); 
+-  }
+-  if (pipe(seek_feedback) == -1 || pipe(seek_control) == -1)
+-    io_error("pipe");
+-  for (next = 0; next < Seeks; next++)
+-    seek_tickets[next] = 1;
+-  for ( ; next < (Seeks + SeekProcCount); next++)
+-    seek_tickets[next] = 0;
+-
+-  /* launch some parallel seek processes */
+-  for (next = 0; next < SeekProcCount; next++)
+-  { /* for each seek proc */
+-    if ((child = fork()) == -1)
+-      io_error("fork");
+-    else if (child == 0)
+-    { /* child process */
+-
+-      /* set up and wait for the go-ahead */
+-      close(seek_feedback[0]);
+-      close(seek_control[1]);
+-      /* don't bother with direct io here */
+-      newfile(name, &fd[0], &stream[0], 0, 0, 0);
+-      srandom(getpid() ^ (int) time((time_t *) 0));
+-      fprintf(stderr, "Seeker %d...", next + 1);
+-
+-      /* wait for the go-ahead */
+-      if (read(seek_control[0], seek_tickets, 1) != 1)
+-	io_error("read ticket");
+-      timestamp();
+-      seeker_report[StartTime] = time_so_far();
+-
+-      /* loop until we read a 0 ticket back from our parent */
+-      while(seek_tickets[0])
+-      { /* until Mom says stop */
+-        doseek((long) (random() % (size / SeekChunk)), fd[0],
+-	  ((lseek_count++ % UpdateSeek) == 0));
+-	if (read(seek_control[0], seek_tickets, 1) != 1)
+-	  io_error("read ticket");
+-      } /* until Mom says stop */
+-      if (close(fd[0]) == -1)
+-        io_error("close after seek");
+-
+-      /* report to parent */
+-      get_delta_t(Lseek);
+-      seeker_report[EndTime] = time_so_far();
+-      seeker_report[CPU] = delta[(int) Lseek][CPU];
+-      if (write(seek_feedback[1], seeker_report, sizeof(seeker_report))
+-          != sizeof(seeker_report))
+-        io_error("pipe write");
+-      exit(0);
+-    } /* child process */
+-  } /* for each seek proc */
+-
+-  /*
+-   * Back in the parent; in an effort to ensure the children get an even
+-   *  start, wait a few seconds for them to get scheduled, open their
+-   *  files & so on.
+-   */
+-  close(seek_feedback[1]);
+-  close(seek_control[0]);
+-  sleep(2+(SeekProcCount+4)/8);
+-  fprintf(stderr, "start 'em...");
+-  if (write(seek_control[1], seek_tickets, (Seeks+SeekProcCount)) 
+-      != (Seeks+SeekProcCount))
+-    io_error("write tickets");
+-  
+-  /* read back from children */
+-  for (next = 0; next < SeekProcCount; next++)
+-  { /* for each child */
+-    if (read(seek_feedback[0], (char *) seeker_report, sizeof(seeker_report))
+-        != sizeof(seeker_report))
+-      io_error("pipe read");
+-
+-    /*
+-     * each child writes back its CPU, start & end times.  The elapsed time 
+-     *  to do all the seeks is the time the first child started until the 
+-     *  time the last child stopped
+-     */
+-    delta[(int) Lseek][CPU] += seeker_report[CPU];
+-    if (next == 0)
+-    { /* first time */
+-      first_start = seeker_report[StartTime];
+-      last_stop = seeker_report[EndTime];
+-    } /* first time */
+-    else
+-    { /* not first time */
+-      first_start = (first_start < seeker_report[StartTime]) ?
+-	first_start : seeker_report[StartTime]; 
+-      last_stop = (last_stop > seeker_report[EndTime]) ?
+-	last_stop : seeker_report[EndTime]; 
+-    } /* not first time */
+-    if (wait(&child) == -1)
+-      io_error("wait");
+-    fprintf(stderr, "done...");
+-  } /* for each child */
+-  delta[(int) Lseek][Elapsed] = last_stop - first_start;
+-  fprintf(stderr, "\n");
+-
+-  if (html)
+-    write_html(machine, size, volumes);
+-  else
+-    report(machine, size, volumes);
+-
+-  delfiles ();
+-  free(__buf) ;
+-  return(0);
+-}
+-
+-#define FLTBUFS 8
+-char fltidx = 0;
+-char fltbuf[8][FLTBUFS];
+-char * cpupc (const int idx)
+-{
+-	double p = 100.0 * (double)delta[idx][CPU] / (double)delta[idx][Elapsed];
+-	fltidx++; fltidx %= FLTBUFS;
+-	if (p >= 99.95) sprintf (fltbuf[fltidx], "%4.0f", p);
+-		else    sprintf (fltbuf[fltidx], "%4.1f", p);
+-	return fltbuf[fltidx];
+-}
+-
+-static void
+-write_html(
+-  char * machine,
+-  off_t  size,
+-  int volumes)
+-{
+-  printf("<TR><TD>%s</TD><TD>%ld * %d</TD>", machine, size / (1024 * 1024), volumes);
+-  printf("<TD>%d</TD><TD>%s</TD><TD>%d</TD><TD>%s</TD><TD>%d</TD><TD>%s</TD>",
+-    (int) (((double) size * (double) volumes) / (delta[(int) Putc][Elapsed] * 1024.0)),
+-    cpupc(Putc),
+-    (int) (((double) size * (double) volumes) / (delta[(int) FastWrite][Elapsed] * 1024.0)),
+-    cpupc(FastWrite),
+-    (int) (((double) size * (double) volumes) / (delta[(int) ReWrite][Elapsed] * 1024.0)),
+-    cpupc(ReWrite));
+-  printf("<TD>%d</TD><TD>%s</TD><TD>%d</TD><TD>%s</TD>",
+-    (int) (((double) size * (double) volumes) / (delta[(int) Getc][Elapsed] * 1024.0)),
+-    cpupc(Getc),
+-    (int) (((double) size * (double) volumes) / (delta[(int) FastRead][Elapsed] * 1024.0)),
+-    cpupc(FastRead));
+-  printf("<TD>%6.1f</TD><TD>%s</TD></TR>\n",
+-    ((double) Seeks) / delta[(int) Lseek][Elapsed],
+-    cpupc(Lseek));
+-}
+-
+-static void
+-report(
+-  char * machine,
+-  off_t  size,
+-  int volumes)
+-{
+-  printf("              ");
+-  printf(
+-    "---Sequential Output %s--- ---Sequential Input-- --Rnd Seek-\n",
+-    (dosync? "(sync)--": "(nosync)"));
+-  printf("              ");
+-  if (o_direct && useunlock)
+-  printf(
+-    "-CharUnlk- -DIOBlock- -DRewrite- -CharUnlk- -DIOBlock- --%02ik (%02i)-\n",
+-    (Seeks+500)/1000, SeekProcCount);
+-  else if (o_direct && !useunlock)
+-  printf(
+-    "-Per Char- -DIOBlock- -DRewrite- -Per Char- -DIOBlock- --%02ik (%02i)-\n",
+-    (Seeks+500)/1000, SeekProcCount);
+-  else if (!o_direct && useunlock)
+-  printf(
+-    "-CharUnlk- --Block--- -Rewrite-- -CharUnlk- --Block--- --%02ik (%02i)-\n",
+-    (Seeks+500)/1000, SeekProcCount);
+-  else if (!o_direct && !useunlock)
+-  printf(
+-    "-Per Char- --Block--- -Rewrite-- -Per Char- --Block--- --%02ik (%02i)-\n",
+-    (Seeks+500)/1000, SeekProcCount);
+-	
+-  printf("Machine    MB ");
+-  printf("K/sec %%CPU K/sec %%CPU K/sec %%CPU K/sec %%CPU K/sec ");
+-  printf("%%CPU   /sec %%CPU\n");
+-
+-  printf("%-6.6s %d*%4ld ", machine, volumes, size / (1024 * 1024));
+-  printf("%5d %s%6d %s %5d %s ",
+-    (int) (((double) size * (double) volumes) / (delta[(int) Putc][Elapsed] * 1024.0)),
+-    cpupc(Putc),
+-    (int) (((double) size * (double) volumes) / (delta[(int) FastWrite][Elapsed] * 1024.0)),
+-    cpupc(FastWrite),
+-    (int) (((double) size * (double) volumes) / (delta[(int) ReWrite][Elapsed] * 1024.0)),
+-    cpupc(ReWrite));
+-  printf("%5d %s%6d %s ",
+-    (int) (((double) size * (double) volumes) / (delta[(int) Getc][Elapsed] * 1024.0)),
+-    cpupc(Getc),
+-    (int) (((double) size * (double) volumes) / (delta[(int) FastRead][Elapsed] * 1024.0)),
+-    cpupc(FastRead));
+-  printf("%6.1f %s\n",
+-    ((double) Seeks) / delta[(int) Lseek][Elapsed],
+-    cpupc(Lseek));
+-}
+-
+-static void
+-newfile(
+-  char *   name,
+-  int *    fd,
+-  FILE * * stream,
+-  int      create,
+-  int      volcnt,
+-  int	   o_dio)
+-{
+-  char fullname[SmallChunk];
+-#ifdef SUPPORT_DIO	
+-  int d_mask = o_dio ? O_DIRECT : 0;
+-#else
+-  int d_mask = 0;
+-#endif
+-  sprintf(fullname,"%s.%d",name,volcnt);
+-  if (create)
+-  { /* create from scratch */
+-    if (unlink(fullname) == -1 && *fd != -1)
+-      io_error("unlink");
+-    *fd = open(fullname, O_RDWR | O_CREAT | O_EXCL | d_mask, 0777);
+-  } /* create from scratch */
+-  else
+-    *fd = open(fullname, O_RDWR | d_mask, 0777);
+-
+-  if (*fd == -1)
+-    io_error(fullname);
+-  *stream = fdopen(*fd, "r+");
+-  if (*stream == NULL)
+-    io_error("fdopen");
+-}
+-
+-static void
+-usage()
+-{
+-  fprintf(stderr, "Bonnie %s: USAGE:\n", version);
+-  fprintf(stderr,
+-    "bonnie [-d scratch-dir] [-s size-in-Mb] [-v number-of-volumes] [-html]\n"
+-    " [-m machine-label] [-p number-of-seekers] [-S seeks] [-y (=fsync)]\n"
+-    " [-u (=unlocked)]");
+-#ifdef SUPPORT_DIO
+-  fprintf (stderr, " [-o_direct]\n");
+-#else	
+-  fprintf (stderr, "\n");
+-#endif	
+-  exit(1);
+-}
+-
+-static void
+-timestamp()
+-{
+-  last_timestamp = time_so_far();
+-  last_cpustamp = cpu_so_far();
+-}
+-
+-static void 
+-get_delta_t(test)
+-  tests_t test;
+-{
+-  int which = (int) test;
+-
+-  delta[which][Elapsed] = time_so_far() - last_timestamp;
+-  delta[which][CPU] = cpu_so_far() - last_cpustamp;
+-}
+-
+-static double 
+-cpu_so_far()
+-{
+-#if defined(SysV)
+-  struct tms tms;
+-
+-  if (times(&tms) == -1)
+-    io_error("times");
+-  return ((double) tms.tms_utime) / ((double) sysconf(_SC_CLK_TCK)) +
+-    ((double) tms.tms_stime) / ((double) sysconf(_SC_CLK_TCK));
+-
+-#else
+-  struct rusage rusage;
+-
+-  getrusage(RUSAGE_SELF, &rusage);
+-  return
+-    ((double) rusage.ru_utime.tv_sec) +
+-      (((double) rusage.ru_utime.tv_usec) / 1000000.0) +
+-        ((double) rusage.ru_stime.tv_sec) +
+-          (((double) rusage.ru_stime.tv_usec) / 1000000.0);
+-#endif
+-}
+-
+-static double
+-time_so_far()
+-{
+-#if defined(SysV)
+-  int        val;
+-  struct tms tms;
+-
+-  if ((val = times(&tms)) == -1)
+-    io_error("times");
+-
+-  return ((double) val) / ((double) sysconf(_SC_CLK_TCK));
+-
+-#else
+-  struct timeval tp;
+-
+-  if (gettimeofday(&tp, (struct timezone *) NULL) == -1)
+-    io_error("gettimeofday");
+-  return ((double) (tp.tv_sec - basetime)) +
+-    (((double) tp.tv_usec) / 1000000.0);
+-#endif
+-}
+-
+-static void
+-delfiles ()
+-{
+-  int volcnt;
+-  for(volcnt = 0; volcnt < volumes; volcnt++)
+-  {
+-    char fullname[SmallChunk];
+-    sprintf(fullname,"%s.%d",name,volcnt);
+-    unlink(fullname);
+-  }
+-}
+-
+-
+-static void
+-io_error(char * message)
+-{
+-  char buf[SmallChunk];
+-
+-  delfiles ();
+-  sprintf(buf, "Bonnie: drastic I/O error (%s)", message);
+-  perror(buf);
+-  exit(1);
+-}
+-
+-#ifdef unix
+-static void
+-breakhandler (int sig)
+-{
+-  signal (sig, SIG_DFL);
+-  delfiles ();
+-  raise (sig);
+-}
+-#endif
+-
+-/*
+- * Do a typical-of-something random I/O.  Any serious application that
+- *  has a random I/O bottleneck is going to be smart enough to operate
+- *  in a page mode, and not stupidly pull individual words out at
+- *  odd offsets.  
+- * The 'where' argument is used as a chunk number
+- * To keep the cache from getting too clever, some pages must be updated.  
+- *  However an application that updated each of many random pages that 
+- *  it looked at is hard to imagine.  
+- * However, it would be wrong to put the update percentage in as a
+- *  parameter - the effect is too nonlinear.
+- */
+-static void 
+-doseek(
+-  off_t where,
+-  int   fd,
+-  int   update)
+-{
+-  int   buf[Chunk / IntSize];
+-  off_t probe;
+-  off_t size;
+-
+-  probe = where * SeekChunk;
+-  if (lseek(fd, probe, 0) != probe)
+-    io_error("lseek in doseek");
+-  if ((size = read(fd, (char *) buf, SeekChunk)) == -1)
+-    io_error("read in doseek");
+-
+-  /* every so often, update a block */
+-  if (update)
+-  { /* update this block */
+-
+-    /* touch a word */
+-    buf[((int) random() % (size/IntSize - 2)) + 1]--;
+-    if (lseek(fd, (long) probe, 0) != probe)
+-      io_error("lseek in doseek update");
+-    if (write(fd, (char *) buf, size) == -1)
+-      io_error("write in doseek");
+-  } /* update this block */
+-}
+-  
+-#if defined(SysV)
+-static char randseed[32];
+-
+-static void
+-srandom(int seed)
+-{
+-  sprintf(randseed, "%06d", seed);
+-}
+-
+-static long
+-random()
+-{
+-  return nrand48(randseed);
+-}
+-#endif
+-
+Binary files bonnie/bonnie.o and /usr/local/ARMLinux/trunk/vendor/buildroot/build_arm_nofpu/obonnie/bonnie.o differ
+diff -purN bonnie/Makefile /usr/local/ARMLinux/trunk/vendor/buildroot/build_arm_nofpu/obonnie/Makefile
+--- bonnie/Makefile	2002-02-20 18:22:55.000000000 +0000
++++ /usr/local/ARMLinux/trunk/vendor/buildroot/build_arm_nofpu/obonnie/Makefile	2006-01-03 17:22:40.000000000 +0000
+@@ -1,34 +1,75 @@
+ # Bonnie Makefile
+ 
+-# For Linux use -O2
+-CFLAGS = -O2 $(SYSFLAGS)
+-#CFLAGS = -O $(SYSFLAGS)
+-#CC = cc
+-
+-DESTDIR =
+-PREFIX = /usr
+-MANDIR = $(PREFIX)/share/man
+-
+-bsd:	
+-	@echo 'Options are "make bsd" and "make SysV" - the default is "bsd".'
+-	@echo 'If you get messages about missing functions, try "make SysV."'
+-	$(MAKE) Bonnie 
+-
+-SysV:	
+-	$(MAKE) Bonnie 'SYSFLAGS=-DSysV'
+-
+-Bonnie:	
+-
+-
+-# Added 99/07/20, <garloff@suse.de>
+-install: Bonnie
+-	install -d $(DESTDIR)$(PREFIX)/bin
+-	install -s -m 0755 -o root -g root Bonnie $(DESTDIR)$(PREFIX)/bin/bonnie
+-	install -d $(DESTDIR)$(MANDIR)/man1
+-	install -m 0644 -o man -g root bonnie.1 $(DESTDIR)$(MANDIR)/man1/bonnie.1
+-	gzip -9f $(DESTDIR)$(MANDIR)/man1/bonnie.1
+-	
+-clean: 
+-	rm -f Bonnie
+ 
+-	
++PROG      := bonnie
++
++# If you want a static binary, turn this on.
++DOSTATIC = false
++
++# Set the following to `true' to make a debuggable build.
++# Leave this set to `false' for production use.
++DODEBUG = false
++
++# If you want large file summit support, turn this on.
++# This has no effect if you don't have a kernel with lfs
++# support, and a system with libc-2.1.3 or later.
++# LFS allows support for files larger than 2GB!
++DOLFS = true
++
++
++
++# If you are running a cross compiler, you may want to set this
++# to something more interesting, like "powerpc-linux-".
++CROSS = ../../build_arm/staging_dir/usr/bin/arm-linux-uclibcgnueabi-
++CC = $(CROSS)gcc
++AR = $(CROSS)ar
++STRIPTOOL = $(CROSS)strip
++
++WARNINGS=-Wall -Wmissing-prototypes -Wstrict-prototypes #-Wshadow
++CFLAGS=-fomit-frame-pointer
++
++# A nifty macro to make testing gcc features easier
++check_gcc=$(shell if $(CC) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; \
++	then echo "$(1)"; else echo "$(2)"; fi)
++
++# use '-Os' optimization if available, else use -O2
++OPTIMIZATION=
++OPTIMIZATION=${call check_gcc,-Os,-O2}
++
++ifeq ($(strip $(DOLFS)),true)
++    # For large file summit support
++    CFLAGS+=-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
++endif
++ifeq ($(strip $(DODEBUG)),true)
++    CFLAGS  += $(WARNINGS) -g -D_GNU_SOURCE
++    LDFLAGS += -Wl,-warn-common
++    STRIP    =
++else
++    CFLAGS  += $(WARNINGS) $(OPTIMIZATION) -fomit-frame-pointer -D_GNU_SOURCE
++    LDFLAGS += -s -Wl,-warn-common
++    STRIP    = $(STRIPTOOL) --remove-section=.note --remove-section=.comment $(PROG)
++endif
++ifeq ($(strip $(DOSTATIC)),true)
++    LDFLAGS += --static
++endif
++
++ifndef $(PREFIX)
++    PREFIX = `pwd`/_install
++endif
++
++SOURCE=$(PROG).c
++OBJS=$(patsubst %.c,%.o, $(SOURCE))
++
++all: $(OBJS) $(PROG)
++
++$(PROG): $(OBJS)
++	$(CC) -s $(LDFLAGS) $(OBJS) -o $(PROG)
++	$(STRIPTOOL) --remove-section=.note --remove-section=.comment $(PROG)
++
++$(OBJS): %.o: %.c Makefile 
++	$(CC) $(CFLAGS) -c $*.c -o $*.o
++
++clean:
++	rm -f *.o core $(PROG)
++
++

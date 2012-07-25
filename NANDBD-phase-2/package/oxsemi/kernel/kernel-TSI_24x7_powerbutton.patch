@@ -1,0 +1,748 @@
+diff -Naur linux-kernel.LANCE/arch/arm/plat-oxnas/Makefile linux-kernel.LANCE+TSI/arch/arm/plat-oxnas/Makefile
+--- linux-kernel.LANCE/arch/arm/plat-oxnas/Makefile	2011-03-25 01:50:18.000000000 -0700
++++ linux-kernel.LANCE+TSI/arch/arm/plat-oxnas/Makefile	2011-09-19 18:48:03.000000000 -0700
+@@ -13,6 +13,8 @@
+ obj-y += filter_misc.o
+ obj-y += prealloc_init.o
+ 
++obj-y += power_button.o
++
+ obj-$(CONFIG_OXNAS_FAST_OPEN_FILTER) += fast_open_filter.o
+ 
+ obj-$(CONFIG_OXNAS_ZERO_COPY_RX_SUPPORT) += oxnas_net.o
+@@ -33,8 +35,8 @@
+ obj-$(CONFIG_OXNAS_PHY_TEMPERATURE_MODULE)	+= phy-temp-monitor.o
+ obj-$(CONFIG_I2S)				+= i2s.o
+ obj-$(CONFIG_OXNAS_USB_TEST_MODES)		+= usb-test-mode.o
+-obj-$(CONFIG_LEON_POWER_BUTTON_MONITOR)		+= power_button.o
+-obj-$(CONFIG_USER_RECOVERY_BUTTON_MONITOR)	+= user_recovery_button.o
++###obj-$(CONFIG_LEON_POWER_BUTTON_MONITOR)		+= power_button.o
++###obj-$(CONFIG_USER_RECOVERY_BUTTON_MONITOR)	+= user_recovery_button.o
+ obj-$(CONFIG_LEON_WATCHDOG_MODULE)		+= watchdog.o
+ obj-$(CONFIG_VENDOR_SCSI_SMD_IF_MODULE)		+= vendor_scsi.o
+ obj-$(CONFIG_OXNAS_GPIO_TEST)			+= ox820_gpio.o
+diff -Naur linux-kernel.LANCE/arch/arm/plat-oxnas/power_button.c linux-kernel.LANCE+TSI/arch/arm/plat-oxnas/power_button.c
+--- linux-kernel.LANCE/arch/arm/plat-oxnas/power_button.c	2011-03-25 01:50:18.000000000 -0700
++++ linux-kernel.LANCE+TSI/arch/arm/plat-oxnas/power_button.c	2011-09-19 18:48:27.000000000 -0700
+@@ -1,7 +1,7 @@
+ /*
+- * linux/arch/arm/mach-oxnas/power_button.c
++ * linux/arch/arm/plat-oxnas/power_button.c
+  *
+- * Copyright (C) 2006,2009 Oxford Semiconductor Ltd
++ * Copyright (C) 2010 PLX Technology Inc
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -17,10 +17,23 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
++
++/**
++ * basic idea of this module is:
++ *  flash LED slowly until userspace says booting is done, then solid
++ *  flash LED slowly when notified that reboot initiated
++ *  flash LED rapidly when notified that reset-to-factory-defaults initiated
++ *  hold power button down for 3 seconds, do nice poweroff, led flashes slowly
++ *  hold power button down for 10 seconds, reset to factory defaults, led flashes rapidly
++ *
++ * code is a bit verbose and abstract so I can visually check it for correctness 
++ */
++
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
+ #include <linux/timer.h>
++#include <linux/sysfs.h>
+ #include <linux/kobject.h>
+ #include <linux/workqueue.h>
+ #include <linux/io.h>
+@@ -28,236 +41,549 @@
+ 
+ MODULE_LICENSE("GPL v2");
+ 
+-// Global variable to hold LED inversion state
+-extern int oxnas_global_invert_leds;
+-
+-// Make a module parameter to set whether LEDs are inverted 
+-static int invert_leds = 0;
+-module_param(invert_leds, bool, S_IRUGO|S_IWUSR);
+-
+-#define DEFAULT_TIMER_COUNT_LIMIT 24	/* In eigths of a second */
++#define DEMO_BUTTON_GPIO    11
++#define DEMO_LED             26
+ 
+-static int timer_count_limit = DEFAULT_TIMER_COUNT_LIMIT;
+-module_param(timer_count_limit, int, S_IRUGO|S_IWUSR);
+-
+-#if (CONFIG_OXNAS_POWER_BUTTON_GPIO < SYS_CTRL_NUM_PINS)
+-#define SWITCH_NUM          CONFIG_OXNAS_POWER_BUTTON_GPIO
++#define SWITCH_NUM          DEMO_BUTTON_GPIO
+ #define IRQ_NUM             GPIOA_INTERRUPT
+ #define INT_STATUS_REG      GPIO_A_INTERRUPT_EVENT
+ #define SWITCH_CLR_OE_REG   GPIO_A_OUTPUT_ENABLE_CLEAR
+ #define DEBOUNCE_REG        GPIO_A_INPUT_DEBOUNCE_ENABLE
+ #define LEVEL_INT_REG       GPIO_A_LEVEL_INTERRUPT_ENABLE
+ #define FALLING_INT_REG     GPIO_A_FALLING_EDGE_ACTIVE_LOW_ENABLE
++#define RISING_INT_REG      GPIO_A_RISING_EDGE_ACTIVE_HIGH_ENABLE
+ #define DATA_REG            GPIO_A_DATA
+-#else
+-#define SWITCH_NUM          (CONFIG_OXNAS_POWER_BUTTON_GPIO - SYS_CTRL_NUM_PINS)
+-#define IRQ_NUM             GPIOB_INTERRUPT
+-#define INT_STATUS_REG      GPIO_B_INTERRUPT_EVENT
+-#define SWITCH_CLR_OE_REG   GPIO_B_OUTPUT_ENABLE_CLEAR
+-#define DEBOUNCE_REG        GPIO_B_INPUT_DEBOUNCE_ENABLE
+-#define LEVEL_INT_REG       GPIO_B_LEVEL_INTERRUPT_ENABLE
+-#define FALLING_INT_REG     GPIO_B_FALLING_EDGE_ACTIVE_LOW_ENABLE
+-#define DATA_REG            GPIO_B_DATA
+-#endif
+ 
+ #define SWITCH_MASK (1UL << (SWITCH_NUM))
+-
+-#define TIMER_INTERVAL_JIFFIES  ((HZ) >> 3) /* An eigth of a second */
++#define LED_MASK    (1UL << (DEMO_LED))
+ 
+ extern spinlock_t oxnas_gpio_spinlock;
+ 
+-static unsigned long count;
+-static struct timer_list timer;
++#define DEBUG
+ 
+-/** Have to use active low level interupt generation, as otherwise might miss
+- *  interrupts that arrive concurrently with a PCI interrupt, as PCI interrupts
+- *  are generated via GPIO pins and std PCI drivers will not know that there
+- *  may be other pending GPIO interrupt sources waiting to be serviced and will
+- *  simply return IRQ_HANDLED if they see themselves as having generated the
+- *  interrupt, thus preventing later chained handlers from being called
++#ifdef DEBUG
++#define db_print(...) printk(__VA_ARGS__)
++void dump_regs(void) {
++	struct {
++		char * name;
++		unsigned int reg_p;
++	} list[] =
++		  { 
++			  { "GPIO_DAT",  GPIO_A_DATA},
++			  { "GPIO_INT", GPIO_A_INTERRUPT_EVENT},
++			  { "GPIO_INT_STAT", GPIO_A_INTERRUPT_STATUS_REGISTER},
++			  { "GPIO_RISE_STAT", GPIO_A_RISING_EDGE_DETECT},
++			  { "GPIO_FALL_STAT", GPIO_A_FALLING_EDGE_DETECT},
++			  { "GPIO_FALL_INT", GPIO_A_FALLING_EDGE_ACTIVE_LOW_ENABLE},
++			  { "GPIO_RISE_INT", GPIO_A_RISING_EDGE_ACTIVE_HIGH_ENABLE},
++			  { "GPIO_OUT", GPIO_A_OUTPUT_VALUE },
++			  { "GPIO_OUT_EN",GPIO_A_OUTPUT_ENABLE },
++			  { "SEC", SYS_CTRL_SECONDARY_SEL},
++			  { "TER", SYS_CTRL_TERTIARY_SEL},
++			  { "QUAT", SYS_CTRL_QUATERNARY_SEL},
++			  { "DEB", SYS_CTRL_DEBUG_SEL },
++			  { "ALT", SYS_CTRL_ALTERNATIVE_SEL}
++		  };
++	
++	int i;
++	for (i = 0; i < sizeof(list)/sizeof(list[0]); i++) {
++		printk(KERN_INFO "%s:0x%08x:0x%08x\n"
++		       , list[i].name,list[i].reg_p, readl(list[i].reg_p));
++  } 
++} 
++
++#else
++#define dump_regs(...)
++#define db_print(...) 
++#endif 
++
++/**
++ * soft power button device driver object
++ * invokes /etc/hotplug/oxnas_soft_power_button.action
+  */
+-static irqreturn_t int_handler(int irq, void* dev_id)
+-{
+-	int status = IRQ_NONE;
+-	unsigned int int_status = readl((volatile unsigned long *)INT_STATUS_REG);
+ 
+-	/* Is the interrupt for us? */
+-	if (int_status & SWITCH_MASK) {
+-		/* Disable the power button GPIO line interrupt */
+-		spin_lock(&oxnas_gpio_spinlock);
+-		writel(readl(FALLING_INT_REG) & ~SWITCH_MASK, FALLING_INT_REG);
+-		spin_unlock(&oxnas_gpio_spinlock);
++typedef struct soft_power_button_driver_s {
++	struct kset    *kset;
++	struct kobject  kobject;
++} soft_power_button_driver_t;
+ 
+-		/* Zeroise button hold down counter */
+-		count = 0;
++static soft_power_button_driver_t soft_power_button_driver;
+ 
+-		/* Start hold down timer with a timeout of 1/8 second */
+-		mod_timer(&timer, jiffies + TIMER_INTERVAL_JIFFIES);
++static void soft_power_button_work_handler(struct work_struct * not_used) {
++	kobject_uevent(&soft_power_button_driver.kobject, KOBJ_OFFLINE);
++}
+ 
+-		/* Only mark interrupt as serviced if no other unmasked GPIO interrupts
+-		are pending */
+-		if (!readl((volatile unsigned long *)INT_STATUS_REG)) {
+-			status = IRQ_HANDLED;
+-		}
+-	}
++DECLARE_WORK(soft_power_button_hotplug_work, soft_power_button_work_handler);
+ 
+-	return status;
++static struct kobj_type ktype_soft_power_button = {
++	.release = 0,
++	.sysfs_ops = 0,
++	.default_attrs = 0,
++};
++
++static int soft_power_button_hotplug_filter(struct kset* kset, struct kobject* kobj) {
++	return get_ktype(kobj) == &ktype_soft_power_button;
+ }
+ 
+-/*
+- * Device driver object
++static const char* soft_power_button_hotplug_name(struct kset* kset, struct kobject* kobj) {
++	return "oxnas_soft_power_button";
++}
++
++static struct kset_uevent_ops soft_power_button_uevent_ops = {
++	.filter = soft_power_button_hotplug_filter,
++	.name   = soft_power_button_hotplug_name,
++	.uevent = NULL,
++};
++
++/**
++ * hard power button Device driver object
++ * invokes /etc/hotplug/oxnas_hard_power_button.action
+  */
+-typedef struct power_button_driver_s {
+-	/** sysfs dir tree root for power button driver */
++
++typedef struct hard_power_button_driver_s {
+ 	struct kset    *kset;
+ 	struct kobject  kobject;
+-} power_button_driver_t;
++} hard_power_button_driver_t;
++
++static hard_power_button_driver_t hard_power_button_driver;
++
++static void hard_power_button_work_handler(struct work_struct * not_used) {
++	kobject_uevent(&hard_power_button_driver.kobject, KOBJ_OFFLINE);
++}
++
++DECLARE_WORK(hard_power_button_hotplug_work, hard_power_button_work_handler);
++
++static struct kobj_type ktype_hard_power_button = {
++	.release = 0,
++	.sysfs_ops = 0,
++	.default_attrs = 0,
++};
++
++static int hard_power_button_hotplug_filter(struct kset* kset, struct kobject* kobj) {
++	return get_ktype(kobj) == &ktype_hard_power_button;
++}
++
++static const char* hard_power_button_hotplug_name(struct kset* kset, struct kobject* kobj) {
++	return "oxnas_hard_power_button";
++}
+ 
+-static power_button_driver_t power_button_driver;
++static struct kset_uevent_ops hard_power_button_uevent_ops = {
++	.filter = hard_power_button_hotplug_filter,
++	.name   = hard_power_button_hotplug_name,
++	.uevent = NULL,
++};
++
++/**
++ *  wraparound timer with state/latch to keep it coherent
++ */
++
++static int global_timer_counter; 
++
++static enum {
++	TIMER_RESET_UP,                          /* reset button up */
++	TIMER_RESET_DOWN,                        /* reset button down for short period */
++	TIMER_RESET_DOWN_MEDIUM_DELAY_EXCEEDED,  /* reset button down, poweroff will happen when released */
++	TIMER_RESET_DOWN_LONG_DELAY_EXCEEDED,    /* reset button down, factory-defaults reset when released */
++} global_timer_state;
++
++static enum {
++	BOOTING,                                 /* booting up */
++	REBOOTING,                               /* booting down, normally */
++	UP_AND_RUNNING,                          /* up and running */
++	POWER_OFF,                               /* power off started */
++	FACTORY_DEFAULTS,                        /* factory-defaults reset started */
++} global_booting_state;
++
++/**
++ * disable reset button when too early in boot process, or when reset in progress
++ */
++
++static int global_reset_button_enabled;  /* false */
++
++/**
++ * blink mode for the LED
++ */
++
++enum led_enum {
++	LED_OFF,
++	LED_ON,
++	LED_BLINK_SLOWLY,
++	LED_BLINK_RAPIDLY,
++};
+ 
+-static void work_handler(struct work_struct * not_used) {
+-	kobject_uevent(&power_button_driver.kobject, KOBJ_OFFLINE);
++static inline void do_led (enum led_enum led_state)
++{
++	int flag;
++	switch (led_state) {
++	case LED_OFF:
++		flag = 0;
++		break;
++	case LED_ON:
++		flag = 1;
++		break;
++	case LED_BLINK_SLOWLY:
++		flag = global_timer_counter & 4; /* flash LED 2 times a second */
++		break;
++	case LED_BLINK_RAPIDLY:
++		flag = global_timer_counter & 1; /* flash LED 8 times a second */
++		break;
++	}
++	if (flag) {
++		writel(LED_MASK, GPIO_A_OUTPUT_SET);    /* LED on */
++	} else {
++		writel(LED_MASK, GPIO_A_OUTPUT_CLEAR);  /* LED off */
++	}
+ }
+ 
+-DECLARE_WORK(power_button_hotplug_work, work_handler);
++/**
++ * timer for power button events
++ */
++
++#define TIMER_INTERVAL_JIFFIES  ((HZ) >> 3) /* an eighth of a second */
++#define TIMER_COUNT_LIMIT_MEDIUM 24         /*  3 seconds in eighths of a second */
++#define TIMER_COUNT_LIMIT_LONG 80           /* 10 seconds in eighths of a second */
++
++static struct timer_list timer;
++
++/**
++ *  handle release of reset button in interrupt context
++ */
++
++static inline void do_reset_button_release_in_interrupt_context (void)
++{
++	if (global_reset_button_enabled) {  /* ignore if reset already in progress, or early booting */
++		switch (global_timer_state) {
++		case TIMER_RESET_UP:                          /* impossible */
++			return;
++		case TIMER_RESET_DOWN:                        /* LED steady off, timer running */
++			global_timer_state = TIMER_RESET_UP;
++			if (global_booting_state == UP_AND_RUNNING) {
++				do_led(LED_ON);
++				del_timer(&timer);           /* beware multi-processor race! */
++			}
++			return;
++		case TIMER_RESET_DOWN_MEDIUM_DELAY_EXCEEDED:  /* LED blinking slowly, timer running */
++			global_reset_button_enabled = 0;  /* false */
++			global_timer_state = TIMER_RESET_UP;
++			global_booting_state = POWER_OFF;
++			schedule_work(&soft_power_button_hotplug_work);
++			return;
++		case TIMER_RESET_DOWN_LONG_DELAY_EXCEEDED:    /* LED blinking rapidly, timer running */
++			global_reset_button_enabled = 0;  /* false */
++			global_timer_state = TIMER_RESET_UP;
++			global_booting_state = FACTORY_DEFAULTS;
++			schedule_work(&hard_power_button_hotplug_work);
++			return;
++		}
++	}
++}
++
++/**
++ *  handle press of reset button in interrupt context
++ */
++
++static inline void do_reset_button_press_in_interrupt_context (void)
++{
++	if (global_reset_button_enabled) {  /* ignore if reset already in progress, or early booting */
++		global_timer_counter = 0;
++		global_timer_state = TIMER_RESET_DOWN;
++		do_led(LED_OFF);
++		mod_timer(&timer, jiffies + TIMER_INTERVAL_JIFFIES);  /* shove forward 1/8 second */
++	}
++}
+ 
+ static void timer_handler(unsigned long data)
+ {
+-	unsigned long flags;
++	global_timer_counter++;  /* allowed to wrap */
+ 
+-	/* Is the power button still pressed? */
+-	if (!(readl(DATA_REG) & SWITCH_MASK)) {
+-		/* Yes, so increment count of how many timer intervals have passed since
+-		power button was pressed */
+-		if (++count == timer_count_limit) {
+-			schedule_work(&power_button_hotplug_work);
+-		} else {
+-			/* Restart timer with a timeout of 1/8 second */
+-			mod_timer(&timer, jiffies + TIMER_INTERVAL_JIFFIES);
++	switch (global_timer_state) {
++	case TIMER_RESET_UP:
++		switch (global_booting_state) {
++		case BOOTING:
++		case REBOOTING:
++		case POWER_OFF:
++			do_led(LED_BLINK_SLOWLY);
++			break;
++		case UP_AND_RUNNING:
++			do_led(LED_ON);
++			return;                    /* <<<<<< do NOT resume timer! */
++		case FACTORY_DEFAULTS:
++			do_led(LED_BLINK_RAPIDLY);
++			break;
+ 		}
+-	} else {
+-		/* The h/w debounced power button has been released, so reenable the
+-		active low interrupt detection to trap the user's next attempt to
+-		power down */
+-		spin_lock_irqsave(&oxnas_gpio_spinlock, flags);
+-        /* Clear the original interrupt */
+-		writel(SWITCH_MASK, INT_STATUS_REG);
+-        /* Enable falling edge interrupts */
+-		writel(readl(FALLING_INT_REG) | SWITCH_MASK, FALLING_INT_REG);
+-		spin_unlock_irqrestore(&oxnas_gpio_spinlock, flags);
++		break;
++	case TIMER_RESET_DOWN:
++		do_led(LED_OFF);
++		if (global_timer_counter >= TIMER_COUNT_LIMIT_MEDIUM) {
++			global_timer_state = TIMER_RESET_DOWN_MEDIUM_DELAY_EXCEEDED;
++		}
++		break;
++	case TIMER_RESET_DOWN_MEDIUM_DELAY_EXCEEDED:
++		do_led(LED_BLINK_SLOWLY);
++		if (global_timer_counter >= TIMER_COUNT_LIMIT_LONG)
++			global_timer_state = TIMER_RESET_DOWN_LONG_DELAY_EXCEEDED;
++		break;
++	case TIMER_RESET_DOWN_LONG_DELAY_EXCEEDED:
++		do_led(LED_BLINK_RAPIDLY);
++		break;
+ 	}
++	mod_timer(&timer, jiffies + TIMER_INTERVAL_JIFFIES);  /* 1/8 second */
+ }
+ 
+-static struct kobj_type ktype_power_button = {
+-	.release = 0,
+-	.sysfs_ops = 0,
+-	.default_attrs = 0,
+-};
++/**
++ * monitoring and control of led flashing
++ * /sys/...
++ */
+ 
+-static int power_button_hotplug_filter(struct kset* kset, struct kobject* kobj) {
+-	return get_ktype(kobj) == &ktype_power_button;
++static ssize_t timer_booting_flag_show(struct kobject *kobj, struct kobj_attribute *attr,
++                         char *buf)
++{
++	switch (global_booting_state) {
++	case BOOTING:
++		return sprintf(buf, "booting\n");
++	case REBOOTING:
++		return sprintf(buf, "rebooting\n");
++	case UP_AND_RUNNING:
++		return sprintf(buf, "up_and_running\n");
++	case POWER_OFF:
++		return sprintf(buf, "power_off\n");
++	case FACTORY_DEFAULTS:
++		return sprintf(buf, "factory_defaults\n");
++	}
++	return sprintf(buf, "impossible\n");
+ }
+ 
+-static const char* power_button_hotplug_name(struct kset* kset, struct kobject* kobj) {
+-	return "oxnas_power_button";
++static ssize_t timer_booting_flag_store(struct kobject *kobj, struct kobj_attribute *attr,
++                          const char * buf, size_t n)
++{
++        int value;  /* boolean */
++        if (sscanf(buf, "%d", &value) != 1) {
++                printk(KERN_ERR "timer_booting_flag_store: Invalid value\n");
++                return -EINVAL;
++        }
++	switch (value) {
++	case 0:  /* enable reset button */
++		db_print(KERN_INFO "power button: enabled\n");
++		global_reset_button_enabled = 1;  /* true */
++		break;
++	case 1:  /* end of booting */
++		db_print(KERN_INFO "power button: end of normal booting\n");
++		global_booting_state = UP_AND_RUNNING;
++		do_led(LED_ON);
++		del_timer(&timer);
++		break;
++	case 2:  /* begin of normal rebooting */
++		db_print(KERN_INFO "power button: begin of normal rebooting\n");
++		global_booting_state = REBOOTING;
++		mod_timer(&timer, jiffies + TIMER_INTERVAL_JIFFIES);  /* shove forward 1/8 second */
++		break;
++	default:
++                printk(KERN_ERR "timer_booting_flag_store: Invalid value\n");
++                return -EINVAL;
++	}
++        return n;
+ }
+ 
+-static struct kset_uevent_ops power_button_uevent_ops = {
+-	.filter = power_button_hotplug_filter,
+-	.name   = power_button_hotplug_name,
+-	.uevent = NULL,
+-};
++static struct kobj_attribute timer_booting_flag_attr =
++        __ATTR(timer_booting_flag, 0644, timer_booting_flag_show, timer_booting_flag_store);
++
++/**
++ *  Have to use active low level interupt generation, as otherwise might miss
++ *  interrupts that arrive concurrently with a PCI interrupt, as PCI interrupts
++ *  are generated via GPIO pins and std PCI drivers will not know that there
++ *  may be other pending GPIO interrupt sources waiting to be serviced and will
++ *  simply return IRQ_HANDLED if they see themselves as having generated the
++ *  interrupt, thus preventing later chained handlers from being called
++ */
++static irqreturn_t int_handler(int irq, void* dev_id)
++{
++	int status = IRQ_NONE;
++	unsigned int int_status = readl((volatile unsigned long *)INT_STATUS_REG);
++	
++
++	/* Is the interrupt for us? */
++	if (int_status & SWITCH_MASK) {
++		
++		db_print(KERN_INFO "interrupt detected 0x%08x\n", int_status);
++		
++		spin_lock(&oxnas_gpio_spinlock);
++
++		/* disable both interrupts */
++		writel(readl(RISING_INT_REG) & ~SWITCH_MASK, RISING_INT_REG);
++		writel(readl(FALLING_INT_REG) & ~SWITCH_MASK, FALLING_INT_REG);
++		
++		/* clear edge latches */
++		writel(SWITCH_MASK, GPIO_A_RISING_EDGE_DETECT);
++		writel(SWITCH_MASK, GPIO_A_FALLING_EDGE_DETECT);
++		
++		if (readl(GPIO_A_DATA) & SWITCH_MASK ) {
++			db_print(KERN_INFO "power button RELEASED (sig high)\n");
++			/* enable the button GPIO falling line interrupt */
++			writel(readl(FALLING_INT_REG) | SWITCH_MASK, FALLING_INT_REG);
++			do_reset_button_release_in_interrupt_context();
++		} else {
++			db_print(KERN_INFO "power button PRESSED (sig low)\n");
++			/* enable the power button GPIO riseing line interrupt */
++			writel(readl(RISING_INT_REG) | SWITCH_MASK, RISING_INT_REG);
++			do_reset_button_press_in_interrupt_context();
++		}
++		spin_unlock(&oxnas_gpio_spinlock);
++	
++//		dump_regs();
++		
++		/* Only mark interrupt as serviced if no other unmasked GPIO interrupts
++		are pending */
++		if (!readl((volatile unsigned long *)INT_STATUS_REG)) {
++			status = IRQ_HANDLED;
++		}
++	}
++
++	return status;
++}
++
++static int unique_hash; /* provide a unique address for irq registration */
+ 
+ static int __init power_button_init(void)
+ {
+ 	int err = 0;
+ 	unsigned long flags;
+ 
+-	/* Copy the LED inversion module parameter into the global variable */
+-	oxnas_global_invert_leds = invert_leds;
++	/* Prepare the soft power button sysfs interface for use */
+ 
+-	/* Prepare the sysfs interface for use */
+-	power_button_driver.kset = kset_create_and_add("power_button", &power_button_uevent_ops, kernel_kobj);
+-	if (!power_button_driver.kset) {
+-		printk(KERN_ERR "power_button_init() Failed to create kset\n");
++	soft_power_button_driver.kset
++		= kset_create_and_add("soft_power_button"
++				      , &soft_power_button_uevent_ops, kernel_kobj);
++	if (!soft_power_button_driver.kset) {
++		printk(KERN_ERR "power_button_init() Failed to create kset for soft_power_button\n");
+ 		return -ENOMEM;
+ 	}
+ 
+-	power_button_driver.kobject.kset = power_button_driver.kset;
+-	err = kobject_init_and_add(&power_button_driver.kobject,
+-		&ktype_power_button, NULL, "%d", 0);
++	soft_power_button_driver.kobject.kset = soft_power_button_driver.kset;
++	err = kobject_init_and_add(&soft_power_button_driver.kobject,
++		&ktype_soft_power_button, NULL, "%d", 0);
++	if (err) {
++		printk(KERN_ERR "power_button_init() Failed to add kobject for soft_power_button\n");
++		err = -EINVAL;
++		goto exit0;
++	}
++
++	/* Prepare the hard power button sysfs interface for use */
++
++	hard_power_button_driver.kset
++		= kset_create_and_add("hard_power_button"
++				      , &hard_power_button_uevent_ops, kernel_kobj);
++	if (!hard_power_button_driver.kset) {
++		printk(KERN_ERR "power_button_init() Failed to create kset for hard_power_button\n");
++		err = -ENOMEM;
++		goto exit0;
++	}
++
++	hard_power_button_driver.kobject.kset = hard_power_button_driver.kset;
++	err = kobject_init_and_add(&hard_power_button_driver.kobject,
++		&ktype_hard_power_button, NULL, "%d", 0);
+ 	if (err) {
+-		printk(KERN_ERR "power_button_init() Failed to add kobject\n");
+-		kset_unregister(power_button_driver.kset);
+-		kobject_put(&power_button_driver.kobject);
+-		return -EINVAL;
++		printk(KERN_ERR "power_button_init() Failed to add kobject for hard_power_button\n");
++		err = -EINVAL;
++		goto exit1;
+ 	}
+ 
+-	/* Setup the timer that will time how long the user holds down the power
+-	   button */
++	/* Setup timer that will time how long the user holds down the power button */
+ 	init_timer(&timer);
+ 	timer.data = 0;
+ 	timer.function = timer_handler;
+ 
+-	/* Install a shared interrupt handler on the appropriate GPIO bank's
+-	   interrupt line */
+-	if (request_irq(IRQ_NUM, int_handler, IRQF_SHARED, "Power Button", &power_button_driver)) {
++        err = sysfs_create_file(kernel_kobj, &timer_booting_flag_attr.attr);
++        if (err) {
++                printk(KERN_ERR "sysfs_create_file failed: %d\n", err);
++		err = -EINVAL;
++		goto exit2;
++	}
++
++	/* Install a shared interrupt handler on the appropriate GPIO bank's interrupt line */
++	if (request_irq(IRQ_NUM, int_handler, IRQF_SHARED, "Power Button", &unique_hash)) {
+ 		printk(KERN_ERR "Power Button: cannot register IRQ %d\n", IRQ_NUM);
+-		del_timer_sync(&timer);
+-		return -EIO;
++		err = -EIO;
++		goto exit3;
+ 	}
+ 
+ 	spin_lock_irqsave(&oxnas_gpio_spinlock, flags);
++
+ 	/* Disable primary, secondary and teriary GPIO functions on switch lines */
+-#if defined(CONFIG_ARCH_OX820)
+-#if (CONFIG_OXNAS_POWER_BUTTON_GPIO < SYS_CTRL_NUM_PINS)
+-    writel(readl(SYS_CTRL_SECONDARY_SEL)   & ~SWITCH_MASK, SYS_CTRL_SECONDARY_SEL);
+-    writel(readl(SYS_CTRL_TERTIARY_SEL)    & ~SWITCH_MASK, SYS_CTRL_TERTIARY_SEL);
+-    writel(readl(SYS_CTRL_QUATERNARY_SEL)  & ~SWITCH_MASK, SYS_CTRL_QUATERNARY_SEL);
+-    writel(readl(SYS_CTRL_DEBUG_SEL)       & ~SWITCH_MASK, SYS_CTRL_DEBUG_SEL);
+-    writel(readl(SYS_CTRL_ALTERNATIVE_SEL) & ~SWITCH_MASK, SYS_CTRL_ALTERNATIVE_SEL);
+-#else
+-    writel(readl(SEC_CTRL_SECONDARY_SEL)   & ~SWITCH_MASK, SEC_CTRL_SECONDARY_SEL);
+-    writel(readl(SEC_CTRL_TERTIARY_SEL)    & ~SWITCH_MASK, SEC_CTRL_TERTIARY_SEL);
+-    writel(readl(SEC_CTRL_QUATERNARY_SEL)  & ~SWITCH_MASK, SEC_CTRL_QUATERNARY_SEL);
+-    writel(readl(SEC_CTRL_DEBUG_SEL)       & ~SWITCH_MASK, SEC_CTRL_DEBUG_SEL);
+-    writel(readl(SEC_CTRL_ALTERNATIVE_SEL) & ~SWITCH_MASK, SEC_CTRL_ALTERNATIVE_SEL);
+-#endif
+-#endif
++	writel(readl(SEC_CTRL_SECONDARY_SEL)   & ~(SWITCH_MASK | LED_MASK), SEC_CTRL_SECONDARY_SEL);
++	writel(readl(SEC_CTRL_TERTIARY_SEL)    & ~(SWITCH_MASK | LED_MASK), SEC_CTRL_TERTIARY_SEL);
++	writel(readl(SEC_CTRL_QUATERNARY_SEL)  & ~(SWITCH_MASK | LED_MASK), SEC_CTRL_QUATERNARY_SEL);
++	writel(readl(SEC_CTRL_DEBUG_SEL)       & ~(SWITCH_MASK | LED_MASK), SEC_CTRL_DEBUG_SEL);
++	writel(readl(SEC_CTRL_ALTERNATIVE_SEL) & ~(SWITCH_MASK | LED_MASK), SEC_CTRL_ALTERNATIVE_SEL);
+ 
+ 	/* Enable GPIO input on switch line */
+ 	writel(SWITCH_MASK, SWITCH_CLR_OE_REG);
+-
++	
++	/* Enable GPIO output on led line */
++	writel(LED_MASK, GPIO_A_OUTPUT_CLEAR);
++	writel(LED_MASK, GPIO_A_OUTPUT_ENABLE_SET);
++
++	/* ensure interupts not pending in latches */
++	writel(SWITCH_MASK, GPIO_A_RISING_EDGE_DETECT);
++	writel(SWITCH_MASK, GPIO_A_FALLING_EDGE_DETECT);
++	
+ 	/* Set up the power button GPIO line for active low, debounced interrupt */
+ 	writel(readl(DEBOUNCE_REG)    | SWITCH_MASK, DEBOUNCE_REG);
+ 	writel(readl(FALLING_INT_REG) | SWITCH_MASK, FALLING_INT_REG);
++	
+ 	spin_unlock_irqrestore(&oxnas_gpio_spinlock, flags);
+ 
+-	printk(KERN_INFO "Power button driver registered\n");
++//	dump_regs();
++
++	mod_timer(&timer, jiffies + TIMER_INTERVAL_JIFFIES);  /* shove forward 1/8 second */
++
++	printk(KERN_INFO "power button driver registered\n");
+ 	return 0;
++
++exit3:
++        sysfs_remove_file(kernel_kobj, &timer_booting_flag_attr.attr);
++
++exit2:
++	del_timer_sync(&timer);
++exit1:
++	kobject_put(&hard_power_button_driver.kobject);
++	kset_unregister(hard_power_button_driver.kset);
++exit0:
++	kobject_put(&soft_power_button_driver.kobject);
++	kset_unregister(soft_power_button_driver.kset);
++
++	return err;
+ }
+ 
+ static void __exit power_button_exit(void)
+ {
+ 	unsigned long flags;
+ 
+-	kobject_put(&power_button_driver.kobject);
+-	kset_unregister(power_button_driver.kset);
++        sysfs_remove_file(kernel_kobj, &timer_booting_flag_attr.attr);
++
++	kobject_put(&soft_power_button_driver.kobject);
++	kset_unregister(soft_power_button_driver.kset);
++
++	kobject_put(&hard_power_button_driver.kobject);
++	kset_unregister(hard_power_button_driver.kset);
+ 
+ 	/* Deactive the timer */
+ 	del_timer_sync(&timer);
+ 
++	do_led(LED_OFF);
++
+ 	/* Disable interrupt generation by the power button GPIO line */
+ 	spin_lock_irqsave(&oxnas_gpio_spinlock, flags);
+ 	writel(readl(FALLING_INT_REG) & ~SWITCH_MASK, FALLING_INT_REG);
+ 	spin_unlock_irqrestore(&oxnas_gpio_spinlock, flags);
+ 
+ 	/* Remove the handler for the shared interrupt line */
+-	free_irq(IRQ_NUM, &power_button_driver);
++	free_irq(IRQ_NUM, &unique_hash);
++
++	printk(KERN_INFO "power button driver de-registered\n");
+ }
+ 
+ /** 
+- * macros to register intiialisation and exit functions with kernal
++ * macros to register initialisation and exit functions with kernal
+  */
+ module_init(power_button_init);
+ module_exit(power_button_exit);

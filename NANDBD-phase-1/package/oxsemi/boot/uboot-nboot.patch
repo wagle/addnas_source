@@ -1,0 +1,397 @@
+diff -Naur u-boot.orig/board/oxnas/config-820.mk u-boot/board/oxnas/config-820.mk
+--- u-boot.orig/board/oxnas/config-820.mk	2010-07-26 00:52:22.000000000 -0700
++++ u-boot/board/oxnas/config-820.mk	2011-04-06 14:15:57.000000000 -0700
+@@ -59,3 +59,8 @@
+ 		     -DUSE_NAND=$(USE_NAND)\
+ 		     -DUSE_OTP=$(USE_OTP) \
+ 		     -DUSE_OTP_MAC=$(USE_OTP_MAC)
++
++ifdef SDK_BUILD_NAND_BOOT
++PLATFORM_CPPFLAGS += -DCFG_ENV_IS_NOWHERE -DSDK_BUILD_NAND_BOOT
++endif
++
+diff -Naur u-boot.orig/common/cmd_nand.c u-boot/common/cmd_nand.c
+--- u-boot.orig/common/cmd_nand.c	2010-07-26 00:52:25.000000000 -0700
++++ u-boot/common/cmd_nand.c	2011-04-06 14:15:57.000000000 -0700
+@@ -448,11 +448,16 @@
+ 
+ 	sectorsize = mtd->oobblock;
+ 
++#ifdef CONFIG_MTD_NAND_WRITE_MLC
+ 	if (nand_read_mlc (mtd, offset,
+ 		    sectorsize, (u_char *)addr)) {
++#else
++	if (nand_read_slc (mtd, offset,
++			sectorsize, (u_char *)addr)) {
+ 		printf ("** Read error on %d\n", idx);
+ 		return 1;
+ 	}
++#endif
+ 
+ 	hdr = (image_header_t *)addr;
+ 
+@@ -467,13 +472,17 @@
+ 		return 1;
+ 	}
+ 
++#ifdef CONFIG_MTD_NAND_WRITE_MLC
+ 	if (nand_read_mlc (mtd, offset, cnt,
+ 		    (u_char *)(addr))) {
+ //	if (nand_read_mlc (mtd, offset + sectorsize, cnt,
+ //		    (u_char *)(addr+sectorsize))) {
++#else
++	if (nand_read_slc (mtd, offset, cnt, (u_char *)(addr))) {
+ 		printf ("** Read error on %d\n", idx);
+ 		return 1;
+ 	}
++#endif
+ 
+ 	/* Loading ok, update default load address */
+ 
+@@ -498,7 +507,7 @@
+ U_BOOT_CMD(
+ 	nboot,	4,	1,	do_nandboot,
+ 	"nboot   - boot from NAND device\n",
+-	"loadAddr offset dev\n"
++	"loadAddr dev offset\n"
+ );
+ #if 0
+ static int nand_load_image(cmd_tbl_t *cmdtp, nand_info_t *nand,
+@@ -703,7 +712,11 @@
+ 	len = simple_strtoul(argv[2], NULL, 16);
+ 
+ 	nand = &nand_info[nand_curr_device];
+-	return nand_write_mlc (nand, offset, len, retlen, addr);
++#ifdef CONFIG_MTD_NAND_WRITE_MLC
++	return nand_write_mlc (nand, offset, len, &retlen, addr);
++#else
++	return nand_write_slc (nand, offset, len, &retlen, addr);
++#endif
+ }
+ 
+ U_BOOT_CMD(nwboot, 4, 1, do_nandwriteboot,
+diff -Naur u-boot.orig/common/main.c u-boot/common/main.c
+--- u-boot.orig/common/main.c	2010-07-26 00:52:25.000000000 -0700
++++ u-boot/common/main.c	2011-04-06 14:15:57.000000000 -0700
+@@ -450,7 +450,7 @@
+ 		/* Save the revised bootargs string to the runtime environment */
+ 		setenv("bootargs", cmd_string);
+ 	}
+-
++#ifndef SDK_BUILD_NAND_BOOT
+ 	/* Upgrade, recovery and power button monitor code
+ 	 */
+ 	int do_recovery = 0; /* default no recovery */
+@@ -461,14 +461,17 @@
+ 
+ 	char upgrade_mode = 0;//*(volatile char*)(MODE_FLAG_LOCATION + 0);
+ 	char recovery_mode = 0;//*(volatile char*)(MODE_FLAG_LOCATION + 1);
++#endif
+ 	char controlled_pd_mode = 0;//*(volatile char*)(MODE_FLAG_LOCATION + 2);
+ 	
+ 	char tempBuf[1024];
+ 	char* cmd_string;
+ 
++#ifndef SDK_BUILD_NAND_BOOT
+ 	if (recovery_mode == RECOVERY_MAGIC) {
+ 		do_recovery = 1; /* perform recovery */
+ 	} 
++#endif
+ 
+ #if (USE_OTP_MAC == 1)
+ 	int i;
+@@ -553,6 +556,7 @@
+ 
+ 	setenv("bootargs", cmd_string);
+ 
++#ifndef SDK_BUILD_NAND_BOOT
+ 	/* branch off inot recovery or upadate */
+ 	if (upgrade_mode == UPGRADE_MAGIC) {
+         /* Script to select first disk */
+@@ -595,7 +599,7 @@
+ 		cmd_string = strcat(cmd_string, " adminmode=recovery");
+ 		setenv("bootargs", cmd_string);
+ 	} 
+-
++#endif // SDK_BUILD_NAND_BOOT
+ #endif // CONFIG_OXNAS
+ 
+ #ifdef CONFIG_PREBOOT
+diff -Naur u-boot.orig/drivers/mtd/nand/nand_base.c u-boot/drivers/mtd/nand/nand_base.c
+--- u-boot.orig/drivers/mtd/nand/nand_base.c	2010-07-26 00:52:25.000000000 -0700
++++ u-boot/drivers/mtd/nand/nand_base.c	2011-04-07 09:59:25.000000000 -0700
+@@ -1112,6 +1112,8 @@
+ 	return nand_read_ecc (mtd, from, len, retlen, buf, NULL, NULL);
+ }
+ 
++static int nand_block_isbad (struct mtd_info *mtd, loff_t ofs);
++#ifdef CONFIG_MTD_NAND_WRITE_MLC
+ /**
+  * nand_read_mlc - [MTD Interface] Read data and do MLC style error checking
+  * @mtd:	MTD device structure
+@@ -1120,7 +1122,6 @@
+  * @buf:	the databuffer to put data
+  *
+ */
+-static int nand_block_isbad (struct mtd_info *mtd, loff_t ofs);
+ int nand_read_mlc (struct mtd_info *mtd, loff_t from, size_t len, u_char * buf)
+ {
+ 	struct nand_chip *this = mtd->priv;
+@@ -1130,18 +1131,17 @@
+ 	int pagesize = 1 << this->page_shift;
+ 	loff_t pagesperblock = erasesize / pagesize;
+ 	const loff_t blockskip = (CONFIG_FLASH_KERNEL_SPACE / pagedata + 1) * CONFIG_PAGE_REPLICATION * CONFIG_BLOCK_REPLICATION / pagesperblock;
+-	int badblocks = 0;
+ 	int badpage;
+ 	int totalbadpages = 0, totalbadblocks = 0;
+ 
+ 	if (from % erasesize != 0)
+ 	{
+ 		printf("Offset not a multiple of erasesize size (%d)\n", erasesize);
+-		return -EINVAL;
++		return 1;
+ 	}
+ 
+ 
+-	from *= CONFIG_PAGE_REPLICATION;
++	//from *= CONFIG_PAGE_REPLICATION;
+ 	while (len > 0)
+ 	{
+ 		size_t lentoread = len > pagedata ? pagedata : len;
+@@ -1150,29 +1150,30 @@
+ 		{
+ 			size_t retsize;
+ 			size_t skip = 0;
++			int badblocks = 0;
+ 
+ 			// skip bad blocks
+ 			while (nand_block_isbad(mtd, from + badblocks * erasesize + skip * erasesize))
+ 			{
+ 				totalbadblocks++;
+-				if (++badblocks > CONFIG_BLOCK_REPLICATION)
++				if (++badblocks >= CONFIG_BLOCK_REPLICATION)
+ 				{
+ 					printf("Too many bad blocks\n");
+-					return -EBADMSG;
++					return 1;
+ 				}
+ 				skip += blockskip;
+ 			}
+ 
+-			//printf("read from %x, len %x\n", (int)(from + badpage * pagesize +  skip * erasesize), lentoread);
+-			int ret = nand_read_ecc (mtd, (loff_t)(from + badpage * pagesize +  skip * erasesize), lentoread, &retsize, buf, NULL, NULL);
++			//printf("read from %x, len %x\n", (int)(from + badblocks * erasesize + skip * erasesize + badpage * pagesize), lentoread);
++			int ret = nand_read_ecc (mtd, (loff_t)(from + badblocks * erasesize + skip * erasesize + badpage * pagesize), lentoread, &retsize, buf, NULL, NULL);
+ 			//printf("ret %d\n", ret);
+ 			if (ret < 0)
+ 			{
+ 				totalbadpages++;
+-				if (++badpage > CONFIG_PAGE_REPLICATION)
++				if (++badpage >= CONFIG_PAGE_REPLICATION)
+ 				{
+ 					printf("Too many bad pages\n");
+-					return -EBADMSG;
++					return 1;
+ 				}
+ 			}
+ 			else
+@@ -1191,7 +1192,52 @@
+ 	}
+ 	return 0;
+ }
++#else
++int nand_read_slc (struct mtd_info *mtd, loff_t from, size_t len, u_char * buf)
++{
++	struct nand_chip *this = mtd->priv;
++	loff_t erasesize = mtd->erasesize;
++	loff_t pagesize = 1 << this->page_shift;
++	loff_t pagesperblock = erasesize / pagesize;
++
++	if (from % erasesize != 0)
++	{
++		printf("Offset not a multiple of erasesize size (%d)\n", erasesize);
++		return 1;
++	}
++
++	if ((len % pagesize) != 0)
++	{
++		len = (len / pagesize + 1) * pagesize;
++	}
++
++	while (len > 0)
++	{
++		int ret, i;
++		size_t retsize;
++
++		/* skip bad blocks */
++		while (nand_block_isbad(mtd, from)) {
++			printf("Skip bad block at 0x%x\n");
++			from += erasesize;
++		}
++		/* Read up one block to buf */
++		for (i = 0; i < pagesperblock && len > 0; i++) {
++			ret = nand_read_ecc(mtd, from, pagesize, &retsize, buf, NULL, NULL);
++			if (ret < 0) {
++				printf("Unable to read data from 0x%x\n", from);
++				return 1;
++			}
++			from += pagesize;
++			len -= pagesize;
++			buf += pagesize;
++		}
++	}
++	return 0;
++}
++#endif
+ 
++#ifdef CONFIG_MTD_NAND_WRITE_MLC
+ /**
+  * nand_write_mlc - [MTD Interface] Read data and do MLC style error checking
+  * @mtd:	MTD device structure
+@@ -1217,7 +1263,7 @@
+ 	if (from % erasesize != 0)
+ 	{
+ 		printf("Offset not a multiple of erase size (%x)\n", erasesize);
+-		return -EINVAL;
++		return 1;
+ 	}
+ 
+ 	if ((len % pagesize) != 0)
+@@ -1227,7 +1273,7 @@
+ 
+ 	while (len > 0)
+ 	{
+-		skip = 0;
++		skip = 0; badblocks=0;
+ 		lentowrite = len > pagedata ? pagedata : len;
+ 		for (nblock = 0; nblock < CONFIG_BLOCK_REPLICATION; nblock++)
+ 		{
+@@ -1235,11 +1281,12 @@
+ 			if (nand_block_isbad(mtd, from + nblock * erasesize + skip * erasesize))
+ 			{
+ 				printf("Block is bad\n");
+-				if (badblocks++ > CONFIG_BLOCK_REPLICATION / 4)
++				if (++badblocks >= CONFIG_BLOCK_REPLICATION)
+ 				{
+ 					printf("Too many bad blocks\n");
+-					return -EBADMSG;
++					return 1;
+ 				}
++				skip += blockskip;
+ 				continue;
+ 			}
+ 
+@@ -1263,6 +1310,54 @@
+ 	printf("\n");
+ 	return 0;
+ }
++#else
++int nand_write_slc (struct mtd_info *mtd, loff_t from, size_t len, size_t * retlen, u_char * buf)
++{
++	struct nand_chip *this = mtd->priv;
++	loff_t erasesize = mtd->erasesize;
++	loff_t pagesize = 1 << this->page_shift;
++	loff_t pagesperblock = erasesize / pagesize;
++
++	if (from % erasesize != 0)
++	{
++		printf("Offset not a multiple of erase size (%x)\n", erasesize);
++		return 1;
++	}
++
++	if ((len % pagesize) != 0)
++	{
++		len = (len / pagesize + 1) * pagesize;
++	}
++
++	*retlen = 0;
++	while (len > 0)
++	{
++		int ret, i;
++		size_t retsize;
++
++		/* skip bad blocks */
++		while (nand_block_isbad(mtd, from)) {
++			printf("Skip bad block at 0x%x\n");
++			from += erasesize;
++		}
++		/* Fill data up to one block */
++		for (i = 0; i < pagesperblock && len > 0 ; i++) {
++			ret = nand_write_ecc(mtd, from, pagesize, &retsize,
++					buf, NULL, NULL);
++			if (ret < 0) {
++				printf("Unable to write data to 0x%x\n", from);
++				return 1;
++			}
++			*retlen += pagesize;
++			from += pagesize;
++			len -= pagesize;
++			buf += pagesize;
++		}
++	}
++	printf("\n");
++	return 0;
++}
++#endif
+ 
+ /**
+  * nand_read_ecc - [MTD Interface] Read data with ECC
+diff -Naur u-boot.orig/include/configs/ox820.h u-boot/include/configs/ox820.h
+--- u-boot.orig/include/configs/ox820.h	2010-07-26 00:52:20.000000000 -0700
++++ u-boot/include/configs/ox820.h	2011-04-06 16:01:31.000000000 -0700
+@@ -302,7 +302,7 @@
+ #endif // CONFIG_OXNAS_USE_SATA
+ 
+ #ifdef CONFIG_CMD_NAND
+-#define NAND_COMMANDS (SATA_COMMANDS | CFG_CMD_NAND)
++#define NAND_COMMANDS (SATA_COMMANDS | CFG_CMD_NAND | CFG_CMD_LEDFAIL)
+ #else
+ #define NAND_COMMANDS (SATA_COMMANDS)
+ #endif // CFG_NO_FLASH
+@@ -326,7 +326,8 @@
+ #else
+ #define LINUX_ROOT_DEVICE "root=/dev/sda1"
+ #endif
+-#define CONFIG_BOOTARGS LINUX_ROOT_DEVICE " console=ttyS0,115200 elevator=cfq mac_adr=0x00,0x30,0xe0,0x00,0x00,0x01"
++#define COMMON_BOOTARGS " console=ttyS0,115200 elevator=cfq mac_adr=0x00,0x30,0xe0,0x00,0x00,0x01"
++#define CONFIG_BOOTARGS LINUX_ROOT_DEVICE COMMON_BOOTARGS
+ 
+ #ifdef CONFIG_OXNAS_USE_SATA
+ #define CONFIG_BOOTDELAY	2
+@@ -352,6 +353,17 @@
+ #define UPGRADE_FS_LOCATION     0x60700000
+ #define UPGRADE_KERNEL_LOCATION 0x60800000
+ 
++#elif defined(SDK_BUILD_NAND_BOOT)
++#define CONFIG_BOOTARGS "root=ubi0:rootfs ubi.mtd=2,512 rootfstype=ubifs" COMMON_BOOTARGS
++#define CONFIG_BOOTDELAY    2
++#define CONFIG_BOOTCOMMAND  "run extinguishled boot_nand"
++#define CONFIG_EXTRA_ENV_SETTINGS \
++    "load_nand=nboot 60500000 0 440000\0" \
++    "load_nand2=nboot 60500000 0 A40000\0" \
++    "lightled=ledfail 1\0" \
++    "extinguishled=ledfail 0\0" \
++    "boot=bootm 60500000\0" \
++    "boot_nand=run load_nand boot || run load_nand2 boot || run lightled\0"
+ #else // CONFIG_OXNAS_USE_SATA
+ 
+ /* command for booting from flash */
+diff -Naur u-boot.orig/include/linux/mtd/nand.h u-boot/include/linux/mtd/nand.h
+--- u-boot.orig/include/linux/mtd/nand.h	2010-07-26 00:52:19.000000000 -0700
++++ u-boot/include/linux/mtd/nand.h	2011-04-06 14:15:57.000000000 -0700
+@@ -64,9 +64,14 @@
+ /* Read raw data from the device without ECC */
+ extern int nand_read_raw (struct mtd_info *mtd, uint8_t *buf, loff_t from, size_t len, size_t ooblen);
+ 
++#ifdef CONFIG_MTD_NAND_WRITE_MLC
+ // write MLC compatible boot information
+ extern int nand_write_mlc (struct mtd_info *mtd, loff_t from, size_t len, size_t * retlen, u_char * buf);
+-
++extern int nand_read_mlc (struct mtd_info *mtd, loff_t from, size_t len, u_char * buf);
++#else
++extern int nand_write_slc (struct mtd_info *mtd, loff_t from, size_t len, size_t * retlen, u_char * buf);
++extern int nand_read_slc (struct mtd_info *mtd, loff_t from, size_t len, u_char * buf);
++#endif
+ 
+ /* This constant declares the max. oobsize / page, which
+  * is supported now. If you add a chip with bigger oobsize/page

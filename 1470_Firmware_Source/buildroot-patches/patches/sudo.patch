@@ -1,0 +1,19 @@
+diff -urN package/sudo.orig/sudo.mk package/sudo/sudo.mk
+--- package/sudo.orig/sudo.mk	2008-06-20 08:15:48.000000000 +0100
++++ package/sudo/sudo.mk	2008-06-20 16:28:05.000000000 +0100
+@@ -59,14 +59,13 @@
+ $(TARGET_DIR)/usr/bin/sudo: $(SUDO_DIR)/sudo
+ 	$(INSTALL) -m 4555 -D $(SUDO_DIR)/sudo $(TARGET_DIR)/usr/bin/sudo
+ 	$(INSTALL) -m 0555 -D $(SUDO_DIR)/visudo $(TARGET_DIR)/usr/sbin/visudo
+-	$(INSTALL) -m 0440 -D $(SUDO_DIR)/sudoers $(TARGET_DIR)/etc/sudoers
+ 	$(STRIPCMD) $(TARGET_DIR)/usr/bin/sudo $(TARGET_DIR)/usr/sbin/visudo
+ 	touch -c $(TARGET_DIR)/usr/bin/sudo
+ 
+ sudo: uclibc $(TARGET_DIR)/usr/bin/sudo
+ 
+ sudo-clean:
+-	rm -f $(TARGET_DIR)/usr/bin/sudo $(TARGET_DIR)/etc/sudoers \
++	rm -f $(TARGET_DIR)/usr/bin/sudo \
+ 		$(TARGET_DIR)/usr/sbin/visudo
+ 	-$(MAKE) -C $(SUDO_DIR) clean
+ 

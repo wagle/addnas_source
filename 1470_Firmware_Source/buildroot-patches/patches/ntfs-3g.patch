@@ -1,0 +1,14 @@
+diff -urN package/ntfs-3g.orig/ntfs-3g.mk package/ntfs-3g/ntfs-3g.mk
+--- package/ntfs-3g.orig/ntfs-3g.mk	2008-06-20 08:16:07.000000000 +0100
++++ package/ntfs-3g/ntfs-3g.mk	2008-06-20 11:05:06.000000000 +0100
+@@ -55,8 +55,8 @@
+ 	touch -c $@
+ 
+ $(TARGET_DIR)/usr/bin/ntfs-3g: $(STAGING_DIR)/usr/bin/ntfs-3g
+-	cp -dpf $(STAGING_DIR)/usr/lib/libntfs-3g.so.* $(TARGET_DIR)/usr/lib/
+-	cp -dpf $(STAGING_DIR)/usr/bin/ntfs-3g $(TARGET_DIR)/usr/bin/
++	cp -dpf $(STAGING_DIR)/lib/libntfs-3g.so.* $(TARGET_DIR)/usr/lib/
++	cp -dpf $(STAGING_DIR)/bin/ntfs-3g $(TARGET_DIR)/usr/bin/
+ 	touch -c $@
+ 
+ ntfs-3g: uclibc pkgconfig libfuse $(TARGET_DIR)/usr/bin/ntfs-3g

@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# Set readahead on the user data partition
+blockdev --setra 4096 /dev/md4

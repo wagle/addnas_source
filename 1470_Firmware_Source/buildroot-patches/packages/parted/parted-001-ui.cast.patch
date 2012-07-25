@@ -1,0 +1,11 @@
+--- parted-1.8.8/parted/ui.c.orig	2007-07-23 19:58:31.000000000 +0200
++++ parted-1.8.8/parted/ui.c	2008-03-11 16:35:28.000000000 +0100
+@@ -760,7 +760,7 @@
+ realloc_and_cat (char* str, const char* append)
+ {
+         int      length = strlen (str) + strlen (append) + 1;
+-        char*    new_str = realloc (str, length);
++        char*    new_str = (char*) realloc (str, length);
+ 
+         strcat (new_str, append);
+         return new_str;

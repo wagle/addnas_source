@@ -1,0 +1,121 @@
+#!/bin/sh
+#
+# default.script
+#
+[ -z "$1" ] && echo "Error: should be called from udhcpc" && exit 1
+
+SCRIPTS_PATH=/etc/init.d
+RESOLV_CONF="/etc/resolv.conf"
+STATUS_FILES_PATH=/var/run
+NETWORK_STARTED_FILE=$STATUS_FILES_PATH/network_started
+LOG_FILE=/var/log/dhcp.log
+CRONTAB_PATH=/etc/crontabs
+
+[ -n "$broadcast" ] && BROADCAST="broadcast $broadcast"
+[ -n "$subnet" ] && NETMASK="netmask $subnet"
+
+. /var/oxsemi/network-settings
+. /etc/default-settings
+
+# Extract network related settings from the environment and update the
+# network from them
+process_env() {
+	if [ -n "$router" ] ; then
+		for i in $router ; do
+			/sbin/route add default gw $i dev $interface
+		done
+	fi
+
+	echo -n > $RESOLV_CONF
+	[ -n "$domain" ] && echo search $domain >> $RESOLV_CONF
+	for i in $dns ; do
+		echo nameserver $i >> $RESOLV_CONF
+	done
+
+	if [ -z "$ntpsrv" ]
+	then
+		ntpsrv=$default_ntp
+	fi
+
+	if [ -n "$ntpsrv" ] ; then
+		sed "s/server.*\$/server $ntpsrv iburst/" < /etc/ntp.conf > tmp$$
+		mv -f tmp$$ /etc/ntp.conf
+	fi
+}
+
+case "$1" in
+	deconfig)
+		# If the zeroconf daemon is not running
+		if !(ps -AH | grep -q zcip) ; then
+			# Stop network services
+			$SCRIPTS_PATH/network_servers.sh stop
+
+			# Zeroise the network interface
+			ip addr flush $interface
+		fi
+		;;
+
+	bound)
+		$SCRIPTS_PATH/cron-daemon.sh stop
+
+		# If the zeroconf daemon is running
+		if ps -AH | grep -q zcip ; then
+			# Stop the zeroconf process
+			killall zcip > /dev/null 2>&1
+
+			# Stop network services
+			$SCRIPTS_PATH/network_servers.sh stop
+
+			# Zeroise the network interface
+			ip addr flush $interface
+		fi
+
+		# Bring the interface up
+		/sbin/ifconfig $interface $ip $BROADCAST $NETMASK
+
+		process_env
+
+		# Update configuration information used by network dependent services
+		$SCRIPTS_PATH/update_network_config.sh $ip $domain
+
+		# Start servers dependent on networking
+		$SCRIPTS_PATH/network_servers.sh start
+
+		# Start services started after network dependent servers
+		$SCRIPTS_PATH/post_network_start.sh start
+
+		# Use the crontab without DHCP polling
+		cp $CRONTAB_PATH/root-std $CRONTAB_PATH/root
+		$SCRIPTS_PATH/cron-daemon.sh start
+
+		# Create file indicating that networking has been started
+		touch $NETWORK_STARTED_FILE
+		;;
+
+	renew)
+		process_env
+
+		# Cause NTP daemon to re-read its config file for any server changes
+		$SCRIPTS_PATH/ntp.sh reload
+
+		# Apply any netmask and broadcast changes that may have occured
+		/sbin/ifconfig $interface $BROADCAST $NETMASK
+		;;
+
+	leasefail)
+		# If the zeroconf daemon is not running
+		if !(ps -AH | grep -q zcip) ; then
+			# Stop network services
+			$SCRIPTS_PATH/network_servers.sh stop
+
+			# Zeroise the network interface
+			ip addr flush $interface
+
+			# Start zeroconf daemon
+			/sbin/zcip $interface /etc/zcip.conf
+		fi
+		;;
+esac
+
+exit 0
+

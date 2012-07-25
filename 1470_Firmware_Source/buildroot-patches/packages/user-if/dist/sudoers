@@ -1,0 +1,85 @@
+# sudoers file.
+#
+# This file MUST be edited with the 'visudo' command as root.
+#
+# See the sudoers man page for the details on how to write a sudoers file.
+#
+
+# Host alias specification
+
+# User alias specification
+
+# Cmnd alias specification
+
+# Defaults specification
+
+# Runas alias specification
+
+# User privilege specification
+root		ALL=(ALL) ALL
+
+# Uncomment to allow people in group wheel to run all commands
+# %wheel	ALL=(ALL)	ALL
+
+# Same thing without a password
+# %wheel	ALL=(ALL)	NOPASSWD: ALL
+
+# Samples
+# %users  ALL=/sbin/mount /cdrom,/sbin/umount /cdrom
+# %users  localhost=/sbin/shutdown -h now
+
+www-data	ALL=(root) NOPASSWD : /usr/bin/install,\
+                /usr/bin/diff,\
+                /usr/www/nbin/mdadm.sh,\
+                /usr/www/nbin/ethtool.sh,\
+                /usr/www/nbin/chmod.sh,\
+                /usr/www/nbin/chown.sh,\
+                /usr/www/nbin/chgrp.sh,\
+                /usr/www/nbin/touch.sh,\
+                /usr/www/nbin/mkdir.sh,\
+                /usr/www/nbin/setusersymlink.sh,\
+                /usr/www/nbin/fdisk.sh,\
+                /usr/www/nbin/fs_addUser.sh,\
+                /usr/www/nbin/fs_chgPasswd.sh,\
+                /usr/www/nbin/fs_delUser.sh,\
+                /usr/www/nbin/makeSharedir.sh,\
+                /usr/www/nbin/renameShare.sh,\
+                /usr/www/nbin/restartSamba.sh,\
+                /usr/www/nbin/reconfigSamba.sh,\
+                /usr/www/nbin/quickRestartNetwork.sh,\
+                /usr/www/nbin/rmShareDir.sh,\
+                /usr/www/nbin/setAdminUser.sh,\
+                /usr/www/nbin/setDeviceDate.sh,\
+                /usr/www/nbin/setDeviceTime.sh,\
+                /usr/www/nbin/updNetwork.sh,\
+                /usr/www/nbin/dm_setDriveType.sh,\
+                /usr/www/nbin/dm_formatExternal.sh,\
+                /usr/www/nbin/dm_formatInternal.sh,\
+                /usr/www/nbin/dm_removeUSBdevice.sh,\
+                /usr/www/nbin/shareControl.sh,\
+                /usr/www/nbin/wget.sh,\
+                /usr/www/nbin/commonfuncs,\
+		/usr/www/nbin/applyupgrade.sh,\
+		/usr/www/nbin/checkupgrade.sh,\
+		/usr/www/nbin/getupgrade.sh,\
+		/usr/www/nbin/mlnet.sh,\
+                /etc/RAID-message-sender-en.sh,\
+                /sbin/mdadm --detail *,\
+                /bin/dd of=/dev/null count=1b if=*,\
+                /etc/init.d/samba.sh,\
+                /etc/init.d/mlnet.sh,\
+                /sbin/hdparm -I /dev/sda /dev/sdb,\
+                /sbin/hdparm -I /dev/sda,\
+                /sbin/hdparm -I /dev/sdb,\
+                /usr/www/nbin/updateNFS.sh,\
+		/usr/www/nbin/copy.sh,\
+		/usr/www/nbin/remove.sh,\
+		/usr/www/nbin/check_open_files.sh,\
+		/usr/www/nbin/inetdControl.sh,\
+		/usr/www/nbin/updateHardwareClock.sh,\
+		/usr/www/nbin/cleanUpgradeDir.sh,\
+		/shares/external/*/opt/upgrader/sbin/upgrader.sh,\
+		/etc/init.d/proftpd.sh,\
+		/sbin/reboot,\
+		/etc/init.d/tsi-archiver
+

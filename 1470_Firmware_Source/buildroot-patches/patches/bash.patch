@@ -1,0 +1,5281 @@
+diff -urN package/bash.ORIG/bash31-001 package/bash/bash31-001
+--- package/bash.ORIG/bash31-001	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-001	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,104 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-001
++
++Bug-Reported-by: Mike Frysinger <vapier@gentoo.org>
++Bug-Reference-ID: <20051212015924.GA820@toucan.gentoo.org> <20051214034438.GK1863@toucan.gentoo.org>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2005-12/msg00030.html http://lists.gnu.org/archive/html/bug-bash/2005-12/msg00041.html
++
++Bug-Description:
++
++There are parsing problems with compound assignments in several contexts,
++including as arguments to builtins like `local', `eval', and `let', and
++as multiple assignments in a single command.
++
++Patch:
++
++*** bash-3.1/parse.y	Fri Nov 11 23:14:18 2005
++--- bash-3.1/parse.y	Fri Dec 16 20:43:07 2005
++***************
++*** 3696,3700 ****
++        b = builtin_address_internal (token, 0);
++        if (b && (b->flags & ASSIGNMENT_BUILTIN))
++!         parser_state |= PST_ASSIGNOK;
++      }
++  
++--- 3696,3702 ----
++        b = builtin_address_internal (token, 0);
++        if (b && (b->flags & ASSIGNMENT_BUILTIN))
++! 	parser_state |= PST_ASSIGNOK;
++!       else if (STREQ (token, "eval") || STREQ (token, "let"))
++! 	parser_state |= PST_ASSIGNOK;
++      }
++  
++***************
++*** 4687,4691 ****
++  {
++    WORD_LIST *wl, *rl;
++!   int tok, orig_line_number, orig_token_size;
++    char *saved_token, *ret;
++  
++--- 4689,4693 ----
++  {
++    WORD_LIST *wl, *rl;
++!   int tok, orig_line_number, orig_token_size, orig_last_token, assignok;
++    char *saved_token, *ret;
++  
++***************
++*** 4693,4696 ****
++--- 4695,4699 ----
++    orig_token_size = token_buffer_size;
++    orig_line_number = line_number;
+++   orig_last_token = last_read_token;
++  
++    last_read_token = WORD;	/* WORD to allow reserved words here */
++***************
++*** 4699,4702 ****
++--- 4702,4707 ----
++    token_buffer_size = 0;
++  
+++   assignok = parser_state&PST_ASSIGNOK;		/* XXX */
+++ 
++    wl = (WORD_LIST *)NULL;	/* ( */
++    parser_state |= PST_COMPASSIGN;
++***************
++*** 4741,4745 ****
++      }
++  
++!   last_read_token = WORD;
++    if (wl)
++      {
++--- 4746,4750 ----
++      }
++  
++!   last_read_token = orig_last_token;		/* XXX - was WORD? */
++    if (wl)
++      {
++***************
++*** 4753,4756 ****
++--- 4758,4765 ----
++    if (retlenp)
++      *retlenp = (ret && *ret) ? strlen (ret) : 0;
+++ 
+++   if (assignok)
+++     parser_state |= PST_ASSIGNOK;
+++ 
++    return ret;
++  }
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 0
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 1
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-002 package/bash/bash31-002
+--- package/bash.ORIG/bash31-002	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-002	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,239 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-002
++
++Bug-Reported-by: vapier@gentoo.org
++Bug-Reference-ID: <20051210223218.GD3324@toucan.gentoo.org>
++Bug-Reference-URL:http://lists.gnu.org/archive/html/bug-bash/2005-12/msg00021.html
++
++Bug-Description:
++
++This corrects several omissions in the bash documentation:  It adds the new
++options to `ulimit', the exact expansions for `case' patterns, clarification
++of the language concerning the return value of `[[', and updated version
++information.
++
++Patch:
++
++*** bash-3.1/doc/bash.1	Wed Oct 12 11:40:52 2005
++--- bash-3.1/doc/bash.1	Wed Dec 28 19:58:54 2005
++***************
++*** 7,16 ****
++  .\"	chet@po.cwru.edu
++  .\"
++! .\"	Last Change: Sat Aug 27 13:28:44 EDT 2005
++  .\"
++  .\" bash_builtins, strip all but Built-Ins section
++  .if \n(zZ=1 .ig zZ
++  .if \n(zY=1 .ig zY
++! .TH BASH 1 "2005 Aug 27" "GNU Bash-3.1-beta1"
++  .\"
++  .\" There's some problem with having a `@'
++--- 7,16 ----
++  .\"	chet@po.cwru.edu
++  .\"
++! .\"	Last Change: Wed Dec 28 19:58:45 EST 2005
++  .\"
++  .\" bash_builtins, strip all but Built-Ins section
++  .if \n(zZ=1 .ig zZ
++  .if \n(zY=1 .ig zY
++! .TH BASH 1 "2005 Dec 28" "GNU Bash-3.1"
++  .\"
++  .\" There's some problem with having a `@'
++***************
++*** 678,683 ****
++  is enabled, the match is performed without regard to the case
++  of alphabetic characters.
++! The return value is 0 if the string matches or does not match
++! the pattern, respectively, and 1 otherwise.
++  Any part of the pattern may be quoted to force it to be matched as a
++  string.
++--- 678,683 ----
++  is enabled, the match is performed without regard to the case
++  of alphabetic characters.
++! The return value is 0 if the string matches (\fB==\fP) or does not match
++! (\fB!=\fP) the pattern, and 1 otherwise.
++  Any part of the pattern may be quoted to force it to be matched as a
++  string.
++***************
++*** 808,811 ****
++--- 808,817 ----
++  .B Pathname Expansion
++  below).
+++ The \fIword\fP is expanded using tilde
+++ expansion, parameter and variable expansion, arithmetic substituion,
+++ command substitution, process substitution and quote removal.
+++ Each \fIpattern\fP examined is expanded using tilde
+++ expansion, parameter and variable expansion, arithmetic substituion,
+++ command substitution, and process substitution.
++  If the shell option
++  .B nocasematch
++***************
++*** 8485,8489 ****
++  none are found.
++  .TP
++! \fBulimit\fP [\fB\-SHacdflmnpstuv\fP [\fIlimit\fP]]
++  Provides control over the resources available to the shell and to
++  processes started by it, on systems that allow such control.
++--- 8485,8489 ----
++  none are found.
++  .TP
++! \fBulimit\fP [\fB\-SHacdfilmnpqstuvx\fP [\fIlimit\fP]]
++  Provides control over the resources available to the shell and to
++  processes started by it, on systems that allow such control.
++***************
++*** 8524,8527 ****
++--- 8524,8530 ----
++  The maximum size of files created by the shell
++  .TP
+++ .B \-i
+++ The maximum number of pending signals
+++ .TP
++  .B \-l
++  The maximum size that may be locked into memory
++***************
++*** 8537,8540 ****
++--- 8540,8546 ----
++  The pipe size in 512-byte blocks (this may not be set)
++  .TP
+++ .B \-q
+++ The maximum number of bytes in POSIX message queues
+++ .TP
++  .B \-s
++  The maximum stack size
++***************
++*** 8548,8551 ****
++--- 8554,8560 ----
++  .B \-v
++  The maximum amount of virtual memory available to the shell
+++ .TP
+++ .B \-x
+++ The maximum number of file locks
++  .PD
++  .PP
++*** bash-3.1/doc/bashref.texi	Mon Oct  3 15:07:21 2005
++--- bash-3.1/doc/bashref.texi	Fri Dec 30 10:50:39 2005
++***************
++*** 962,967 ****
++  is enabled, the match is performed without regard to the case
++  of alphabetic characters.
++! The return value is 0 if the string matches or does not match
++! the pattern, respectively, and 1 otherwise.
++  Any part of the pattern may be quoted to force it to be matched as a
++  string.
++--- 962,967 ----
++  is enabled, the match is performed without regard to the case
++  of alphabetic characters.
++! The return value is 0 if the string matches (@samp{==}) or does not
++! match (@samp{!=})the pattern, and 1 otherwise.
++  Any part of the pattern may be quoted to force it to be matched as a
++  string.
++***************
++*** 2599,2603 ****
++  or inconvenient to obtain with separate utilities.
++  
++! This section briefly the builtins which Bash inherits from
++  the Bourne Shell, as well as the builtin commands which are unique
++  to or have been extended in Bash.
++--- 2597,2601 ----
++  or inconvenient to obtain with separate utilities.
++  
++! This section briefly describes the builtins which Bash inherits from
++  the Bourne Shell, as well as the builtin commands which are unique
++  to or have been extended in Bash.
++***************
++*** 3834,3838 ****
++  @btindex ulimit
++  @example
++! ulimit [-acdflmnpstuvSH] [@var{limit}]
++  @end example
++  @code{ulimit} provides control over the resources available to processes
++--- 3834,3838 ----
++  @btindex ulimit
++  @example
++! ulimit [-acdfilmnpqstuvxSH] [@var{limit}]
++  @end example
++  @code{ulimit} provides control over the resources available to processes
++***************
++*** 3858,3861 ****
++--- 3858,3864 ----
++  The maximum size of files created by the shell.
++  
+++ @item -i
+++ The maximum number of pending signals.
+++ 
++  @item -l
++  The maximum size that may be locked into memory.
++***************
++*** 3870,3873 ****
++--- 3873,3879 ----
++  The pipe buffer size.
++  
+++ @item -q
+++ The maximum number of bytes in POSIX message queues.
+++ 
++  @item -s
++  The maximum stack size.
++***************
++*** 3882,3885 ****
++--- 3888,3894 ----
++  The maximum amount of virtual memory available to the process.
++  
+++ @item -x
+++ The maximum number of file locks.
+++ 
++  @end table
++  
++***************
++*** 4090,4095 ****
++  
++  @item -x
++! Print a trace of simple commands, \fBfor\fP commands, \fBcase\fP
++! commands, \fBselect\fP commands, and arithmetic \fBfor\fP commands
++  and their arguments or associated word lists after they are
++  expanded and before they are executed.  The value of the @env{PS4}
++--- 4103,4108 ----
++  
++  @item -x
++! Print a trace of simple commands, @code{for} commands, @code{case}
++! commands, @code{select} commands, and arithmetic @code{for} commands
++  and their arguments or associated word lists after they are
++  expanded and before they are executed.  The value of the @env{PS4}
++*** bash-3.1/doc/version.texi	Tue Sep 20 14:52:56 2005
++--- bash-3.1/doc/version.texi	Fri Dec 30 10:50:58 2005
++***************
++*** 3,10 ****
++  @end ignore
++  
++! @set LASTCHANGE Mon Sep  5 11:47:04 EDT 2005
++  
++! @set EDITION 3.1-beta1
++! @set VERSION 3.1-beta1
++! @set UPDATED 5 September 2005
++! @set UPDATED-MONTH September 2005
++--- 3,10 ----
++  @end ignore
++  
++! @set LASTCHANGE Fri Dec 30 10:50:51 EST 2005
++  
++! @set EDITION 3.1
++! @set VERSION 3.1
++! @set UPDATED 30 December 2005
++! @set UPDATED-MONTH December 2005
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 1
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 2
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-003 package/bash/bash31-003
+--- package/bash.ORIG/bash31-003	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-003	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,47 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-003
++
++Bug-Reported-by: Adam Buraczewski <adamb@nor.pl>
++Bug-Reference-ID: <200512210950.jBL9o4C2008608@localhost.localdomain>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2005-12/msg00055.html
++
++Bug-Description:
++
++A missing #define guard causes bash to not compile when readline is not
++configured in, either as the result of explicit disabling or when the
++`--enable-minimal-config' option is given to configure.
++
++Patch:
++
++*** bash-3.1/variables.c	Sat Nov 12 21:22:37 2005
++--- bash-3.1/variables.c	Mon Dec 26 13:34:03 2005
++***************
++*** 861,867 ****
++--- 863,871 ----
++    char val[INT_STRLEN_BOUND(int) + 1], *v;
++  
+++ #if defined (READLINE)
++    /* If we are currently assigning to LINES or COLUMNS, don't do anything. */
++    if (winsize_assignment)
++      return;
+++ #endif
++  
++    v = inttostr (lines, val, sizeof (val));
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 2
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 3
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-004 package/bash/bash31-004
+--- package/bash.ORIG/bash31-004	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-004	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,48 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-004
++
++Bug-Reported-by: Mike Frysinger <vapier@gentoo.org>
++Bug-Reference-ID: <20051223172359.GF14579@toucan.gentoo.org>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2005-12/msg00062.html
++
++Bug-Description:
++
++A local array variable declared at function scope that shadows a variable
++of the same name declared in a previous scope did not create a separate
++variable instance, but used the previous one.
++
++Patch:
++
++*** bash-3.1/subst.c	Mon Oct 24 09:51:13 2005
++--- bash-3.1/subst.c	Fri Dec 30 12:11:53 2005
++***************
++*** 2188,2192 ****
++      {
++        v = find_variable (name);
++!       if (v == 0 || array_p (v) == 0)
++          v = make_local_array_variable (name);
++        v = assign_array_var_from_string (v, value, flags);
++--- 2188,2192 ----
++      {
++        v = find_variable (name);
++!       if (v == 0 || array_p (v) == 0 || v->context != variable_context)
++          v = make_local_array_variable (name);
++        v = assign_array_var_from_string (v, value, flags);
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 3
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 4
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-005 package/bash/bash31-005
+--- package/bash.ORIG/bash31-005	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-005	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,54 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-005
++
++Bug-Reported-by:
++Bug-Reference-ID:
++Bug-Reference-URL:
++
++Bug-Description:
++
++When tilde expansion fails, POSIX leaves it unspecified whether or not the
++word undergoes the additional word expansions.  Bash-3.1 as distributed
++skipped the rest of the expansions; this patch restores the bash-3.0 behavior.
++
++This means that something like
++	USER=ratbert
++	echo ~$USER
++
++will echo `~ratbert' rather than `~$USER'.
++
++Patch:
++
++*** bash-3.1/subst.c	Mon Oct 24 09:51:13 2005
++--- bash-3.1/subst.c	Fri Dec 30 12:11:53 2005
++***************
++*** 6796,6799 ****
++--- 6823,6832 ----
++  	    {
++  	      temp1 = bash_tilde_expand (temp, tflag);
+++ 	      if  (temp1 && *temp1 == '~' && STREQ (temp, temp1))
+++ 		{
+++ 		  FREE (temp);
+++ 		  FREE (temp1);
+++ 		  goto add_character;		/* tilde expansion failed */
+++ 		}
++  	      free (temp);
++  	      temp = temp1;
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 4
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 5
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-006 package/bash/bash31-006
+--- package/bash.ORIG/bash31-006	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-006	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,58 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-006
++
++Bug-Reported-by: Mike Frysinger <vapier@gentoo.org>
++Bug-Reference-ID: <200601120613.11907.vapier@gentoo.org>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2006-01/msg00045.html
++
++Bug-Description:
++
++Under some circumstances, Bash can use an incorrect setting for the flag
++that indicates whether or not the terminal can auto-wrap, resulting in line-
++wrapping errors.
++
++Patch:
++
++*** bash-3.1/lib/readline/terminal.c	Sat Nov 12 20:46:54 2005
++--- bash-3.1/lib/readline/terminal.c	Tue Jan 31 10:57:54 2006
++***************
++*** 123,127 ****
++  
++  /* Non-zero means the terminal can auto-wrap lines. */
++! int _rl_term_autowrap;
++  
++  /* Non-zero means that this terminal has a meta key. */
++--- 126,130 ----
++  
++  /* Non-zero means the terminal can auto-wrap lines. */
++! int _rl_term_autowrap = -1;
++  
++  /* Non-zero means that this terminal has a meta key. */
++***************
++*** 275,278 ****
++--- 278,284 ----
++       int rows, cols;
++  {
+++   if (_rl_term_autowrap == -1)
+++     _rl_init_terminal_io (rl_terminal_name);
+++ 
++    if (rows > 0)
++      _rl_screenheight = rows;
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 5
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 6
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-007 package/bash/bash31-007
+--- package/bash.ORIG/bash31-007	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-007	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,121 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-007
++
++Bug-Reported-by: Tim Waugh <twaugh@redhat.com>, Laird Breyer <laird@lbreyer.com>
++Bug-Reference-ID: <20060105174434.GY16000@redhat.com>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2006-01/msg00009.html
++		   http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=347695
++
++Bug-Description:
++
++When the number of saved jobs exceeds the initial size of the jobs array
++(4096 slots), the array must be compacted and reallocated.  An error in
++the code to do that could cause a segmentation fault.
++
++Patch:
++
++*** bash-3.1/jobs.c	Fri Nov 11 23:13:27 2005
++--- bash-3.1/jobs.c	Wed Feb  1 13:55:38 2006
++***************
++*** 845,851 ****
++  {
++    sigset_t set, oset;
++!   int nsize, i, j;
++    JOB **nlist;
++  
++    nsize = ((js.j_njobs + JOB_SLOTS - 1) / JOB_SLOTS);
++    nsize *= JOB_SLOTS;
++--- 888,895 ----
++  {
++    sigset_t set, oset;
++!   int nsize, i, j, ncur, nprev;
++    JOB **nlist;
++  
+++   ncur = nprev = NO_JOB;
++    nsize = ((js.j_njobs + JOB_SLOTS - 1) / JOB_SLOTS);
++    nsize *= JOB_SLOTS;
++***************
++*** 855,869 ****
++  
++    BLOCK_CHILD (set, oset);
++!   nlist = (JOB **) xmalloc (nsize * sizeof (JOB *));
++    for (i = j = 0; i < js.j_jobslots; i++)
++      if (jobs[i])
++!       nlist[j++] = jobs[i];
++  
++    js.j_firstj = 0;
++!   js.j_lastj = (j > 0) ? j - 1: 0;
++    js.j_jobslots = nsize;
++  
++!   free (jobs);
++!   jobs = nlist;
++  
++    UNBLOCK_CHILD (oset);
++--- 899,947 ----
++  
++    BLOCK_CHILD (set, oset);
++!   nlist = (js.j_jobslots == nsize) ? jobs : (JOB **) xmalloc (nsize * sizeof (JOB *));
++! 
++    for (i = j = 0; i < js.j_jobslots; i++)
++      if (jobs[i])
++!       {
++! 	if (i == js.j_current)
++! 	  ncur = j;
++! 	if (i == js.j_previous)
++! 	  nprev = j;
++! 	nlist[j++] = jobs[i];
++!       }
++! 
++! #if defined (DEBUG)
++!   itrace ("realloc_jobs_list: resize jobs list from %d to %d", js.j_jobslots, nsize);
++!   itrace ("realloc_jobs_list: j_lastj changed from %d to %d", js.j_lastj, (j > 0) ? j - 1 : 0);
++!   itrace ("realloc_jobs_list: j_njobs changed from %d to %d", js.j_njobs, (j > 0) ? j - 1 : 0);
++! #endif
++  
++    js.j_firstj = 0;
++!   js.j_lastj = (j > 0) ? j - 1 : 0;
++!   js.j_njobs = j;
++    js.j_jobslots = nsize;
++  
++!   /* Zero out remaining slots in new jobs list */
++!   for ( ; j < nsize; j++)
++!     nlist[j] = (JOB *)NULL;
++! 
++!   if (jobs != nlist)
++!     {
++!       free (jobs);
++!       jobs = nlist;
++!     }
++! 
++!   if (ncur != NO_JOB)
++!     js.j_current = ncur;
++!   if (nprev != NO_JOB)
++!     js.j_previous = nprev;
++! 
++!   /* Need to reset these */
++!   if (js.j_current == NO_JOB || js.j_previous == NO_JOB || js.j_current > js.j_lastj || js.j_previous > js.j_lastj)
++!     reset_current ();
++! 
++! #ifdef DEBUG
++!   itrace ("realloc_jobs_list: reset js.j_current (%d) and js.j_previous (%d)", js.j_current, js.j_previous);
++! #endif
++  
++    UNBLOCK_CHILD (oset);
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 6
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 7
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-008 package/bash/bash31-008
+--- package/bash.ORIG/bash31-008	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-008	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,51 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-008
++
++Bug-Reported-by: Ingemar Nilsson <init@kth.se>
++Bug-Reference-ID: <43C38D35.7020404@kth.se>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2006-01/msg00044.html
++
++Bug-Description:
++
++In some cases, bash inappropriately allows SIGINT from the terminal to
++reach background processes.
++
++Patch:
++
++*** bash-3.1/jobs.c	Fri Nov 11 23:13:27 2005
++--- bash-3.1/jobs.c	Wed Feb  1 13:55:38 2006
++***************
++*** 2199,2203 ****
++    wait_sigint_received = 0;
++    if (job_control == 0)
++!     old_sigint_handler = set_signal_handler (SIGINT, wait_sigint_handler);
++  
++    termination_state = last_command_exit_value;
++--- 2298,2306 ----
++    wait_sigint_received = 0;
++    if (job_control == 0)
++!     {
++!       old_sigint_handler = set_signal_handler (SIGINT, wait_sigint_handler);
++!       if (old_sigint_handler == SIG_IGN)
++! 	set_signal_handler (SIGINT, old_sigint_handler);
++!     }
++  
++    termination_state = last_command_exit_value;
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 7
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 8
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-009 package/bash/bash31-009
+--- package/bash.ORIG/bash31-009	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-009	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,66 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-009
++
++Bug-Reported-by: Joshua Neuheisel <jneuheisel@gmail.com>
++Bug-Reference-ID: <25d873330601140820v4ad8efd2t8bf683b073c138b3@mail.gmail.com>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2006-01/msg00062.html
++
++Bug-Description:
++
++Under some circumstances, background (asynchronous) jobs can set the terminal
++process group incorrectly.  This can cause a foreground process (including
++the foreground shell) to get read errors and exit.
++
++Patch:
++
++*** bash-3.1/jobs.c	Fri Nov 11 23:13:27 2005
++--- bash-3.1/jobs.c	Wed Feb  1 13:55:38 2006
++***************
++*** 620,625 ****
++  	   * the parent gives it away.
++  	   *
++  	   */
++! 	  if (job_control && newjob->pgrp)
++  	    give_terminal_to (newjob->pgrp, 0);
++  	}
++--- 634,642 ----
++  	   * the parent gives it away.
++  	   *
+++ 	   * Don't give the terminal away if this shell is an asynchronous
+++ 	   * subshell.
+++ 	   *
++  	   */
++! 	  if (job_control && newjob->pgrp && (subshell_environment&SUBSHELL_ASYNC) == 0)
++  	    give_terminal_to (newjob->pgrp, 0);
++  	}
++***************
++*** 1656,1660 ****
++  	     shell's process group (we could be in the middle of a
++  	     pipeline, for example). */
++! 	  if (async_p == 0 && pipeline_pgrp != shell_pgrp)
++  	    give_terminal_to (pipeline_pgrp, 0);
++  
++--- 1743,1747 ----
++  	     shell's process group (we could be in the middle of a
++  	     pipeline, for example). */
++! 	  if (async_p == 0 && pipeline_pgrp != shell_pgrp && ((subshell_environment&SUBSHELL_ASYNC) == 0))
++  	    give_terminal_to (pipeline_pgrp, 0);
++  
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 8
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 9
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-010 package/bash/bash31-010
+--- package/bash.ORIG/bash31-010	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-010	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,164 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-010
++
++Bug-Reported-by: vw@vonwolff.de
++Bug-Reference-ID: <20060123135234.1AC2F1D596@wst07.vonwolff.de>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2006-01/msg00090.html
++
++Bug-Description:
++
++There is a difference in behavior between bash-3.0 and bash-3.1 involving
++parsing of single- and double-quoted strings occurring in old-style
++command substitution.  The difference has to do with how backslashes are
++processed.  This patch restores a measure of backwards compatibility while
++the question of POSIX conformance and ultimately correct behavior is discussed.
++
++THIS IS AN UPDATED PATCH.  USE THIS COMMAND TO REVERSE THE EFFECTS OF
++THE ORIGINAL PATCH.  THE CURRENT DIRECTORY MUST BE THE BASH-3.1 SOURCE
++DIRECTORY.
++
++patch -p0 -R < bash31-010.orig
++
++Then apply this patch as usual.
++
++Patch:
++
++*** bash-3.1/parse.y	Fri Nov 11 23:14:18 2005
++--- bash-3.1/parse.y	Thu Feb 23 08:21:12 2006
++***************
++*** 2716,2721 ****
++--- 2723,2729 ----
++  #define P_ALLOWESC	0x02
++  #define P_DQUOTE	0x04
++  #define P_COMMAND	0x08	/* parsing a command, so look for comments */
+++ #define P_BACKQUOTE	0x10	/* parsing a backquoted command substitution */
++  
++  static char matched_pair_error;
++  static char *
++***************
++*** 2725,2736 ****
++       int *lenp, flags;
++  {
++    int count, ch, was_dollar, in_comment, check_comment;
++!   int pass_next_character, nestlen, ttranslen, start_lineno;
++    char *ret, *nestret, *ttrans;
++    int retind, retsize, rflags;
++  
++    count = 1;
++!   pass_next_character = was_dollar = in_comment = 0;
++    check_comment = (flags & P_COMMAND) && qc != '\'' && qc != '"' && (flags & P_DQUOTE) == 0;
++  
++    /* RFLAGS is the set of flags we want to pass to recursive calls. */
++--- 2733,2744 ----
++       int *lenp, flags;
++  {
++    int count, ch, was_dollar, in_comment, check_comment;
++!   int pass_next_character, backq_backslash, nestlen, ttranslen, start_lineno;
++    char *ret, *nestret, *ttrans;
++    int retind, retsize, rflags;
++  
++    count = 1;
++!   pass_next_character = backq_backslash = was_dollar = in_comment = 0;
++    check_comment = (flags & P_COMMAND) && qc != '\'' && qc != '"' && (flags & P_DQUOTE) == 0;
++  
++    /* RFLAGS is the set of flags we want to pass to recursive calls. */
++***************
++*** 2742,2752 ****
++    start_lineno = line_number;
++    while (count)
++      {
++! #if 0
++!       ch = shell_getc ((qc != '\'' || (flags & P_ALLOWESC)) && pass_next_character == 0);
++! #else
++!       ch = shell_getc (qc != '\'' && pass_next_character == 0);
++! #endif
++        if (ch == EOF)
++  	{
++  	  free (ret);
++--- 2750,2757 ----
++    start_lineno = line_number;
++    while (count)
++      {
++!       ch = shell_getc (qc != '\'' && pass_next_character == 0 && backq_backslash == 0);
++! 
++        if (ch == EOF)
++  	{
++  	  free (ret);
++***************
++*** 2771,2779 ****
++  	  continue;
++  	}
++        /* Not exactly right yet */
++!       else if (check_comment && in_comment == 0 && ch == '#' && (retind == 0 || ret[retind-1] == '\n' || whitespace (ret[retind -1])))
++  	in_comment = 1;
++  
++        if (pass_next_character)		/* last char was backslash */
++  	{
++  	  pass_next_character = 0;
++--- 2776,2791 ----
++  	  continue;
++  	}
++        /* Not exactly right yet */
++!       else if MBTEST(check_comment && in_comment == 0 && ch == '#' && (retind == 0 || ret[retind-1] == '\n' || whitespace (ret[retind - 1])))
++  	in_comment = 1;
++  
+++       /* last char was backslash inside backquoted command substitution */
+++       if (backq_backslash)
+++ 	{
+++ 	  backq_backslash = 0;
+++ 	  /* Placeholder for adding special characters */
+++ 	}
+++ 
++        if (pass_next_character)		/* last char was backslash */
++  	{
++  	  pass_next_character = 0;
++***************
++*** 2814,2819 ****
++--- 2824,2831 ----
++  	{
++  	  if MBTEST((flags & P_ALLOWESC) && ch == '\\')
++  	    pass_next_character++;
+++ 	  else if MBTEST((flags & P_BACKQUOTE) && ch == '\\')
+++ 	    backq_backslash++;
++  	  continue;
++  	}
++  
++***************
++*** 2898,2904 ****
++  	}
++        else if MBTEST(qc == '`' && (ch == '"' || ch == '\'') && in_comment == 0)
++  	{
++! 	  nestret = parse_matched_pair (0, ch, ch, &nestlen, rflags);
++  	  goto add_nestret;
++  	}
++        else if MBTEST(was_dollar && (ch == '(' || ch == '{' || ch == '['))	/* ) } ] */
++--- 2910,2920 ----
++  	}
++        else if MBTEST(qc == '`' && (ch == '"' || ch == '\'') && in_comment == 0)
++  	{
++! 	  /* Add P_BACKQUOTE so backslash quotes the next character and
++! 	     shell_getc does the right thing with \<newline>.  We do this for
++! 	     a measure  of backwards compatibility -- it's not strictly the
++! 	     right POSIX thing. */
++! 	  nestret = parse_matched_pair (0, ch, ch, &nestlen, rflags|P_BACKQUOTE);
++  	  goto add_nestret;
++  	}
++        else if MBTEST(was_dollar && (ch == '(' || ch == '{' || ch == '['))	/* ) } ] */
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 9
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 10
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-011 package/bash/bash31-011
+--- package/bash.ORIG/bash31-011	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-011	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,47 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-011
++
++Bug-Reported-by: Mike Stroyan <mike.stroyan@hp.com>
++Bug-Reference-ID: <E1EvwxP-0004LD-GC@localhost.localdomain>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2006-01/msg00033.html
++
++Bug-Description:
++
++A change in bash-3.1 caused the single quotes to be stripped from ANSI-C
++quoting inside double-quoted command substitutions.
++
++Patch:
++
++*** bash-3.1/parse.y	Fri Nov 11 23:14:18 2005
++--- bash-3.1/parse.y	Wed Jan 25 14:55:18 2006
++***************
++*** 2908,2912 ****
++  	    count--;
++  	  if (ch == '(')		/* ) */
++! 	    nestret = parse_matched_pair (0, '(', ')', &nestlen, rflags);
++  	  else if (ch == '{')		/* } */
++  	    nestret = parse_matched_pair (0, '{', '}', &nestlen, P_FIRSTCLOSE|rflags);
++--- 2914,2918 ----
++  	    count--;
++  	  if (ch == '(')		/* ) */
++! 	    nestret = parse_matched_pair (0, '(', ')', &nestlen, rflags & ~P_DQUOTE);
++  	  else if (ch == '{')		/* } */
++  	    nestret = parse_matched_pair (0, '{', '}', &nestlen, P_FIRSTCLOSE|rflags);
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 10
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 11
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-012 package/bash/bash31-012
+--- package/bash.ORIG/bash31-012	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-012	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,47 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-012
++
++Bug-Reported-by: Alexander Kshevetskiy <alex@dgap.mipt.ru>
++Bug-Reference-ID: <308374997.20060124175849@dgap.mipt.ru>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2006-01/msg00097.html
++
++Bug-Description:
++
++There is a parsing problem involving parentheses in assignment statements
++that causes words to be terminated prematurely.
++
++Patch:
++
++*** bash-3.1/parse.y	Fri Nov 11 23:14:18 2005
++--- bash-3.1/parse.y	Wed Jan 25 14:55:18 2006
++***************
++*** 3579,3583 ****
++  	      all_digit_token = 0;
++  	      compound_assignment = 1;
++! #if 0
++  	      goto next_character;
++  #else
++--- 3584,3588 ----
++  	      all_digit_token = 0;
++  	      compound_assignment = 1;
++! #if 1
++  	      goto next_character;
++  #else
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 11
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 12
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-013 package/bash/bash31-013
+--- package/bash.ORIG/bash31-013	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-013	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,44 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-013
++
++Bug-Reported-by: Bob Rossi <bob@brasko.net>
++Bug-Reference-ID: <43F60606.80708@case.edu>
++Bug-Reference-URL:
++
++Bug-Description:
++
++In some cases, readline will reference freed memory when attempting to
++display a portion of the prompt.
++
++Patch:
++
++*** bash-3.1-patched/lib/readline/readline.c	Mon Jul  4 22:29:35 2005
++--- bash-3.1/lib/readline/readline.c	Fri Feb 17 22:54:22 2006
++***************
++*** 282,287 ****
++--- 282,288 ----
++  {
++    FREE (rl_prompt);
++    rl_prompt = prompt ? savestring (prompt) : (char *)NULL;
+++   rl_display_prompt = rl_prompt ? rl_prompt : "";
++  
++    rl_visible_prompt_length = rl_expand_prompt (rl_prompt);
++    return 0;
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 12
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 13
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-014 package/bash/bash31-014
+--- package/bash.ORIG/bash31-014	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-014	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,105 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-014
++
++Bug-Reported-by: Mike Stroyan <mike.stroyan@hp.com>
++Bug-Reference-ID: <20060203191607.GC27614@localhost>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2006-02/msg00004.html
++
++Bug-Description:
++
++The displayed search prompt is corrupted when using non-incremental
++searches in vi and emacs mode if the prompt contains non-printing
++characters or spans multiple lines.  The prompt is expanded more than
++once; the second time without the escape sequences that protect non-
++printing characters from the length calculations.
++
++Patch:
++
++*** bash-3.1-patched/lib/readline/display.c	Wed Nov 30 14:05:02 2005
++--- bash-3.1/lib/readline/display.c	Sat Feb 18 12:14:58 2006
++***************
++*** 1983,1993 ****
++       int pchar;
++  {
++    int len;
++!   char *pmt;
++  
++    rl_save_prompt ();
++  
++!   if (saved_local_prompt == 0)
++      {
++        len = (rl_prompt && *rl_prompt) ? strlen (rl_prompt) : 0;
++        pmt = (char *)xmalloc (len + 2);
++--- 1998,2012 ----
++       int pchar;
++  {
++    int len;
++!   char *pmt, *p;
++  
++    rl_save_prompt ();
++  
++!   /* We've saved the prompt, and can do anything with the various prompt
++!      strings we need before they're restored.  We want the unexpanded
++!      portion of the prompt string after any final newline. */
++!   p = rl_prompt ? strrchr (rl_prompt, '\n') : 0;
++!   if (p == 0)
++      {
++        len = (rl_prompt && *rl_prompt) ? strlen (rl_prompt) : 0;
++        pmt = (char *)xmalloc (len + 2);
++***************
++*** 1998,2016 ****
++      }
++    else
++      {
++!       len = *saved_local_prompt ? strlen (saved_local_prompt) : 0;
++        pmt = (char *)xmalloc (len + 2);
++        if (len)
++! 	strcpy (pmt, saved_local_prompt);
++        pmt[len] = pchar;
++        pmt[len+1] = '\0';
++!       local_prompt = savestring (pmt);
++!       prompt_last_invisible = saved_last_invisible;
++!       prompt_visible_length = saved_visible_length + 1;
++!     }
++  
++    prompt_physical_chars = saved_physical_chars + 1;
++- 
++    return pmt;
++  }
++  
++--- 2017,2033 ----
++      }
++    else
++      {
++!       p++;
++!       len = strlen (p);
++        pmt = (char *)xmalloc (len + 2);
++        if (len)
++! 	strcpy (pmt, p);
++        pmt[len] = pchar;
++        pmt[len+1] = '\0';
++!     }  
++  
+++   /* will be overwritten by expand_prompt, called from rl_message */
++    prompt_physical_chars = saved_physical_chars + 1;
++    return pmt;
++  }
++  
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 13
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 14
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-015 package/bash/bash31-015
+--- package/bash.ORIG/bash31-015	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-015	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,106 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-015
++
++Bug-Reported-by: Benoit Vila
++Bug-Reference-ID: <43FCA614.1090108@free.fr>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2006-02/msg00058.html
++
++Bug-Description:
++
++A problem with the extended globbing code prevented dots from matching
++filenames when used in some extended matching patterns.
++
++Patch:
++
++*** bash-3.1/lib/glob/sm_loop.c	Sun Oct 16 21:21:04 2005
++--- bash-3.1/lib/glob/sm_loop.c	Mon Feb 27 17:18:43 2006
++***************
++*** 639,643 ****
++    CHAR *pnext;			/* pointer to next sub-pattern */
++    CHAR *srest;			/* pointer to rest of string */
++!   int m1, m2;
++  
++  #if DEBUG_MATCHING
++--- 638,642 ----
++    CHAR *pnext;			/* pointer to next sub-pattern */
++    CHAR *srest;			/* pointer to rest of string */
++!   int m1, m2, xflags;		/* xflags = flags passed to recursive matches */
++  
++  #if DEBUG_MATCHING
++***************
++*** 645,648 ****
++--- 644,648 ----
++  fprintf(stderr, "extmatch: s = %s; se = %s\n", s, se);
++  fprintf(stderr, "extmatch: p = %s; pe = %s\n", p, pe);
+++ fprintf(stderr, "extmatch: flags = %d\n", flags);
++  #endif
++  
++***************
++*** 678,683 ****
++  		 multiple matches of the pattern. */
++  	      if (m1)
++! 		m2 = (GMATCH (srest, se, prest, pe, flags) == 0) ||
++! 		      (s != srest && GMATCH (srest, se, p - 1, pe, flags) == 0);
++  	      if (m1 && m2)
++  		return (0);
++--- 678,687 ----
++  		 multiple matches of the pattern. */
++  	      if (m1)
++! 		{
++! 		  /* if srest > s, we are not at start of string */
++! 		  xflags = (srest > s) ? (flags & ~FNM_PERIOD) : flags;
++! 		  m2 = (GMATCH (srest, se, prest, pe, xflags) == 0) ||
++! 			(s != srest && GMATCH (srest, se, p - 1, pe, xflags) == 0);
++! 		}
++  	      if (m1 && m2)
++  		return (0);
++***************
++*** 705,710 ****
++  	  for ( ; srest <= se; srest++)
++  	    {
++  	      if (GMATCH (s, srest, psub, pnext - 1, flags) == 0 &&
++! 		  GMATCH (srest, se, prest, pe, flags) == 0)
++  		return (0);
++  	    }
++--- 709,716 ----
++  	  for ( ; srest <= se; srest++)
++  	    {
+++ 	      /* if srest > s, we are not at start of string */
+++ 	      xflags = (srest > s) ? (flags & ~FNM_PERIOD) : flags;
++  	      if (GMATCH (s, srest, psub, pnext - 1, flags) == 0 &&
++! 		  GMATCH (srest, se, prest, pe, xflags) == 0)
++  		return (0);
++  	    }
++***************
++*** 727,731 ****
++  		break;
++  	    }
++! 	  if (m1 == 0 && GMATCH (srest, se, prest, pe, flags) == 0)
++  	    return (0);
++  	}
++--- 733,739 ----
++  		break;
++  	    }
++! 	  /* if srest > s, we are not at start of string */
++! 	  xflags = (srest > s) ? (flags & ~FNM_PERIOD) : flags;
++! 	  if (m1 == 0 && GMATCH (srest, se, prest, pe, xflags) == 0)
++  	    return (0);
++  	}
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 14
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 15
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-016 package/bash/bash31-016
+--- package/bash.ORIG/bash31-016	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-016	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,51 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-016
++
++Bug-Reported-by: Nikita Danilov <nikita@clusterfs.com>
++Bug-Reference-ID: <17397.51015.769854.541057@gargle.gargle.HOWL>
++Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2006-02/msg00064.html
++
++Bug-Description:
++
++Bash will dump core when attempting to perform globbing in directories with
++very large numbers of files.
++
++Patch:
++
++*** bash-3.1/lib/glob/glob.c	Thu Mar 24 12:42:27 2005
++--- bash-3.1/lib/glob/glob.c	Fri Mar  3 16:54:12 2006
++***************
++*** 361,364 ****
++--- 361,365 ----
++  
++    firstmalloc = 0;
+++   nalloca = 0;
++  
++    /* If PAT is empty, skip the loop, but return one (empty) filename. */
++***************
++*** 547,550 ****
++--- 551,556 ----
++  	      tmplink = lastlink;
++  	    }
+++ 	  else
+++ 	    tmplink = 0;
++  	  free (lastlink->name);
++  	  lastlink = lastlink->next;
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 15
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 16
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-017 package/bash/bash31-017
+--- package/bash.ORIG/bash31-017	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-017	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,131 @@
++			     BASH PATCH REPORT
++			     =================
++
++Bash-Release: 3.1
++Patch-ID: bash31-017
++
++Bug-Reported-by: syphir@syphir.sytes.net
++Bug-Reference-ID: <442421F5.3010105@syphir.sytes.net>
++Bug-Reference-URL: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=358831
++
++Bug-Description:
++
++Array expansion fails with an arithmetic syntax error when the subscript
++appears within double quotes.  For example: ${a["4"]}.
++
++Patch:
++
++*** bash-3.1/subst.c	Wed Apr 12 08:47:08 2006
++--- bash-3.1/subst.c	Wed Apr 12 08:49:02 2006
++***************
++*** 2576,2579 ****
++--- 2576,2586 ----
++  }
++  
+++ char *
+++ expand_arith_string (string, quoted)
+++      char *string;
+++ {
+++   return (expand_string_if_necessary (string, quoted, expand_string));
+++ }
+++ 
++  #if defined (COND_COMMAND)
++  /* Just remove backslashes in STRING.  Returns a new string. */
++***************
++*** 5249,5253 ****
++      t = (char *)0;
++  
++!   temp1 = expand_string_if_necessary (substr, Q_DOUBLE_QUOTES, expand_string);
++    *e1p = evalexp (temp1, &expok);
++    free (temp1);
++--- 5256,5260 ----
++      t = (char *)0;
++  
++!   temp1 = expand_arith_string (substr, Q_DOUBLE_QUOTES);
++    *e1p = evalexp (temp1, &expok);
++    free (temp1);
++***************
++*** 5294,5298 ****
++        t++;
++        temp2 = savestring (t);
++!       temp1 = expand_string_if_necessary (temp2, Q_DOUBLE_QUOTES, expand_string);
++        free (temp2);
++        t[-1] = ':';
++--- 5301,5305 ----
++        t++;
++        temp2 = savestring (t);
++!       temp1 = expand_arith_string (temp2, Q_DOUBLE_QUOTES);
++        free (temp2);
++        t[-1] = ':';
++***************
++*** 6436,6440 ****
++  
++  	  /* Expand variables found inside the expression. */
++! 	  temp1 = expand_string_if_necessary (temp2, Q_DOUBLE_QUOTES, expand_string);
++  	  free (temp2);
++  
++--- 6443,6447 ----
++  
++  	  /* Expand variables found inside the expression. */
++! 	  temp1 = expand_arith_string (temp2, Q_DOUBLE_QUOTES);
++  	  free (temp2);
++  
++***************
++*** 6478,6482 ****
++  
++         /* Do initial variable expansion. */
++!       temp1 = expand_string_if_necessary (temp, Q_DOUBLE_QUOTES, expand_string);
++  
++        goto arithsub;
++--- 6485,6489 ----
++  
++         /* Do initial variable expansion. */
++!       temp1 = expand_arith_string (temp, Q_DOUBLE_QUOTES);
++  
++        goto arithsub;
++*** bash-3.1/subst.h	Sun Nov  7 15:12:28 2004
++--- bash-3.1/subst.h	Mon Mar 27 09:10:38 2006
++***************
++*** 152,155 ****
++--- 152,158 ----
++  extern char *expand_assignment_string_to_string __P((char *, int));
++  
+++ /* Expand an arithmetic expression string */
+++ extern char *expand_arith_string __P((char *, int));
+++ 
++  /* De-quoted quoted characters in STRING. */
++  extern char *dequote_string __P((char *));
++*** bash-3.1/arrayfunc.c	Mon Jul  4 20:25:58 2005
++--- bash-3.1/arrayfunc.c	Mon Mar 27 09:10:47 2006
++***************
++*** 593,601 ****
++    strncpy (exp, s, len - 1);
++    exp[len - 1] = '\0';
++! #if 0
++!   t = expand_string_to_string (exp, 0);
++! #else 
++!   t = expand_string_to_string (exp, Q_DOUBLE_QUOTES);
++! #endif
++    this_command_name = (char *)NULL;
++    val = evalexp (t, &expok);
++--- 591,595 ----
++    strncpy (exp, s, len - 1);
++    exp[len - 1] = '\0';
++!   t = expand_arith_string (exp, 0);
++    this_command_name = (char *)NULL;
++    val = evalexp (t, &expok);
++*** bash-3.1/patchlevel.h	Wed Jul 20 13:58:20 2005
++--- bash-3.1/patchlevel.h	Wed Dec  7 13:48:42 2005
++***************
++*** 26,30 ****
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 16
++  
++  #endif /* _PATCHLEVEL_H_ */
++--- 26,30 ----
++     looks for to find the patch level (for the sccs version string). */
++  
++! #define PATCHLEVEL 17
++  
++  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash31-018 package/bash/bash31-018
+--- package/bash.ORIG/bash31-018	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash31-018	2011-04-26 20:16:36.000000000 -0600
+@@ -0,0 +1,12 @@
++diff -urN bash-3.1.orig/builtins/Makefile.in bash-3.1/builtins/Makefile.in
++--- bash-3.1.orig/builtins/Makefile.in	2008-06-30 13:45:08.000000000 +0100
+++++ bash-3.1/builtins/Makefile.in	2008-06-30 13:13:38.000000000 +0100
++@@ -63,7 +63,7 @@
++ 
++ LIBS = @LIBS@
++ LDFLAGS = @LDFLAGS@ $(LOCAL_LDFLAGS) $(CFLAGS)
++-LDFLAGS_FOR_BUILD = $(LDFLAGS)
+++LDFLAGS_FOR_BUILD = 
++ LOCAL_LDFLAGS = @LOCAL_LDFLAGS@
++ #LIBS_FOR_BUILD =
++ LIBS_FOR_BUILD =
+diff -urN package/bash.ORIG/bash32-001 package/bash/bash32-001
+--- package/bash.ORIG/bash32-001	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-001	1969-12-31 17:00:00.000000000 -0700
+@@ -1,47 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-001
+-
+-Bug-Reported-by:	Greg Schafer <gschafer@zip.com.au>
+-Bug-Reference-ID:	<20061012084940.GA15768@tigers.local>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2006-10/msg00046.html
+-
+-Bug-Description:
+-
+-When using historical ``-style command substitution, bash incorrectly attempts
+-to interpret shell comments while scanning for the closing backquote.
+-
+-Patch:
+-
+-*** bash-3.2/parse.y	Tue Sep 19 16:37:21 2006
+---- bash-3.2/parse.y	Thu Oct 12 10:30:57 2006
+-***************
+-*** 2736,2740 ****
+-    count = 1;
+-    pass_next_character = backq_backslash = was_dollar = in_comment = 0;
+-!   check_comment = (flags & P_COMMAND) && qc != '\'' && qc != '"' && (flags & P_DQUOTE) == 0;
+-  
+-    /* RFLAGS is the set of flags we want to pass to recursive calls. */
+---- 2736,2740 ----
+-    count = 1;
+-    pass_next_character = backq_backslash = was_dollar = in_comment = 0;
+-!   check_comment = (flags & P_COMMAND) && qc != '`' && qc != '\'' && qc != '"' && (flags & P_DQUOTE) == 0;
+-  
+-    /* RFLAGS is the set of flags we want to pass to recursive calls. */
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 0
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 1
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-002 package/bash/bash32-002
+--- package/bash.ORIG/bash32-002	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-002	1969-12-31 17:00:00.000000000 -0700
+@@ -1,48 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-002
+-
+-Bug-Reported-by:	Jim Gifford <jim@jg555.com>
+-Bug-Reference-ID:	<12j2pc3aq35mb04@corp.supernews.com>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2006-10/msg00082.html
+-
+-Bug-Description:
+-
+-An incorrect encoding specification in the Content-Type header causes msgfmt
+-to fail, which causes `make install' to fail.
+-
+-Patch:
+-
+-*** bash-3.2/po/ru.po        Tue Jan 10 17:51:03 2006
+---- bash-3.2/po/ru.po    Mon Oct 16 15:13:23 2006
+-***************
+-*** 13,17 ****
+-  "Language-Team: Russian <ru@li.org>\n"
+-  "MIME-Version: 1.0\n"
+-! "Content-Type: text/plain; charset=UTF-8\n"
+-  "Content-Transfer-Encoding: 8bit\n"
+-  "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+---- 13,17 ----
+-  "Language-Team: Russian <ru@li.org>\n"
+-  "MIME-Version: 1.0\n"
+-! "Content-Type: text/plain; charset=KOI8-R\n"
+-  "Content-Transfer-Encoding: 8bit\n"
+-  "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+-
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 1
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 2
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-003 package/bash/bash32-003
+--- package/bash.ORIG/bash32-003	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-003	1969-12-31 17:00:00.000000000 -0700
+@@ -1,147 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-003
+-
+-Bug-Reported-by:	John Gatewood Ham <zappaman@buraphalinux.org>
+-Bug-Reference-ID:	<Pine.LNX.4.64.0610121334140.15558@www.buraphalinux.org>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2006-10/msg00045.html
+-
+-Bug-Description:
+-
+-When using the conditional command's `=~' operator to match regular
+-expressions, the parser did not skip over shell metacharacters in the
+-regular expression, leading to syntax errors.
+-
+-Patch:
+-
+-*** bash-3.2-patched/parse.y	Tue Oct 17 11:45:20 2006
+---- bash-3.2/parse.y	Sat Oct 14 14:56:16 2006
+-***************
+-*** 1029,1034 ****
+---- 1029,1035 ----
+-  #define PST_CMDTOKEN	0x1000		/* command token OK - unused */
+-  #define PST_COMPASSIGN	0x2000		/* parsing x=(...) compound assignment */
+-  #define PST_ASSIGNOK	0x4000		/* assignment statement ok in this context */
+-+ #define PST_REGEXP	0x8000		/* parsing an ERE/BRE as a single word */
+-  
+-  /* Initial size to allocate for tokens, and the
+-     amount to grow them by. */
+-***************
+-*** 2591,2596 ****
+---- 2592,2600 ----
+-        return (character);
+-      }
+-  
+-+   if (parser_state & PST_REGEXP)
+-+     goto tokword;
+-+ 
+-    /* Shell meta-characters. */
+-    if MBTEST(shellmeta (character) && ((parser_state & PST_DBLPAREN) == 0))
+-      {
+-***************
+-*** 2698,2703 ****
+---- 2702,2708 ----
+-    if MBTEST(character == '-' && (last_read_token == LESS_AND || last_read_token == GREATER_AND))
+-      return (character);
+-  
+-+ tokword:
+-    /* Okay, if we got this far, we have to read a word.  Read one,
+-       and then check it against the known ones. */
+-    result = read_token_word (character);
+-***************
+-*** 3202,3209 ****
+-        if (tok == WORD && test_binop (yylval.word->word))
+-  	op = yylval.word;
+-  #if defined (COND_REGEXP)
+-!       else if (tok == WORD && STREQ (yylval.word->word,"=~"))
+-! 	op = yylval.word;
+-  #endif
+-        else if (tok == '<' || tok == '>')
+-  	op = make_word_from_token (tok);  /* ( */
+---- 3207,3217 ----
+-        if (tok == WORD && test_binop (yylval.word->word))
+-  	op = yylval.word;
+-  #if defined (COND_REGEXP)
+-!       else if (tok == WORD && STREQ (yylval.word->word, "=~"))
+-! 	{
+-! 	  op = yylval.word;
+-! 	  parser_state |= PST_REGEXP;
+-! 	}
+-  #endif
+-        else if (tok == '<' || tok == '>')
+-  	op = make_word_from_token (tok);  /* ( */
+-***************
+-*** 3234,3239 ****
+---- 3242,3248 ----
+-  
+-        /* rhs */
+-        tok = read_token (READ);
+-+       parser_state &= ~PST_REGEXP;
+-        if (tok == WORD)
+-  	{
+-  	  tright = make_cond_node (COND_TERM, yylval.word, (COND_COM *)NULL, (COND_COM *)NULL);
+-***************
+-*** 3419,3427 ****
+-  	  goto next_character;
+-  	}
+-  
+-  #ifdef EXTENDED_GLOB
+-        /* Parse a ksh-style extended pattern matching specification. */
+-!       if (extended_glob && PATTERN_CHAR (character))
+-  	{
+-  	  peek_char = shell_getc (1);
+-  	  if MBTEST(peek_char == '(')		/* ) */
+---- 3428,3461 ----
+-  	  goto next_character;
+-  	}
+-  
+-+ #ifdef COND_REGEXP
+-+       /* When parsing a regexp as a single word inside a conditional command,
+-+ 	 we need to special-case characters special to both the shell and
+-+ 	 regular expressions.  Right now, that is only '(' and '|'. */ /*)*/
+-+       if MBTEST((parser_state & PST_REGEXP) && (character == '(' || character == '|'))		/*)*/
+-+         {
+-+           if (character == '|')
+-+             goto got_character;
+-+ 
+-+ 	  push_delimiter (dstack, character);
+-+ 	  ttok = parse_matched_pair (cd, '(', ')', &ttoklen, 0);
+-+ 	  pop_delimiter (dstack);
+-+ 	  if (ttok == &matched_pair_error)
+-+ 	    return -1;		/* Bail immediately. */
+-+ 	  RESIZE_MALLOCED_BUFFER (token, token_index, ttoklen + 2,
+-+ 				  token_buffer_size, TOKEN_DEFAULT_GROW_SIZE);
+-+ 	  token[token_index++] = character;
+-+ 	  strcpy (token + token_index, ttok);
+-+ 	  token_index += ttoklen;
+-+ 	  FREE (ttok);
+-+ 	  dollar_present = all_digit_token = 0;
+-+ 	  goto next_character;
+-+         }
+-+ #endif /* COND_REGEXP */
+-+ 
+-  #ifdef EXTENDED_GLOB
+-        /* Parse a ksh-style extended pattern matching specification. */
+-!       if MBTEST(extended_glob && PATTERN_CHAR (character))
+-  	{
+-  	  peek_char = shell_getc (1);
+-  	  if MBTEST(peek_char == '(')		/* ) */
+-
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 2
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 3
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+-
+diff -urN package/bash.ORIG/bash32-004 package/bash/bash32-004
+--- package/bash.ORIG/bash32-004	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-004	1969-12-31 17:00:00.000000000 -0700
+@@ -1,96 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-004
+-
+-Bug-Reported-by:	Stuart Shelton <srcshelton@gmail.com>
+-Bug-Reference-ID:	<619141e40610261203y6cda5aa6i23cb24c7aeba996e@mail.gmail.com>
+-Bug-Reference-URL:	
+-
+-Bug-Description:
+-
+-A bug in the parameter pattern substitution implementation treated a pattern
+-whose first character was `/' (after expansion) as specifying global
+-replacement.
+-
+-Patch:
+-
+-*** bash-3.2/subst.c	Tue Sep 19 08:35:09 2006
+---- bash-3.2/subst.c	Thu Oct 26 09:17:50 2006
+-***************
+-*** 5707,5712 ****
+---- 5707,5717 ----
+-    vtype &= ~VT_STARSUB;
+-  
+-    mflags = 0;
+-+   if (patsub && *patsub == '/')
+-+     {
+-+       mflags |= MATCH_GLOBREP;
+-+       patsub++;
+-+     }
+-  
+-    /* Malloc this because expand_string_if_necessary or one of the expansion
+-       functions in its call chain may free it on a substitution error. */
+-***************
+-*** 5741,5753 ****
+-      }
+-  
+-    /* ksh93 doesn't allow the match specifier to be a part of the expanded
+-!      pattern.  This is an extension. */
+-    p = pat;
+-!   if (pat && pat[0] == '/')
+-!     {
+-!       mflags |= MATCH_GLOBREP|MATCH_ANY;
+-!       p++;
+-!     }
+-    else if (pat && pat[0] == '#')
+-      {
+-        mflags |= MATCH_BEG;
+---- 5746,5757 ----
+-      }
+-  
+-    /* ksh93 doesn't allow the match specifier to be a part of the expanded
+-!      pattern.  This is an extension.  Make sure we don't anchor the pattern
+-!      at the beginning or end of the string if we're doing global replacement,
+-!      though. */
+-    p = pat;
+-!   if (mflags & MATCH_GLOBREP)
+-!     mflags |= MATCH_ANY;
+-    else if (pat && pat[0] == '#')
+-      {
+-        mflags |= MATCH_BEG;
+-*** bash-3.2/tests/new-exp.right	Thu Aug 10 12:00:00 2006
+---- bash-3.2/tests/new-exp.right	Sun Oct 29 16:03:36 2006
+-***************
+-*** 430,436 ****
+-  Case06---1---A B C::---
+-  Case07---3---A:B:C---
+-  Case08---3---A:B:C---
+-! ./new-exp.tests: line 506: /${$(($#-1))}: bad substitution
+-  argv[1] = <a>
+-  argv[2] = <b>
+-  argv[3] = <c>
+---- 430,436 ----
+-  Case06---1---A B C::---
+-  Case07---3---A:B:C---
+-  Case08---3---A:B:C---
+-! ./new-exp.tests: line 506: ${$(($#-1))}: bad substitution
+-  argv[1] = <a>
+-  argv[2] = <b>
+-  argv[3] = <c>
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 3
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 4
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-005 package/bash/bash32-005
+--- package/bash.ORIG/bash32-005	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-005	1969-12-31 17:00:00.000000000 -0700
+@@ -1,223 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-005
+-
+-Bug-Reported-by:	Stuart Shelton <stuart@openobjects.com>
+-Bug-Reference-ID:	<453F7CC8.6030907@openobjects.com>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2006-10/msg00127.html
+-
+-Bug-Description:
+-
+-A missing extern declaration for `asprintf' caused `double' arguments to be
+-passed as `0', leading to incorrect results.  Additionally, a bug in the
+-replacement asprintf/snprintf function caused an infinite loop when passed
+-0 arguments to the floating point conversions under some circumstances.
+-
+-Patch:
+-
+-*** bash-3.2/builtins/printf.def	Mon Sep 18 08:48:42 2006
+---- bash-3.2/builtins/printf.def	Tue Oct 31 08:19:44 2006
+-***************
+-*** 49,54 ****
+---- 49,60 ----
+-  #  define INT_MIN		(-2147483647-1)
+-  #endif
+-  
+-+ #if defined (PREFER_STDARG)
+-+ #  include <stdarg.h>
+-+ #else
+-+ #  include <varargs.h>
+-+ #endif
+-+ 
+-  #include <stdio.h>
+-  #include <chartypes.h>
+-  
+-***************
+-*** 151,156 ****
+---- 157,166 ----
+-  #define SKIP1 "#'-+ 0"
+-  #define LENMODS "hjlLtz"
+-  
+-+ #ifndef HAVE_ASPRINTF
+-+ extern int asprintf __P((char **, const char *, ...)) __attribute__((__format__ (printf, 2, 3)));
+-+ #endif
+-+ 
+-  static void printf_erange __P((char *));
+-  static int printstr __P((char *, char *, int, int, int));
+-  static int tescape __P((char *, char *, int *));
+-
+-
+-*** bash-3.2/lib/sh/snprintf.c	Thu Apr  6 09:48:40 2006
+---- bash-3.2/lib/sh/snprintf.c	Sat Oct 28 00:00:13 2006
+-***************
+-*** 471,476 ****
+---- 476,483 ----
+-  	  10^x ~= r
+-   * log_10(200) = 2;
+-   * log_10(250) = 2;
+-+  *
+-+  * NOTE: do not call this with r == 0 -- an infinite loop results.
+-   */
+-  static int
+-  log_10(r)
+-***************
+-*** 576,583 ****
+-      { 
+-        integral_part[0] = '0';
+-        integral_part[1] = '\0';
+-!       fraction_part[0] = '0';
+-!       fraction_part[1] = '\0';
+-        if (fract)
+-  	*fract = fraction_part;
+-        return integral_part;
+---- 583,593 ----
+-      { 
+-        integral_part[0] = '0';
+-        integral_part[1] = '\0';
+-!       /* The fractional part has to take the precision into account */
+-!       for (ch = 0; ch < precision-1; ch++)
+-!  	fraction_part[ch] = '0';
+-!       fraction_part[ch] = '0';
+-!       fraction_part[ch+1] = '\0';
+-        if (fract)
+-  	*fract = fraction_part;
+-        return integral_part;
+-***************
+-*** 805,810 ****
+---- 815,821 ----
+-        PUT_CHAR(*tmp, p);
+-        tmp++;
+-      }
+-+ 
+-    PAD_LEFT(p);
+-  }
+-  
+-***************
+-*** 972,982 ****
+-    if ((p->flags & PF_THOUSANDS) && grouping && (t = groupnum (tmp)))
+-      tmp = t;
+-  
+-    /* calculate the padding. 1 for the dot */
+-    p->width = p->width -
+-  	    ((d > 0. && p->justify == RIGHT) ? 1:0) -
+-  	    ((p->flags & PF_SPACE) ? 1:0) -
+-! 	    strlen(tmp) - p->precision - 1;
+-    PAD_RIGHT(p);  
+-    PUT_PLUS(d, p, 0.);
+-    PUT_SPACE(d, p, 0.);
+---- 983,1003 ----
+-    if ((p->flags & PF_THOUSANDS) && grouping && (t = groupnum (tmp)))
+-      tmp = t;
+-  
+-+   if ((*p->pf == 'g' || *p->pf == 'G') && (p->flags & PF_ALTFORM) == 0)
+-+     {
+-+       /* smash the trailing zeros unless altform */
+-+       for (i = strlen(tmp2) - 1; i >= 0 && tmp2[i] == '0'; i--)
+-+         tmp2[i] = '\0'; 
+-+       if (tmp2[0] == '\0')
+-+ 	p->precision = 0;
+-+     }
+-+ 
+-    /* calculate the padding. 1 for the dot */
+-    p->width = p->width -
+-  	    ((d > 0. && p->justify == RIGHT) ? 1:0) -
+-  	    ((p->flags & PF_SPACE) ? 1:0) -
+-! 	    strlen(tmp) - p->precision -
+-! 	    ((p->precision != 0 || (p->flags & PF_ALTFORM)) ? 1 : 0);	/* radix char */
+-    PAD_RIGHT(p);  
+-    PUT_PLUS(d, p, 0.);
+-    PUT_SPACE(d, p, 0.);
+-***************
+-*** 991,1001 ****
+-    if (p->precision != 0 || (p->flags & PF_ALTFORM))
+-      PUT_CHAR(decpoint, p);  /* put the '.' */
+-  
+--   if ((*p->pf == 'g' || *p->pf == 'G') && (p->flags & PF_ALTFORM) == 0)
+--     /* smash the trailing zeros unless altform */
+--     for (i = strlen(tmp2) - 1; i >= 0 && tmp2[i] == '0'; i--)
+--       tmp2[i] = '\0'; 
+-- 
+-    for (; *tmp2; tmp2++)
+-      PUT_CHAR(*tmp2, p); /* the fraction */
+-    
+---- 1012,1017 ----
+-***************
+-*** 1011,1024 ****
+-    char *tmp, *tmp2;
+-    int j, i;
+-  
+-!   if (chkinfnan(p, d, 1) || chkinfnan(p, d, 2))
+-      return;	/* already printed nan or inf */
+-  
+-    GETLOCALEDATA(decpoint, thoussep, grouping);
+-    DEF_PREC(p);
+-!   j = log_10(d);
+-!   d = d / pow_10(j);  /* get the Mantissa */
+-!   d = ROUND(d, p);		  
+-    tmp = dtoa(d, p->precision, &tmp2);
+-  
+-    /* 1 for unit, 1 for the '.', 1 for 'e|E',
+---- 1027,1045 ----
+-    char *tmp, *tmp2;
+-    int j, i;
+-  
+-!   if (d != 0 && (chkinfnan(p, d, 1) || chkinfnan(p, d, 2)))
+-      return;	/* already printed nan or inf */
+-  
+-    GETLOCALEDATA(decpoint, thoussep, grouping);
+-    DEF_PREC(p);
+-!   if (d == 0.)
+-!     j = 0;
+-!   else
+-!     {
+-!       j = log_10(d);
+-!       d = d / pow_10(j);  /* get the Mantissa */
+-!       d = ROUND(d, p);		  
+-!     }
+-    tmp = dtoa(d, p->precision, &tmp2);
+-  
+-    /* 1 for unit, 1 for the '.', 1 for 'e|E',
+-***************
+-*** 1076,1081 ****
+---- 1097,1103 ----
+-         PUT_CHAR(*tmp, p);
+-         tmp++;
+-       }
+-+ 
+-     PAD_LEFT(p);
+-  }
+-  #endif
+-***************
+-*** 1358,1364 ****
+-  		STAR_ARGS(data);
+-  		DEF_PREC(data);
+-  		d = GETDOUBLE(data);
+-! 		i = log_10(d);
+-  		/*
+-  		 * for '%g|%G' ANSI: use f if exponent
+-  		 * is in the range or [-4,p] exclusively
+---- 1380,1386 ----
+-  		STAR_ARGS(data);
+-  		DEF_PREC(data);
+-  		d = GETDOUBLE(data);
+-! 		i = (d != 0.) ? log_10(d) : -1;
+-  		/*
+-  		 * for '%g|%G' ANSI: use f if exponent
+-  		 * is in the range or [-4,p] exclusively
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 4
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 5
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-006 package/bash/bash32-006
+--- package/bash.ORIG/bash32-006	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-006	1969-12-31 17:00:00.000000000 -0700
+@@ -1,45 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-006
+-
+-Bug-Reported-by:	ebb9@byu.net
+-Bug-Reference-ID:	<45540862.9030900@byu.net>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2006-11/msg00017.html
+-			http://lists.gnu.org/archive/html/bug-bash/2006-11/msg00016.html
+-
+-Bug-Description:
+-
+-In some cases, code that is intended to be used in the presence of multibyte
+-characters is called when no such characters are present, leading to incorrect
+-display position calculations and incorrect redisplay.
+-
+-Patch:
+-
+-*** bash-3.2-patched/lib/readline/display.c	Thu Sep 14 14:20:12 2006
+---- bash-3.2/lib/readline/display.c	Mon Nov 13 17:55:57 2006
+-***************
+-*** 2381,2384 ****
+---- 2409,2414 ----
+-    if (end <= start)
+-      return 0;
+-+   if (MB_CUR_MAX == 1 || rl_byte_oriented)
+-+     return (end - start);
+-  
+-    memset (&ps, 0, sizeof (mbstate_t));
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 5
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 6
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-007 package/bash/bash32-007
+--- package/bash.ORIG/bash32-007	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-007	1969-12-31 17:00:00.000000000 -0700
+@@ -1,55 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-007
+-
+-Bug-Reported-by:	jidanni@jidanni.org
+-Bug-Reference-ID:	<E1Gkg12-00017D-Fm@jidanni.org>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2006-11/msg00039.html
+-
+-Bug-Description:
+-
+-When removing the current or previous job from the jobs list, bash incorrectly
+-resets the current job under some circumstances.
+-
+-Patch:
+-
+-*** bash-3.2-patched/jobs.c	Sat Jul 29 16:40:48 2006
+---- bash-3.2/jobs.c	Fri Nov 24 14:50:01 2006
+-***************
+-*** 985,990 ****
+-    if (temp == 0)
+-      return;
+--   if (job_index == js.j_current || job_index == js.j_previous)
+--     reset_current ();
+-  
+-    if ((dflags & DEL_NOBGPID) == 0)
+---- 985,988 ----
+-***************
+-*** 1029,1032 ****
+---- 1027,1033 ----
+-    else if (jobs[js.j_firstj] == 0 || jobs[js.j_lastj] == 0)
+-      reset_job_indices ();
+-+ 
+-+   if (job_index == js.j_current || job_index == js.j_previous)
+-+     reset_current ();
+-  }
+-
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 6
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 7
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+-
+-  
+diff -urN package/bash.ORIG/bash32-008 package/bash/bash32-008
+--- package/bash.ORIG/bash32-008	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-008	1969-12-31 17:00:00.000000000 -0700
+@@ -1,48 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-008
+-
+-Bug-Reported-by:	Linda Walsh <bash@tlinx.org>
+-Bug-Reference-ID:	<456041FD.8000605@tlinx.org>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2006-11/msg00040.html
+-
+-Bug-Description:
+-
+-When checking pathnames from the command hash table (e.g., when the `checkhash'
+-shell option is enabled), a bug causes bash to delete and re-lookup each
+-command.
+-
+-Patch:
+-
+-*** bash-3.2-patched/findcmd.c	Wed Aug 17 16:49:54 2005
+---- bash-3.2/findcmd.c	Fri Nov 24 10:48:37 2006
+-***************
+-*** 309,313 ****
+-      {
+-        st = file_status (hashed_file);
+-!       if ((st ^ (FS_EXISTS | FS_EXECABLE)) != 0)
+-  	{
+-  	  phash_remove (pathname);
+---- 309,313 ----
+-      {
+-        st = file_status (hashed_file);
+-!       if ((st & (FS_EXISTS|FS_EXECABLE)) != (FS_EXISTS|FS_EXECABLE))
+-  	{
+-  	  phash_remove (pathname);
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 7
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 8
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-009 package/bash/bash32-009
+--- package/bash.ORIG/bash32-009	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-009	1969-12-31 17:00:00.000000000 -0700
+@@ -1,61 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-009
+-
+-Bug-Reported-by:	James.M.Botte@lowes.com
+-Bug-Reference-ID:	<BA9FF90F7E5B424998F98EDA9F1F94BE01FA9853@msexchdb01.lowes.com>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2006-12/msg00000.html
+-
+-Bug-Description:
+-
+-When using its built-in replacement for snprintf/asprintf, bash does not
+-treat the %x, %X, and %o format specifiers as unsigned numbers.
+-
+-Patch:
+-
+-*** bash-3.2-patched/lib/sh/snprintf.c	Mon Nov 13 08:58:52 2006
+---- bash-3.2/lib/sh/snprintf.c	Wed Dec  6 11:15:04 2006
+-***************
+-*** 669,673 ****
+-  
+-    sd = d;	/* signed for ' ' padding in base 10 */
+-!   flags = (*p->pf == 'u' || *p->pf == 'U') ? FL_UNSIGNED : 0;
+-    if (*p->pf == 'X')
+-      flags |= FL_HEXUPPER;
+---- 674,679 ----
+-  
+-    sd = d;	/* signed for ' ' padding in base 10 */
+-!   flags = 0;
+-!   flags = (*p->pf == 'x' || *p->pf == 'X' || *p->pf == 'o' || *p->pf == 'u' || *p->pf == 'U') ? FL_UNSIGNED : 0;
+-    if (*p->pf == 'X')
+-      flags |= FL_HEXUPPER;
+-***************
+-*** 739,743 ****
+-  
+-    sd = d;	/* signed for ' ' padding in base 10 */
+-!   flags = (*p->pf == 'u' || *p->pf == 'U') ? FL_UNSIGNED : 0;
+-    if (*p->pf == 'X')
+-      flags |= FL_HEXUPPER;
+---- 745,749 ----
+-  
+-    sd = d;	/* signed for ' ' padding in base 10 */
+-!   flags = (*p->pf == 'x' || *p->pf == 'X' || *p->pf == 'o' || *p->pf == 'u' || *p->pf == 'U') ? FL_UNSIGNED : 0;
+-    if (*p->pf == 'X')
+-      flags |= FL_HEXUPPER;
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 8
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 9
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-010 package/bash/bash32-010
+--- package/bash.ORIG/bash32-010	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-010	1969-12-31 17:00:00.000000000 -0700
+@@ -1,207 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-010
+-
+-Bug-Reported-by:	Ryan Waldron <rew@erebor.com>
+-Bug-Reference-ID:	<20070119065603.546D011E9C@kansas.erebor.com>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2007-01/msg00059.html
+-
+-Bug-Description:
+-
+-The glibc implementation of regcomp/regexec does not allow backslashes to
+-escape "ordinary" pattern characters when matching.  Bash used backslashes
+-to quote all characters when the pattern argument to the [[ special
+-command's =~ operator was quoted.  This caused the match to fail on Linux
+-and other systems using GNU libc.
+-
+-Patch:
+-
+-*** ../bash-3.2.9/pathexp.h	Sat Feb 19 17:23:18 2005
+---- bash-3.2/pathexp.h	Wed Jan 31 22:53:16 2007
+-***************
+-*** 1,5 ****
+-  /* pathexp.h -- The shell interface to the globbing library. */
+-  
+-! /* Copyright (C) 1987-2005 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+---- 1,5 ----
+-  /* pathexp.h -- The shell interface to the globbing library. */
+-  
+-! /* Copyright (C) 1987-2007 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+-***************
+-*** 33,36 ****
+---- 33,37 ----
+-  #define QGLOB_CVTNULL	0x01	/* convert QUOTED_NULL strings to '\0' */
+-  #define QGLOB_FILENAME	0x02	/* do correct quoting for matching filenames */
+-+ #define QGLOB_REGEXP	0x04	/* quote an ERE for regcomp/regexec */
+-  
+-  #if defined (EXTENDED_GLOB)
+-*** ../bash-3.2.9/pathexp.c	Mon May  6 13:43:05 2002
+---- bash-3.2/pathexp.c	Mon Feb 26 16:59:23 2007
+-***************
+-*** 1,5 ****
+-  /* pathexp.c -- The shell interface to the globbing library. */
+-  
+-! /* Copyright (C) 1995-2002 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+---- 1,5 ----
+-  /* pathexp.c -- The shell interface to the globbing library. */
+-  
+-! /* Copyright (C) 1995-2007 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+-***************
+-*** 111,114 ****
+---- 111,141 ----
+-  }
+-  
+-+ /* Return 1 if C is a character that is `special' in a POSIX ERE and needs to
+-+    be quoted to match itself. */
+-+ static inline int
+-+ ere_char (c)
+-+      int c;
+-+ {
+-+   switch (c)
+-+     {
+-+     case '.':
+-+     case '[':
+-+     case '\\':
+-+     case '(':
+-+     case ')':
+-+     case '*':
+-+     case '+':
+-+     case '?':
+-+     case '{':
+-+     case '|':
+-+     case '^':
+-+     case '$':
+-+       return 1;
+-+     default: 
+-+       return 0;
+-+     }
+-+   return (0);
+-+ }
+-+ 
+-  /* PATHNAME can contain characters prefixed by CTLESC; this indicates
+-     that the character is to be quoted.  We quote it here in the style
+-***************
+-*** 143,146 ****
+---- 170,175 ----
+-  	  if ((qflags & QGLOB_FILENAME) && pathname[i+1] == '/')
+-  	    continue;
+-+ 	  if ((qflags & QGLOB_REGEXP) && ere_char (pathname[i+1]) == 0)
+-+ 	    continue;
+-  	  temp[j++] = '\\';
+-  	  i++;
+-*** ../bash-3.2.9/subst.c	Tue Nov  7 16:14:41 2006
+---- bash-3.2/subst.c	Wed Jan 31 23:09:58 2007
+-***************
+-*** 5,9 ****
+-       beauty, but, hey, you're alright.'' */
+-  
+-! /* Copyright (C) 1987-2006 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+---- 5,9 ----
+-       beauty, but, hey, you're alright.'' */
+-  
+-! /* Copyright (C) 1987-2007 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+-***************
+-*** 2647,2655 ****
+-  /* This needs better error handling. */
+-  /* Expand W for use as an argument to a unary or binary operator in a
+-!    [[...]] expression.  If SPECIAL is nonzero, this is the rhs argument
+-     to the != or == operator, and should be treated as a pattern.  In
+-!    this case, we quote the string specially for the globbing code.  The
+-!    caller is responsible for removing the backslashes if the unquoted
+-!    words is needed later. */   
+-  char *
+-  cond_expand_word (w, special)
+---- 2647,2656 ----
+-  /* This needs better error handling. */
+-  /* Expand W for use as an argument to a unary or binary operator in a
+-!    [[...]] expression.  If SPECIAL is 1, this is the rhs argument
+-     to the != or == operator, and should be treated as a pattern.  In
+-!    this case, we quote the string specially for the globbing code.  If
+-!    SPECIAL is 2, this is an rhs argument for the =~ operator, and should
+-!    be quoted appropriately for regcomp/regexec.  The caller is responsible
+-!    for removing the backslashes if the unquoted word is needed later. */   
+-  char *
+-  cond_expand_word (w, special)
+-***************
+-*** 2659,2662 ****
+---- 2660,2664 ----
+-    char *r, *p;
+-    WORD_LIST *l;
+-+   int qflags;
+-  
+-    if (w->word == 0 || w->word[0] == '\0')
+-***************
+-*** 2673,2678 ****
+-        else
+-  	{
+-  	  p = string_list (l);
+-! 	  r = quote_string_for_globbing (p, QGLOB_CVTNULL);
+-  	  free (p);
+-  	}
+---- 2675,2683 ----
+-        else
+-  	{
+-+ 	  qflags = QGLOB_CVTNULL;
+-+ 	  if (special == 2)
+-+ 	    qflags |= QGLOB_REGEXP;
+-  	  p = string_list (l);
+-! 	  r = quote_string_for_globbing (p, qflags);
+-  	  free (p);
+-  	}
+-*** ../bash-3.2.9/execute_cmd.c	Sat Aug 26 00:23:17 2006
+---- bash-3.2/execute_cmd.c	Wed Jan 31 23:12:06 2007
+-***************
+-*** 1,5 ****
+-  /* execute_cmd.c -- Execute a COMMAND structure. */
+-  
+-! /* Copyright (C) 1987-2005 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+---- 1,5 ----
+-  /* execute_cmd.c -- Execute a COMMAND structure. */
+-  
+-! /* Copyright (C) 1987-2007 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+-***************
+-*** 2547,2551 ****
+-        if (arg1 == 0)
+-  	arg1 = nullstr;
+-!       arg2 = cond_expand_word (cond->right->op, patmatch||rmatch);
+-        if (arg2 == 0)
+-  	arg2 = nullstr;
+---- 2547,2551 ----
+-        if (arg1 == 0)
+-  	arg1 = nullstr;
+-!       arg2 = cond_expand_word (cond->right->op, rmatch ? 2 : (patmatch ? 1 : 0));
+-        if (arg2 == 0)
+-  	arg2 = nullstr;
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 9
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 10
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-011 package/bash/bash32-011
+--- package/bash.ORIG/bash32-011	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-011	1969-12-31 17:00:00.000000000 -0700
+@@ -1,138 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-011
+-
+-Bug-Reported-by: Petr Sumbera <Petr.Sumbera@Sun.COM>
+-Bug-Reference-ID: <45AF5F4B.1020800@sun.com>
+-Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2007-01/msg00049.html
+-
+-Bug-Description:
+-
+-Under certain circumstances (loopback mounts), the bash getcwd does not
+-return correct results.  This patch allows the use of the Solaris libc
+-getcwd even though it doesn't dynamically allocate memory.
+-
+-Run `touch configure' to make sure make doesn't try to run autoconf.
+-Then run configure with whatever options you like.
+-
+-Patch:
+-
+-*** ../bash-3.2-patched/configure.in	Tue Sep 26 11:05:45 2006
+---- bash-3.2/configure.in	Wed Jan 31 09:48:00 2007
+-***************
+-*** 6,10 ****
+-  dnl Process this file with autoconf to produce a configure script.
+-  
+-! # Copyright (C) 1987-2006 Free Software Foundation, Inc.
+-  
+-  # This program is free software; you can redistribute it and/or modify
+---- 6,10 ----
+-  dnl Process this file with autoconf to produce a configure script.
+-  
+-! # Copyright (C) 1987-2007 Free Software Foundation, Inc.
+-  
+-  # This program is free software; you can redistribute it and/or modify
+-***************
+-*** 992,996 ****
+-  sco3.2*)	LOCAL_CFLAGS=-DMUST_UNBLOCK_CHLD ;;
+-  sunos4*)	LOCAL_CFLAGS=-DSunOS4 ;;
+-! solaris2.5*)	LOCAL_CFLAGS=-DSunOS5 ;;
+-  lynxos*)	LOCAL_CFLAGS=-DRECYCLES_PIDS ;;
+-  linux*)		LOCAL_LDFLAGS=-rdynamic		 # allow dynamic loading
+---- 992,997 ----
+-  sco3.2*)	LOCAL_CFLAGS=-DMUST_UNBLOCK_CHLD ;;
+-  sunos4*)	LOCAL_CFLAGS=-DSunOS4 ;;
+-! solaris2.5*)	LOCAL_CFLAGS="-DSunOS5 -DSOLARIS" ;;
+-! solaris2*)	LOCAL_CFLAGS=-DSOLARIS ;;
+-  lynxos*)	LOCAL_CFLAGS=-DRECYCLES_PIDS ;;
+-  linux*)		LOCAL_LDFLAGS=-rdynamic		 # allow dynamic loading
+-*** ../bash-3.2-patched/config-bot.h	Tue Sep 12 16:43:04 2006
+---- bash-3.2/config-bot.h	Tue Mar  6 10:41:31 2007
+-***************
+-*** 2,6 ****
+-  /* modify settings or make new ones based on what autoconf tells us. */
+-  
+-! /* Copyright (C) 1989-2002 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+---- 2,6 ----
+-  /* modify settings or make new ones based on what autoconf tells us. */
+-  
+-! /* Copyright (C) 1989-2007 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+-***************
+-*** 71,77 ****
+-  #endif
+-  
+-! /* If we have a getcwd(3), but it calls popen(), #undef HAVE_GETCWD so
+-!    the replacement in getcwd.c will be built. */
+-! #if defined (HAVE_GETCWD) && defined (GETCWD_BROKEN)
+-  #  undef HAVE_GETCWD
+-  #endif
+---- 71,79 ----
+-  #endif
+-  
+-! /* If we have a getcwd(3), but one that does not dynamically allocate memory,
+-!    #undef HAVE_GETCWD so the replacement in getcwd.c will be built.  We do
+-!    not do this on Solaris, because their implementation of loopback mounts
+-!    breaks the traditional file system assumptions that getcwd uses. */
+-! #if defined (HAVE_GETCWD) && defined (GETCWD_BROKEN) && !defined (SOLARIS)
+-  #  undef HAVE_GETCWD
+-  #endif
+-*** ../bash-3.2-patched/builtins/common.c	Thu Jul 27 09:39:51 2006
+---- bash-3.2/builtins/common.c	Tue Mar  6 10:43:27 2007
+-***************
+-*** 1,3 ****
+-! /* Copyright (C) 1987-2005 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+---- 1,3 ----
+-! /* Copyright (C) 1987-2007 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+-***************
+-*** 476,480 ****
+---- 476,484 ----
+-    if (the_current_working_directory == 0)
+-      {
+-+ #if defined (GETCWD_BROKEN)
+-+       the_current_working_directory = getcwd (0, PATH_MAX);
+-+ #else
+-        the_current_working_directory = getcwd (0, 0);
+-+ #endif
+-        if (the_current_working_directory == 0)
+-  	{
+-*** ../bash-3.2-patched/configure	Tue Sep 26 11:06:01 2006
+---- bash-3.2/configure	Tue Mar  6 10:59:20 2007
+-***************
+-*** 27317,27321 ****
+-  sco3.2*)	LOCAL_CFLAGS=-DMUST_UNBLOCK_CHLD ;;
+-  sunos4*)	LOCAL_CFLAGS=-DSunOS4 ;;
+-! solaris2.5*)	LOCAL_CFLAGS=-DSunOS5 ;;
+-  lynxos*)	LOCAL_CFLAGS=-DRECYCLES_PIDS ;;
+-  linux*)		LOCAL_LDFLAGS=-rdynamic		 # allow dynamic loading
+---- 27317,27322 ----
+-  sco3.2*)	LOCAL_CFLAGS=-DMUST_UNBLOCK_CHLD ;;
+-  sunos4*)	LOCAL_CFLAGS=-DSunOS4 ;;
+-! solaris2.5*)	LOCAL_CFLAGS="-DSunOS5 -DSOLARIS" ;;
+-! solaris2*)	LOCAL_CFLAGS=-DSOLARIS ;;
+-  lynxos*)	LOCAL_CFLAGS=-DRECYCLES_PIDS ;;
+-  linux*)		LOCAL_LDFLAGS=-rdynamic		 # allow dynamic loading
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 10
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 11
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-012 package/bash/bash32-012
+--- package/bash.ORIG/bash32-012	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-012	1969-12-31 17:00:00.000000000 -0700
+@@ -1,96 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-012
+-
+-Bug-Reported-by: John Wyman <JohnWyman@celink.com>
+-Bug-Reference-ID: <5E7DEFC094C35044B87FAE761D9F0EE20143A3B7@exchange2k.celink.com>
+-Bug-Reference-URL: 
+-
+-Bug-Description:
+-
+-Some systems (AIX 4.x) don't implement the PRI_xxx macros correctly,
+-causing syntax errors when attempting to compile bash on those systems.
+-This patch adds support for the PRI_MACROS_BROKEN define.
+-
+-You will need to re-run `configure' after applying the patch.  Run
+-`touch configure' so make doesn't try to run autoconf.
+-
+-Patch:
+-
+-*** ../bash-3.2.11/config.h.in	Tue Sep 12 16:00:54 2006
+---- bash-3.2/config.h.in	Tue Mar  6 11:17:55 2007
+-***************
+-*** 1,5 ****
+-  /* config.h -- Configuration file for bash. */
+-  
+-! /* Copyright (C) 1987-2006 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+---- 1,5 ----
+-  /* config.h -- Configuration file for bash. */
+-  
+-! /* Copyright (C) 1987-2007 Free Software Foundation, Inc.
+-  
+-     This file is part of GNU Bash, the Bourne Again SHell.
+-***************
+-*** 414,417 ****
+---- 414,419 ----
+-  #undef HAVE_DECL_STRTOLD
+-  
+-+ #undef PRI_MACROS_BROKEN
+-+ 
+-  #undef STRTOLD_BROKEN
+-  
+-***************
+-*** 1007,1010 ****
+---- 1009,1015 ----
+-  #undef HAVE_DCGETTEXT
+-  
+-+ /* Define if you have the `localeconv' function. */
+-+ #undef HAVE_LOCALECONV
+-+ 
+-  /* Define if your system has a working `malloc' function. */
+-  /* #undef HAVE_MALLOC */
+-*** ../bash-3.2.11/builtins/printf.def	Mon Nov 13 08:58:52 2006
+---- bash-3.2/builtins/printf.def	Sun Feb  4 13:58:59 2007
+-***************
+-*** 2,6 ****
+-  It implements the builtin "printf" in Bash.
+-  
+-! Copyright (C) 1997-2005 Free Software Foundation, Inc.
+-  
+-  This file is part of GNU Bash, the Bourne Again SHell.
+---- 2,6 ----
+-  It implements the builtin "printf" in Bash.
+-  
+-! Copyright (C) 1997-2007 Free Software Foundation, Inc.
+-  
+-  This file is part of GNU Bash, the Bourne Again SHell.
+-***************
+-*** 71,74 ****
+---- 71,78 ----
+-  #include "common.h"
+-  
+-+ #if defined (PRI_MACROS_BROKEN)
+-+ #  undef PRIdMAX
+-+ #endif
+-+ 
+-  #if !defined (PRIdMAX)
+-  #  if HAVE_LONG_LONG
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 11
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 12
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-013 package/bash/bash32-013
+--- package/bash.ORIG/bash32-013	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-013	1969-12-31 17:00:00.000000000 -0700
+@@ -1,65 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-013
+-
+-Bug-Reported-by: Magnus Svensson <msvensson@mysql.com>
+-Bug-Reference-ID: <45BDC44D.80609@mysql.com>
+-Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-readline/2007-01/msg00002.html
+-
+-Bug-Description:
+-
+-Readline neglects to reallocate the array it uses to keep track of wrapped
+-screen lines when increasing its size.  This will eventually result in
+-segmentation faults when given sufficiently long input.
+-
+-Patch:
+-
+-*** ../bash-3.2-patched/lib/readline/display.c	Thu Sep 14 14:20:12 2006
+---- bash-3.2/lib/readline/display.c	Fri Feb  2 20:23:17 2007
+-***************
+-*** 561,574 ****
+---- 561,586 ----
+-        wrap_offset = prompt_invis_chars_first_line = 0;
+-      }
+-  
+-+ #if defined (HANDLE_MULTIBYTE)
+-  #define CHECK_INV_LBREAKS() \
+-        do { \
+-  	if (newlines >= (inv_lbsize - 2)) \
+-  	  { \
+-  	    inv_lbsize *= 2; \
+-  	    inv_lbreaks = (int *)xrealloc (inv_lbreaks, inv_lbsize * sizeof (int)); \
+-+ 	    _rl_wrapped_line = (int *)xrealloc (_rl_wrapped_line, inv_lbsize * sizeof (int)); \
+-  	  } \
+-        } while (0)
+-+ #else
+-+ #define CHECK_INV_LBREAKS() \
+-+       do { \
+-+ 	if (newlines >= (inv_lbsize - 2)) \
+-+ 	  { \
+-+ 	    inv_lbsize *= 2; \
+-+ 	    inv_lbreaks = (int *)xrealloc (inv_lbreaks, inv_lbsize * sizeof (int)); \
+-+ 	  } \
+-+       } while (0)
+-+ #endif /* HANDLE_MULTIBYTE */
+-  
+-  #if defined (HANDLE_MULTIBYTE)	  
+-  #define CHECK_LPOS() \
+-
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 12
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 13
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-014 package/bash/bash32-014
+--- package/bash.ORIG/bash32-014	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-014	1969-12-31 17:00:00.000000000 -0700
+@@ -1,307 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-014
+-
+-Bug-Reported-by: Brett Stahlman <brettstahlman@comcast.net>
+-Bug-Reference-ID: <000701c72d29$a227e0e0$5ec7cf47@computerroom>
+-Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2006-12/msg00065.html
+-
+-Bug-Description:
+-
+-Bash mishandles word splitting under certain circumstances when IFS is
+-null (IFS=).  Constructs affected include ${param/pat/sub} and others
+-when expanding arrays (array[@]).
+-
+-Patch:
+-
+-*** ../bash-3.2-patched/array.c	Wed Jun  1 16:39:22 2005
+---- bash-3.2/array.c	Mon Jan 15 22:58:00 2007
+-***************
+-*** 121,125 ****
+-  }
+-  
+-- #ifdef INCLUDE_UNUSED
+-  /*
+-   * Make and return a new array composed of the elements in array A from
+---- 121,124 ----
+-***************
+-*** 142,146 ****
+-  		n = array_create_element (element_index(p), element_value(p));
+-  		ADD_BEFORE(a->head, n);
+-! 		mi = element_index(ae);
+-  	}
+-  	a->num_elements = i;
+---- 141,145 ----
+-  		n = array_create_element (element_index(p), element_value(p));
+-  		ADD_BEFORE(a->head, n);
+-! 		mi = element_index(n);
+-  	}
+-  	a->num_elements = i;
+-***************
+-*** 148,152 ****
+-  	return a;
+-  }
+-- #endif
+-  
+-  /*
+---- 147,150 ----
+-***************
+-*** 301,304 ****
+---- 299,319 ----
+-  }
+-  
+-+ ARRAY	*
+-+ array_quote_escapes(array)
+-+ ARRAY	*array;
+-+ {
+-+ 	ARRAY_ELEMENT	*a;
+-+ 	char	*t;
+-+ 
+-+ 	if (array == 0 || array_head(array) == 0 || array_empty(array))
+-+ 		return (ARRAY *)NULL;
+-+ 	for (a = element_forw(array->head); a != array->head; a = element_forw(a)) {
+-+ 		t = quote_escapes (a->value);
+-+ 		FREE(a->value);
+-+ 		a->value = t;
+-+ 	}
+-+ 	return array;
+-+ }
+-+ 
+-  /*
+-   * Return a string whose elements are the members of array A beginning at
+-***************
+-*** 312,318 ****
+-  int	starsub, quoted;
+-  {
+-  	ARRAY_ELEMENT	*h, *p;
+-  	arrayind_t	i;
+-! 	char		*ifs, sep[2];
+-  
+-  	p = a ? array_head (a) : 0;
+---- 327,334 ----
+-  int	starsub, quoted;
+-  {
+-+ 	ARRAY		*a2;
+-  	ARRAY_ELEMENT	*h, *p;
+-  	arrayind_t	i;
+-! 	char		*ifs, sep[2], *t;
+-  
+-  	p = a ? array_head (a) : 0;
+-***************
+-*** 337,340 ****
+---- 353,363 ----
+-  		;
+-  
+-+ 	a2 = array_slice(a, h, p);
+-+ 
+-+ 	if (quoted & (Q_DOUBLE_QUOTES|Q_HERE_DOCUMENT))
+-+ 		array_quote(a2);
+-+ 	else
+-+ 		array_quote_escapes(a2);
+-+ 
+-  	if (starsub && (quoted & (Q_DOUBLE_QUOTES|Q_HERE_DOCUMENT))) {
+-  		ifs = getifs();
+-***************
+-*** 344,348 ****
+-  	sep[1] = '\0';
+-  
+-! 	return (array_to_string_internal (h, p, sep, quoted));
+-  }
+-  
+---- 367,374 ----
+-  	sep[1] = '\0';
+-  
+-! 	t = array_to_string (a2, sep, 0);
+-! 	array_dispose(a2);
+-! 
+-! 	return t;
+-  }
+-  
+-***************
+-*** 368,372 ****
+-  
+-  	if (mflags & MATCH_QUOTED)
+-! 		array_quote (a2);
+-  	if (mflags & MATCH_STARSUB) {
+-  		ifs = getifs();
+---- 394,400 ----
+-  
+-  	if (mflags & MATCH_QUOTED)
+-! 		array_quote(a2);
+-! 	else
+-! 		array_quote_escapes(a2);
+-  	if (mflags & MATCH_STARSUB) {
+-  		ifs = getifs();
+-*** ../bash-3.2-patched/array.h	Sun Jun  1 15:50:30 2003
+---- bash-3.2/array.h	Mon Jan 15 22:35:35 2007
+-***************
+-*** 56,59 ****
+---- 56,60 ----
+-  extern int	array_shift_element __P((ARRAY *, char *));
+-  extern ARRAY	*array_quote __P((ARRAY *));
+-+ extern ARRAY	*array_quote_escapes __P((ARRAY *));
+-  
+-  extern char	*array_subrange __P((ARRAY *, arrayind_t, arrayind_t, int, int));
+-*** ../bash-3.2-patched/subst.c	Fri Mar  2 16:20:50 2007
+---- bash-3.2/subst.c	Tue Mar  6 11:40:55 2007
+-***************
+-*** 1888,1892 ****
+---- 1889,1899 ----
+-  #endif
+-  
+-+   /* XXX -- why call quote_list if ifs == 0?  we can get away without doing
+-+      it now that quote_escapes quotes spaces */
+-+ #if 0
+-    tlist = ((quoted & (Q_HERE_DOCUMENT|Q_DOUBLE_QUOTES)) || (ifs && *ifs == 0))
+-+ #else
+-+   tlist = (quoted & (Q_HERE_DOCUMENT|Q_DOUBLE_QUOTES))
+-+ #endif
+-  		? quote_list (list)
+-  		: list_quote_escapes (list);
+-***************
+-*** 2922,2926 ****
+-  /* Quote escape characters in string s, but no other characters.  This is
+-     used to protect CTLESC and CTLNUL in variable values from the rest of
+-!    the word expansion process after the variable is expanded. */
+-  char *
+-  quote_escapes (string)
+---- 2935,2944 ----
+-  /* Quote escape characters in string s, but no other characters.  This is
+-     used to protect CTLESC and CTLNUL in variable values from the rest of
+-!    the word expansion process after the variable is expanded.  If IFS is
+-!    null, we quote spaces as well, just in case we split on spaces later
+-!    (in the case of unquoted $@, we will eventually attempt to split the
+-!    entire word on spaces).  Corresponding code exists in dequote_escapes.
+-!    Even if we don't end up splitting on spaces, quoting spaces is not a
+-!    problem. */
+-  char *
+-  quote_escapes (string)
+-***************
+-*** 2930,2933 ****
+---- 2948,2952 ----
+-    size_t slen;
+-    char *result, *send;
+-+   int quote_spaces;
+-    DECLARE_MBSTATE; 
+-  
+-***************
+-*** 2935,2938 ****
+---- 2954,2958 ----
+-    send = string + slen;
+-  
+-+   quote_spaces = (ifs_value && *ifs_value == 0);
+-    t = result = (char *)xmalloc ((slen * 2) + 1);
+-    s = string;
+-***************
+-*** 2940,2944 ****
+-    while (*s)
+-      {
+-!       if (*s == CTLESC || *s == CTLNUL)
+-  	*t++ = CTLESC;
+-        COPY_CHAR_P (t, s, send);
+---- 2960,2964 ----
+-    while (*s)
+-      {
+-!       if (*s == CTLESC || *s == CTLNUL || (quote_spaces && *s == ' '))
+-  	*t++ = CTLESC;
+-        COPY_CHAR_P (t, s, send);
+-***************
+-*** 2982,2985 ****
+---- 3002,3006 ----
+-    size_t slen;
+-    char *result, *send;
+-+   int quote_spaces;
+-    DECLARE_MBSTATE;
+-  
+-***************
+-*** 2996,3002 ****
+-      return (strcpy (result, s));
+-  
+-    while (*s)
+-      {
+-!       if (*s == CTLESC && (s[1] == CTLESC || s[1] == CTLNUL))
+-  	{
+-  	  s++;
+---- 3017,3024 ----
+-      return (strcpy (result, s));
+-  
+-+   quote_spaces = (ifs_value && *ifs_value == 0);
+-    while (*s)
+-      {
+-!       if (*s == CTLESC && (s[1] == CTLESC || s[1] == CTLNUL || (quote_spaces && s[1] == ' ')))
+-  	{
+-  	  s++;
+-***************
+-*** 4462,4466 ****
+-        RESIZE_MALLOCED_BUFFER (istring, istring_index, 2, istring_size, DEFAULT_ARRAY_SIZE);
+-  
+-!       if ((quoted & (Q_HERE_DOCUMENT|Q_DOUBLE_QUOTES)) || c == CTLESC || c == CTLNUL)
+-  	istring[istring_index++] = CTLESC;
+-  
+---- 4498,4510 ----
+-        RESIZE_MALLOCED_BUFFER (istring, istring_index, 2, istring_size, DEFAULT_ARRAY_SIZE);
+-  
+-!       /* This is essentially quote_string inline */
+-!       if ((quoted & (Q_HERE_DOCUMENT|Q_DOUBLE_QUOTES)) /* || c == CTLESC || c == CTLNUL */)
+-! 	istring[istring_index++] = CTLESC;
+-!       /* Escape CTLESC and CTLNUL in the output to protect those characters
+-! 	 from the rest of the word expansions (word splitting and globbing.)
+-! 	 This is essentially quote_escapes inline. */
+-!       else if (c == CTLESC)
+-! 	istring[istring_index++] = CTLESC;
+-!       else if (c == CTLNUL || (c == ' ' && (ifs_value && *ifs_value == 0)))
+-  	istring[istring_index++] = CTLESC;
+-  
+-***************
+-*** 5552,5555 ****
+---- 5610,5616 ----
+-  	 rely on array_subrange to understand how to deal with them). */
+-        tt = array_subrange (array_cell (v), e1, e2, starsub, quoted);
+-+ #if 0
+-+       /* array_subrange now calls array_quote_escapes as appropriate, so the
+-+ 	 caller no longer needs to. */
+-        if ((quoted & (Q_DOUBLE_QUOTES|Q_HERE_DOCUMENT)) == 0)
+-  	{
+-***************
+-*** 5558,5561 ****
+---- 5619,5623 ----
+-  	}
+-        else
+-+ #endif
+-  	temp = tt;
+-        break;
+-***************
+-*** 5808,5811 ****
+---- 5870,5876 ----
+-      case VT_ARRAYVAR:
+-        temp = array_patsub (array_cell (v), p, rep, mflags);
+-+ #if 0
+-+       /* Don't need to do this anymore; array_patsub calls array_quote_escapes
+-+ 	 as appropriate before adding the space separators. */
+-        if (temp && (mflags & MATCH_QUOTED) == 0)
+-  	{
+-***************
+-*** 5814,5817 ****
+---- 5879,5883 ----
+-  	  temp = tt;
+-  	}
+-+ #endif
+-        break;
+-  #endif
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 13
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 14
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-015 package/bash/bash32-015
+--- package/bash.ORIG/bash32-015	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-015	1969-12-31 17:00:00.000000000 -0700
+@@ -1,95 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-015
+-
+-Bug-Reported-by:
+-Bug-Reference-ID:
+-Bug-Reference-URL:
+-
+-Bug-Description:
+-
+-Under certain circumstances, when using FIFOs for process substitution,
+-bash fails to unlink the FIFOs.  This leaves open file descriptors that
+-can cause the shell to hang and litters the file system.
+-
+-Patch:
+-
+-*** ../bash-3.2-patched/execute_cmd.c	Fri Mar  2 16:20:50 2007
+---- bash-3.2/execute_cmd.c	Wed Jan 31 23:12:06 2007
+-***************
+-*** 3051,3054 ****
+---- 3051,3059 ----
+-      command_line = savestring (the_printed_command_except_trap);
+-  
+-+ #if defined (PROCESS_SUBSTITUTION)
+-+   if ((subshell_environment & SUBSHELL_COMSUB) && (simple_command->flags & CMD_NO_FORK) && fifos_pending() > 0)
+-+     simple_command->flags &= ~CMD_NO_FORK;
+-+ #endif
+-+ 
+-    execute_disk_command (words, simple_command->redirects, command_line,
+-  			pipe_in, pipe_out, async, fds_to_close,
+-*** ../bash-3.2-patched/subst.c	Fri Mar  2 16:20:50 2007
+---- bash-3.2/subst.c	Tue Mar  6 11:40:55 2007
+-***************
+-*** 4129,4132 ****
+---- 4151,4160 ----
+-  }
+-  
+-+ int
+-+ fifos_pending ()
+-+ {
+-+   return nfifo;
+-+ }
+-+ 
+-  static char *
+-  make_named_pipe ()
+-***************
+-*** 4178,4181 ****
+---- 4206,4215 ----
+-  }
+-  
+-+ int
+-+ fifos_pending ()
+-+ {
+-+   return 0;	/* used for cleanup; not needed with /dev/fd */
+-+ }
+-+ 
+-  void
+-  unlink_fifo_list ()
+-***************
+-*** 4671,4674 ****
+---- 4719,4725 ----
+-        last_command_exit_value = rc;
+-        rc = run_exit_trap ();
+-+ #if defined (PROCESS_SUBSTITUTION)
+-+       unlink_fifo_list ();
+-+ #endif
+-        exit (rc);
+-      }
+-*** ../bash-3.2-patched/subst.h	Tue Sep 19 08:34:41 2006
+---- bash-3.2/subst.h	Wed Jan 10 09:46:47 2007
+-***************
+-*** 223,226 ****
+---- 223,227 ----
+-  extern char *pat_subst __P((char *, char *, char *, int));
+-  
+-+ extern int fifos_pending __P((void));
+-  extern void unlink_fifo_list __P((void));
+-
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 14
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 15
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-016 package/bash/bash32-016
+--- package/bash.ORIG/bash32-016	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-016	1969-12-31 17:00:00.000000000 -0700
+@@ -1,52 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-016
+-
+-Bug-Reported-by: Peter Volkov <torre_cremata@mail.ru>
+-Bug-Reference-ID: <1171795523.8021.18.camel@localhost>
+-Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2007-02/msg00054.html
+-
+-Bug-Description:
+-
+-When moving the cursor, bash sometimes misplaces the cursor when the prompt
+-contains two or more multibyte characters.  The particular circumstance that
+-uncovered the problem was having the (multibyte) current directory name in
+-the prompt string.
+-
+-Patch:
+-
+-*** ../bash-3.2/lib/readline/display.c	Fri Jan 19 13:34:50 2007
+---- bash-3.2/lib/readline/display.c	Sat Mar 10 17:25:44 2007
+-***************
+-*** 1745,1749 ****
+-      {
+-        dpos = _rl_col_width (data, 0, new);
+-!       if (dpos > prompt_last_invisible)		/* XXX - don't use woff here */
+-  	{
+-  	  dpos -= woff;
+---- 1745,1752 ----
+-      {
+-        dpos = _rl_col_width (data, 0, new);
+-!       /* Use NEW when comparing against the last invisible character in the
+-! 	 prompt string, since they're both buffer indices and DPOS is a
+-! 	 desired display position. */
+-!       if (new > prompt_last_invisible)		/* XXX - don't use woff here */
+-  	{
+-  	  dpos -= woff;
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 15
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 16
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-017 package/bash/bash32-017
+--- package/bash.ORIG/bash32-017	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-017	1969-12-31 17:00:00.000000000 -0700
+@@ -1,85 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-017
+-
+-Bug-Reported-by: Peter Volkov <torre_cremata@mail.ru>
+-Bug-Reference-ID: <1173636022.7039.36.camel@localhost>
+-Bug-Reference-URL: http://lists.gnu.org/archive/html/bug-bash/2007-03/msg00039.html
+-
+-Bug-Description:
+-
+-When restoring the original prompt after finishing an incremental search,
+-bash sometimes places the cursor incorrectly if the primary prompt contains
+-invisible characters.
+-
+-Patch:
+-
+-*** ../bash-3.2.16/lib/readline/display.c	Fri Apr 20 13:30:16 2007
+---- bash-3.2/lib/readline/display.c	Fri Apr 20 15:17:01 2007
+-***************
+-*** 1599,1604 ****
+-  	  if (temp > 0)
+-  	    {
+-  	      _rl_output_some_chars (nfd, temp);
+-! 	      _rl_last_c_pos += _rl_col_width (nfd, 0, temp);;
+-  	    }
+-  	}
+---- 1599,1618 ----
+-  	  if (temp > 0)
+-  	    {
+-+ 	      /* If nfd begins at the prompt, or before the invisible
+-+ 		 characters in the prompt, we need to adjust _rl_last_c_pos
+-+ 		 in a multibyte locale to account for the wrap offset and
+-+ 		 set cpos_adjusted accordingly. */
+-  	      _rl_output_some_chars (nfd, temp);
+-! 	      if (MB_CUR_MAX > 1 && rl_byte_oriented == 0)
+-! 		{
+-!                   _rl_last_c_pos += _rl_col_width (nfd, 0, temp);
+-!                   if (current_line == 0 && wrap_offset &&  ((nfd - new) <= prompt_last_invisible))
+-! 		    {
+-! 		      _rl_last_c_pos -= wrap_offset;
+-! 		      cpos_adjusted = 1;
+-! 		    }
+-! 		}
+-!               else
+-!                 _rl_last_c_pos += temp;
+-  	    }
+-  	}
+-***************
+-*** 1608,1613 ****
+---- 1622,1639 ----
+-  	  if (temp > 0)
+-  	    {
+-+ 	      /* If nfd begins at the prompt, or before the invisible
+-+ 		 characters in the prompt, we need to adjust _rl_last_c_pos
+-+ 		 in a multibyte locale to account for the wrap offset and
+-+ 		 set cpos_adjusted accordingly. */
+-  	      _rl_output_some_chars (nfd, temp);
+-  	      _rl_last_c_pos += col_temp;		/* XXX */
+-+ 	      if (MB_CUR_MAX > 1 && rl_byte_oriented == 0)
+-+ 		{
+-+ 		  if (current_line == 0 && wrap_offset &&  ((nfd - new) <= prompt_last_invisible))
+-+ 		    {
+-+ 		      _rl_last_c_pos -= wrap_offset;
+-+ 		      cpos_adjusted = 1;
+-+ 		    }
+-+ 		}
+-  	    }
+-  	  lendiff = (oe - old) - (ne - new);
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 16
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 17
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-018 package/bash/bash32-018
+--- package/bash.ORIG/bash32-018	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-018	1969-12-31 17:00:00.000000000 -0700
+@@ -1,98 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-018
+-
+-Bug-Reported-by:	osicka@post.cz
+-Bug-Reference-ID:	<228.177-19682-1132061412-1179356692@post.cz>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2007-05/msg00061.html
+-
+-Bug-Description:
+-
+-In certain cases, bash can lose the saved status of a background job, though
+-it should still be reported by `wait'.  Bash can also loop infinitely after
+-creating and waiting for 4096 jobs.
+-
+-Patch:
+-
+-*** ../bash-20070510/jobs.c	Thu Mar  8 16:05:50 2007
+---- bash-3.2/jobs.c	Fri May 18 11:40:14 2007
+-***************
+-*** 784,792 ****
+-      {
+-        old = js.j_firstj++;
+-        while (js.j_firstj != old)
+-  	{
+-  	  if (js.j_firstj >= js.j_jobslots)
+-  	    js.j_firstj = 0;
+-! 	  if (jobs[js.j_firstj])
+-  	    break;
+-  	  js.j_firstj++;
+---- 784,794 ----
+-      {
+-        old = js.j_firstj++;
+-+       if (old >= js.j_jobslots)
+-+ 	old = js.j_jobslots - 1;
+-        while (js.j_firstj != old)
+-  	{
+-  	  if (js.j_firstj >= js.j_jobslots)
+-  	    js.j_firstj = 0;
+-! 	  if (jobs[js.j_firstj] || js.j_firstj == old)	/* needed if old == 0 */
+-  	    break;
+-  	  js.j_firstj++;
+-***************
+-*** 798,806 ****
+-      {
+-        old = js.j_lastj--;
+-        while (js.j_lastj != old)
+-  	{
+-  	  if (js.j_lastj < 0)
+-  	    js.j_lastj = js.j_jobslots - 1;
+-! 	  if (jobs[js.j_lastj])
+-  	    break;
+-  	  js.j_lastj--;
+---- 800,810 ----
+-      {
+-        old = js.j_lastj--;
+-+       if (old < 0)
+-+ 	old = 0;
+-        while (js.j_lastj != old)
+-  	{
+-  	  if (js.j_lastj < 0)
+-  	    js.j_lastj = js.j_jobslots - 1;
+-! 	  if (jobs[js.j_lastj] || js.j_lastj == old)	/* needed if old == js.j_jobslots */
+-  	    break;
+-  	  js.j_lastj--;
+-***************
+-*** 964,968 ****
+-    realloc_jobs_list ();
+-  
+-!   return (js.j_lastj);
+-  }
+-  
+---- 975,983 ----
+-    realloc_jobs_list ();
+-  
+-! #ifdef DEBUG
+-!   itrace("compact_jobs_list: returning %d", (js.j_lastj || jobs[js.j_lastj]) ? js.j_lastj + 1 : 0);
+-! #endif
+-! 
+-!   return ((js.j_lastj || jobs[js.j_lastj]) ? js.j_lastj + 1 : 0);
+-  }
+-  
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 17
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 18
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-019 package/bash/bash32-019
+--- package/bash.ORIG/bash32-019	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-019	1969-12-31 17:00:00.000000000 -0700
+@@ -1,343 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-019
+-
+-Bug-Reported-by:	Thomas Loeber <ifp@loeber1.de>
+-Bug-Reference-ID:	<200703082223.08919.ifp@loeber1.de>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2007-03/msg00036.html
+-
+-Bug-Description:
+-
+-When rl_read_key returns -1, indicating that bash's controlling terminal
+-has been invalidated for some reason (e.g., receiving a SIGHUP), the error
+-status was not reported correctly to the caller.  This could cause input
+-loops. 
+-
+-Patch:
+-
+-*** ../bash-3.2-patched/lib/readline/complete.c	Fri Jul 28 11:35:49 2006
+---- bash-3.2/lib/readline/complete.c	Tue Mar 13 08:50:16 2007
+-***************
+-*** 429,433 ****
+-        if (c == 'n' || c == 'N' || c == RUBOUT)
+-  	return (0);
+-!       if (c == ABORT_CHAR)
+-  	_rl_abort_internal ();
+-        if (for_pager && (c == NEWLINE || c == RETURN))
+---- 440,444 ----
+-        if (c == 'n' || c == 'N' || c == RUBOUT)
+-  	return (0);
+-!       if (c == ABORT_CHAR || c < 0)
+-  	_rl_abort_internal ();
+-        if (for_pager && (c == NEWLINE || c == RETURN))
+-*** ../bash-3.2-patched/lib/readline/input.c	Wed Aug 16 15:15:16 2006
+---- bash-3.2/lib/readline/input.c	Wed May  2 16:07:59 2007
+-***************
+-*** 514,518 ****
+-       int size;
+-  {
+-!   int mb_len = 0;
+-    size_t mbchar_bytes_length;
+-    wchar_t wc;
+---- 522,526 ----
+-       int size;
+-  {
+-!   int mb_len, c;
+-    size_t mbchar_bytes_length;
+-    wchar_t wc;
+-***************
+-*** 521,531 ****
+-    memset(&ps, 0, sizeof (mbstate_t));
+-    memset(&ps_back, 0, sizeof (mbstate_t));
+-!   
+-    while (mb_len < size)
+-      {
+-        RL_SETSTATE(RL_STATE_MOREINPUT);
+-!       mbchar[mb_len++] = rl_read_key ();
+-        RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-  
+-        mbchar_bytes_length = mbrtowc (&wc, mbchar, mb_len, &ps);
+-        if (mbchar_bytes_length == (size_t)(-1))
+---- 529,545 ----
+-    memset(&ps, 0, sizeof (mbstate_t));
+-    memset(&ps_back, 0, sizeof (mbstate_t));
+-! 
+-!   mb_len = 0;  
+-    while (mb_len < size)
+-      {
+-        RL_SETSTATE(RL_STATE_MOREINPUT);
+-!       c = rl_read_key ();
+-        RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-  
+-+       if (c < 0)
+-+ 	break;
+-+ 
+-+       mbchar[mb_len++] = c;
+-+ 
+-        mbchar_bytes_length = mbrtowc (&wc, mbchar, mb_len, &ps);
+-        if (mbchar_bytes_length == (size_t)(-1))
+-***************
+-*** 565,569 ****
+-    c = first;
+-    memset (mb, 0, mlen);
+-!   for (i = 0; i < mlen; i++)
+-      {
+-        mb[i] = (char)c;
+---- 579,583 ----
+-    c = first;
+-    memset (mb, 0, mlen);
+-!   for (i = 0; c >= 0 && i < mlen; i++)
+-      {
+-        mb[i] = (char)c;
+-*** ../bash-3.2-patched/lib/readline/isearch.c	Mon Dec 26 17:18:53 2005
+---- bash-3.2/lib/readline/isearch.c	Fri Mar  9 14:30:59 2007
+-***************
+-*** 328,333 ****
+-  
+-    f = (rl_command_func_t *)NULL;
+-!  
+-!  /* Translate the keys we do something with to opcodes. */
+-    if (c >= 0 && _rl_keymap[c].type == ISFUNC)
+-      {
+---- 328,340 ----
+-  
+-    f = (rl_command_func_t *)NULL;
+-! 
+-!   if (c < 0)
+-!     {
+-!       cxt->sflags |= SF_FAILED;
+-!       cxt->history_pos = cxt->last_found_line;
+-!       return -1;
+-!     }
+-! 
+-!   /* Translate the keys we do something with to opcodes. */
+-    if (c >= 0 && _rl_keymap[c].type == ISFUNC)
+-      {
+-*** ../bash-3.2-patched/lib/readline/misc.c	Mon Dec 26 17:20:46 2005
+---- bash-3.2/lib/readline/misc.c	Fri Mar  9 14:44:11 2007
+-***************
+-*** 147,150 ****
+---- 147,152 ----
+-  	  rl_clear_message ();
+-  	  RL_UNSETSTATE(RL_STATE_NUMERICARG);
+-+ 	  if (key < 0)
+-+ 	    return -1;
+-  	  return (_rl_dispatch (key, _rl_keymap));
+-  	}
+-*** ../bash-3.2-patched/lib/readline/readline.c	Wed Aug 16 15:00:36 2006
+---- bash-3.2/lib/readline/readline.c	Fri Mar  9 14:47:24 2007
+-***************
+-*** 646,649 ****
+---- 669,677 ----
+-      {
+-        nkey = _rl_subseq_getchar (cxt->okey);
+-+       if (nkey < 0)
+-+ 	{
+-+ 	  _rl_abort_internal ();
+-+ 	  return -1;
+-+ 	}
+-        r = _rl_dispatch_subseq (nkey, cxt->dmap, cxt->subseq_arg);
+-        cxt->flags |= KSEQ_DISPATCHED;
+-*** ../bash-3.2-patched/lib/readline/text.c	Fri Jul 28 11:55:27 2006
+---- bash-3.2/lib/readline/text.c	Sun Mar 25 13:41:38 2007
+-***************
+-*** 858,861 ****
+---- 864,870 ----
+-    RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-  
+-+   if (c < 0)
+-+     return -1;
+-+ 
+-  #if defined (HANDLE_SIGNALS)
+-    if (RL_ISSTATE (RL_STATE_CALLBACK) == 0)
+-***************
+-*** 1521,1524 ****
+---- 1530,1536 ----
+-    mb_len = _rl_read_mbchar (mbchar, MB_LEN_MAX);
+-  
+-+   if (mb_len <= 0)
+-+     return -1;
+-+ 
+-    if (count < 0)
+-      return (_rl_char_search_internal (-count, bdir, mbchar, mb_len));
+-***************
+-*** 1537,1540 ****
+---- 1549,1555 ----
+-    RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-  
+-+   if (c < 0)
+-+     return -1;
+-+ 
+-    if (count < 0)
+-      return (_rl_char_search_internal (-count, bdir, c));
+-*** ../bash-3.2-patched/lib/readline/vi_mode.c	Sat Jul 29 16:42:28 2006
+---- bash-3.2/lib/readline/vi_mode.c	Fri Mar  9 15:02:11 2007
+-***************
+-*** 887,890 ****
+---- 887,897 ----
+-    c = rl_read_key ();
+-    RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-+ 
+-+   if (c < 0)
+-+     {
+-+       *nextkey = 0;
+-+       return -1;
+-+     }
+-+ 
+-    *nextkey = c;
+-  
+-***************
+-*** 903,906 ****
+---- 910,918 ----
+-  	  c = rl_read_key ();	/* real command */
+-  	  RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-+ 	  if (c < 0)
+-+ 	    {
+-+ 	      *nextkey = 0;
+-+ 	      return -1;
+-+ 	    }
+-  	  *nextkey = c;
+-  	}
+-***************
+-*** 1225,1236 ****
+-       _rl_callback_generic_arg *data;
+-  {
+-  #if defined (HANDLE_MULTIBYTE)
+-!   _rl_vi_last_search_mblen = _rl_read_mbchar (_rl_vi_last_search_mbchar, MB_LEN_MAX);
+-  #else
+-    RL_SETSTATE(RL_STATE_MOREINPUT);
+-!   _rl_vi_last_search_char = rl_read_key ();
+-    RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-  #endif
+-  
+-    _rl_callback_func = 0;
+-    _rl_want_redisplay = 1;
+---- 1243,1262 ----
+-       _rl_callback_generic_arg *data;
+-  {
+-+   int c;
+-  #if defined (HANDLE_MULTIBYTE)
+-!   c = _rl_vi_last_search_mblen = _rl_read_mbchar (_rl_vi_last_search_mbchar, MB_LEN_MAX);
+-  #else
+-    RL_SETSTATE(RL_STATE_MOREINPUT);
+-!   c = rl_read_key ();
+-    RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-  #endif
+-  
+-+   if (c <= 0)
+-+     return -1;
+-+ 
+-+ #if !defined (HANDLE_MULTIBYTE)
+-+   _rl_vi_last_search_char = c;
+-+ #endif
+-+ 
+-    _rl_callback_func = 0;
+-    _rl_want_redisplay = 1;
+-***************
+-*** 1248,1251 ****
+---- 1274,1278 ----
+-       int count, key;
+-  {
+-+   int c;
+-  #if defined (HANDLE_MULTIBYTE)
+-    static char *target;
+-***************
+-*** 1294,1302 ****
+-  	{
+-  #if defined (HANDLE_MULTIBYTE)
+-! 	  _rl_vi_last_search_mblen = _rl_read_mbchar (_rl_vi_last_search_mbchar, MB_LEN_MAX);
+-  #else
+-  	  RL_SETSTATE(RL_STATE_MOREINPUT);
+-! 	  _rl_vi_last_search_char = rl_read_key ();
+-  	  RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-  #endif
+-  	}
+---- 1321,1335 ----
+-  	{
+-  #if defined (HANDLE_MULTIBYTE)
+-! 	  c = _rl_read_mbchar (_rl_vi_last_search_mbchar, MB_LEN_MAX);
+-! 	  if (c <= 0)
+-! 	    return -1;
+-! 	  _rl_vi_last_search_mblen = c;
+-  #else
+-  	  RL_SETSTATE(RL_STATE_MOREINPUT);
+-! 	  c = rl_read_key ();
+-  	  RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-+ 	  if (c < 0)
+-+ 	    return -1;
+-+ 	  _rl_vi_last_search_char = c;
+-  #endif
+-  	}
+-***************
+-*** 1468,1471 ****
+---- 1501,1507 ----
+-    RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-  
+-+   if (c < 0)
+-+     return -1;
+-+ 
+-  #if defined (HANDLE_MULTIBYTE)
+-    if (MB_CUR_MAX > 1 && rl_byte_oriented == 0)
+-***************
+-*** 1486,1489 ****
+---- 1522,1528 ----
+-    _rl_vi_last_replacement = c = _rl_vi_callback_getchar (mb, MB_LEN_MAX);
+-  
+-+   if (c < 0)
+-+     return -1;
+-+ 
+-    _rl_callback_func = 0;
+-    _rl_want_redisplay = 1;
+-***************
+-*** 1517,1520 ****
+---- 1556,1562 ----
+-      _rl_vi_last_replacement = c = _rl_vi_callback_getchar (mb, MB_LEN_MAX);
+-  
+-+   if (c < 0)
+-+     return -1;
+-+ 
+-    return (_rl_vi_change_char (count, c, mb));
+-  }
+-***************
+-*** 1651,1655 ****
+-    RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-  
+-!   if (ch < 'a' || ch > 'z')
+-      {
+-        rl_ding ();
+---- 1693,1697 ----
+-    RL_UNSETSTATE(RL_STATE_MOREINPUT);
+-  
+-!   if (ch < 0 || ch < 'a' || ch > 'z')	/* make test against 0 explicit */
+-      {
+-        rl_ding ();
+-***************
+-*** 1703,1707 ****
+-        return 0;
+-      }
+-!   else if (ch < 'a' || ch > 'z')
+-      {
+-        rl_ding ();
+---- 1745,1749 ----
+-        return 0;
+-      }
+-!   else if (ch < 0 || ch < 'a' || ch > 'z')	/* make test against 0 explicit */
+-      {
+-        rl_ding ();
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 18
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 19
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-020 package/bash/bash32-020
+--- package/bash.ORIG/bash32-020	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-020	1969-12-31 17:00:00.000000000 -0700
+@@ -1,183 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-020
+-
+-Bug-Reported-by:	Ian A Watson <WATSON_IAN_A@LILLY.COM>
+-Bug-Reference-ID:	<OFEC551808.69D02C7F-ON8525729A.0045708D-8525729A.0046150B@EliLilly.lilly.com>
+-Bug-Reference-URL:
+-
+-Bug-Description:
+-
+-In some cases of error processing, a jump back to the top-level processing
+-loop from a builtin command  would leave the shell in an inconsistent state.
+-
+-Patch:
+-
+-*** ../bash-3.2-patched/sig.c	Wed Jan 25 14:57:59 2006
+---- bash-3.2/sig.c	Sat Mar 10 11:11:30 2007
+-***************
+-*** 351,354 ****
+---- 351,373 ----
+-  #undef XHANDLER
+-  
+-+ /* Run some of the cleanups that should be performed when we run
+-+    jump_to_top_level from a builtin command context.  XXX - might want to
+-+    also call reset_parser here. */
+-+ void
+-+ top_level_cleanup ()
+-+ {
+-+   /* Clean up string parser environment. */
+-+   while (parse_and_execute_level)
+-+     parse_and_execute_cleanup ();
+-+ 
+-+ #if defined (PROCESS_SUBSTITUTION)
+-+   unlink_fifo_list ();
+-+ #endif /* PROCESS_SUBSTITUTION */
+-+ 
+-+   run_unwind_protects ();
+-+   loop_level = continuing = breaking = 0;
+-+   return_catch_flag = 0;
+-+ }
+-+ 
+-  /* What to do when we've been interrupted, and it is safe to handle it. */
+-  void
+-*** ../bash-3.2-patched/sig.h	Wed Jan 25 14:50:27 2006
+---- bash-3.2/sig.h	Sat Mar 10 11:14:18 2007
+-***************
+-*** 122,125 ****
+---- 122,126 ----
+-  extern void initialize_terminating_signals __P((void));
+-  extern void reset_terminating_signals __P((void));
+-+ extern void top_level_cleanup __P((void));
+-  extern void throw_to_top_level __P((void));
+-  extern void jump_to_top_level __P((int)) __attribute__((__noreturn__));
+-*** ../bash-3.2-patched/builtins/common.c	Tue Apr  3 16:47:13 2007
+---- bash-3.2/builtins/common.c	Mon Apr 30 15:01:33 2007
+-***************
+-*** 132,135 ****
+---- 132,136 ----
+-      {
+-        builtin_error (_("too many arguments"));
+-+       top_level_cleanup ();
+-        jump_to_top_level (DISCARD);
+-      }
+-***************
+-*** 396,400 ****
+-  	    throw_to_top_level ();
+-  	  else
+-! 	    jump_to_top_level (DISCARD);
+-  	}
+-        no_args (list->next);
+---- 410,417 ----
+-  	    throw_to_top_level ();
+-  	  else
+-! 	    {
+-! 	      top_level_cleanup ();
+-! 	      jump_to_top_level (DISCARD);
+-! 	    }
+-  	}
+-        no_args (list->next);
+-*** ../bash-3.2-patched/subst.c	Tue Apr  3 16:47:19 2007
+---- bash-3.2/subst.c	Tue Jul 17 09:45:11 2007
+-***************
+-*** 1279,1283 ****
+-        if (no_longjmp_on_fatal_error == 0)
+-  	{			/* { */
+-! 	  report_error ("bad substitution: no closing `%s' in %s", "}", string);
+-  	  last_command_exit_value = EXECUTION_FAILURE;
+-  	  exp_jump_to_top_level (DISCARD);
+---- 1290,1294 ----
+-        if (no_longjmp_on_fatal_error == 0)
+-  	{			/* { */
+-! 	  report_error (_("bad substitution: no closing `%s' in %s"), "}", string);
+-  	  last_command_exit_value = EXECUTION_FAILURE;
+-  	  exp_jump_to_top_level (DISCARD);
+-***************
+-*** 7662,7665 ****
+---- 7706,7711 ----
+-    expand_no_split_dollar_star = 0;	/* XXX */
+-    expanding_redir = 0;
+-+ 
+-+   top_level_cleanup ();			/* from sig.c */
+-  
+-    jump_to_top_level (v);
+-***************
+-*** 7880,7884 ****
+-  	    {
+-  	      report_error (_("no match: %s"), tlist->word->word);
+-! 	      jump_to_top_level (DISCARD);
+-  	    }
+-  	  else if (allow_null_glob_expansion == 0)
+---- 7927,7931 ----
+-  	    {
+-  	      report_error (_("no match: %s"), tlist->word->word);
+-! 	      exp_jump_to_top_level (DISCARD);
+-  	    }
+-  	  else if (allow_null_glob_expansion == 0)
+-*** ../bash-3.2-patched/arrayfunc.c	Thu Jul 27 09:37:59 2006
+---- bash-3.2/arrayfunc.c	Thu May 31 11:55:46 2007
+-***************
+-*** 619,622 ****
+---- 619,624 ----
+-      {
+-        last_command_exit_value = EXECUTION_FAILURE;
+-+ 
+-+       top_level_cleanup ();      
+-        jump_to_top_level (DISCARD);
+-      }
+-*** ../bash-3.2-patched/expr.c	Wed Dec 28 17:47:03 2005
+---- bash-3.2/expr.c	Tue Apr 24 14:17:59 2007
+-***************
+-*** 930,933 ****
+---- 930,934 ----
+-  	{
+-  	  expr_unwind ();
+-+ 	  top_level_cleanup ();
+-  	  jump_to_top_level (DISCARD);
+-  	}
+-*** ../bash-3.2-patched/variables.c	Fri Sep  8 13:33:32 2006
+---- bash-3.2/variables.c	Tue Jul 17 09:54:59 2007
+-***************
+-*** 1822,1830 ****
+-  	  lval = evalexp (oval, &expok);	/* ksh93 seems to do this */
+-  	  if (expok == 0)
+-! 	    jump_to_top_level (DISCARD);
+-  	}
+-        rval = evalexp (value, &expok);
+-        if (expok == 0)
+-! 	jump_to_top_level (DISCARD);
+-        if (flags & ASS_APPEND)
+-  	rval += lval;
+---- 1855,1869 ----
+-  	  lval = evalexp (oval, &expok);	/* ksh93 seems to do this */
+-  	  if (expok == 0)
+-! 	    {
+-! 	      top_level_cleanup ();
+-! 	      jump_to_top_level (DISCARD);
+-! 	    }
+-  	}
+-        rval = evalexp (value, &expok);
+-        if (expok == 0)
+-! 	{
+-! 	  top_level_cleanup ();
+-! 	  jump_to_top_level (DISCARD);
+-! 	}
+-        if (flags & ASS_APPEND)
+-  	rval += lval;
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 19
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 20
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-021 package/bash/bash32-021
+--- package/bash.ORIG/bash32-021	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-021	1969-12-31 17:00:00.000000000 -0700
+@@ -1,72 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-021
+-
+-Bug-Reported-by:	BAGSHAW Paul RD-TECH-REN <paul.bagshaw@orange-ftgroup.com>
+-Bug-Reference-ID:	<941BA0BF46DB8F4983FF7C8AFE800BC205EA7D4B@ftrdmel3.rd.francetelecom.fr>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2007-03/msg00065.html
+-
+-Bug-Description:
+-
+-When the parser read a backslash-escaped character that would be treated
+-internally as an escape, it would double the number of escape characters.
+-
+-Patch:
+-
+-*** ../bash-3.2-patched/parse.y	Mon Oct 30 17:22:00 2006
+---- bash-3.2/parse.y	Sat Mar 24 17:13:20 2007
+-***************
+-*** 3377,3381 ****
+-  	{
+-  	  pass_next_character = 0;
+-! 	  goto got_character;
+-  	}
+-  
+---- 3377,3381 ----
+-  	{
+-  	  pass_next_character = 0;
+-! 	  goto got_escaped_character;
+-  	}
+-  
+-***************
+-*** 3651,3660 ****
+-      got_character:
+-  
+--       all_digit_token &= DIGIT (character);
+--       dollar_present |= character == '$';
+-- 
+-        if (character == CTLESC || character == CTLNUL)
+-  	token[token_index++] = CTLESC;
+-  
+-        token[token_index++] = character;
+-  
+---- 3651,3662 ----
+-      got_character:
+-  
+-        if (character == CTLESC || character == CTLNUL)
+-  	token[token_index++] = CTLESC;
+-  
+-+     got_escaped_character:
+-+ 
+-+       all_digit_token &= DIGIT (character);
+-+       dollar_present |= character == '$';
+-+ 
+-        token[token_index++] = character;
+-  
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 20
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 21
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-022 package/bash/bash32-022
+--- package/bash.ORIG/bash32-022	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-022	1969-12-31 17:00:00.000000000 -0700
+@@ -1,126 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-022
+-
+-Bug-Reported-by:	Chet Ramey <chet.ramey@cwru.edu>
+-Bug-Reference-ID:
+-Bug-Reference-URL:
+-
+-Bug-Description:
+-
+-POSIX specifies that the `read' builtin invoked from an interative shell
+-must prompt with $PS2 when a line is continued using a backslash while
+-reading from a terminal.
+-
+-Patch:
+-
+-*** ../bash-3.2-patched/builtins/read.def	Tue Sep 19 08:45:48 2006
+---- bash-3.2/builtins/read.def	Thu May 24 16:03:30 2007
+-***************
+-*** 128,133 ****
+-  {
+-    register char *varname;
+-!   int size, i, nr, pass_next, saw_escape, eof, opt, retval, code;
+-!   int input_is_tty, input_is_pipe, unbuffered_read;
+-    int raw, edit, nchars, silent, have_timeout, fd;
+-    unsigned int tmout;
+---- 131,136 ----
+-  {
+-    register char *varname;
+-!   int size, i, nr, pass_next, saw_escape, eof, opt, retval, code, print_ps2;
+-!   int input_is_tty, input_is_pipe, unbuffered_read, skip_ctlesc, skip_ctlnul;
+-    int raw, edit, nchars, silent, have_timeout, fd;
+-    unsigned int tmout;
+-***************
+-*** 135,139 ****
+-    char c;
+-    char *input_string, *orig_input_string, *ifs_chars, *prompt, *arrayname;
+-!   char *e, *t, *t1;
+-    struct stat tsb;
+-    SHELL_VAR *var;
+---- 138,142 ----
+-    char c;
+-    char *input_string, *orig_input_string, *ifs_chars, *prompt, *arrayname;
+-!   char *e, *t, *t1, *ps2;
+-    struct stat tsb;
+-    SHELL_VAR *var;
+-***************
+-*** 149,152 ****
+---- 152,156 ----
+-    USE_VAR(i);
+-    USE_VAR(pass_next);
+-+   USE_VAR(print_ps2);
+-    USE_VAR(saw_escape);
+-    USE_VAR(input_is_pipe);
+-***************
+-*** 164,167 ****
+---- 168,172 ----
+-  #endif
+-    USE_VAR(list);
+-+   USE_VAR(ps2);
+-  
+-    i = 0;		/* Index into the string that we are reading. */
+-***************
+-*** 387,391 ****
+-  #endif
+-  
+-!   for (eof = retval = 0;;)
+-      {
+-  #if defined (READLINE)
+---- 394,399 ----
+-  #endif
+-  
+-!   ps2 = 0;
+-!   for (print_ps2 = eof = retval = 0;;)
+-      {
+-  #if defined (READLINE)
+-***************
+-*** 413,416 ****
+---- 421,433 ----
+-  #endif
+-  
+-+       if (print_ps2)
+-+ 	{
+-+ 	  if (ps2 == 0)
+-+ 	    ps2 = get_string_value ("PS2");
+-+ 	  fprintf (stderr, "%s", ps2 ? ps2 : "");
+-+ 	  fflush (stderr);
+-+ 	  print_ps2 = 0;
+-+ 	}
+-+ 
+-        if (unbuffered_read)
+-  	retval = zread (fd, &c, 1);
+-***************
+-*** 441,445 ****
+-  	  pass_next = 0;
+-  	  if (c == '\n')
+-! 	    i--;		/* back up over the CTLESC */
+-  	  else
+-  	    goto add_char;
+---- 458,466 ----
+-  	  pass_next = 0;
+-  	  if (c == '\n')
+-! 	    {
+-! 	      i--;		/* back up over the CTLESC */
+-! 	      if (interactive && input_is_tty && raw == 0)
+-! 		print_ps2 = 1;
+-! 	    }
+-  	  else
+-  	    goto add_char;
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 21
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 22
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-023 package/bash/bash32-023
+--- package/bash.ORIG/bash32-023	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-023	1969-12-31 17:00:00.000000000 -0700
+@@ -1,51 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-023
+-
+-Bug-Reported-by:	Chet Ramey <chet.ramey@cwru.edu>
+-Bug-Reference-ID:
+-Bug-Reference-URL:
+-
+-Bug-Description:
+-
+-When an error occurs during the pattern removal word expansion, the shell
+-can free unallocated memory or free memory multiple times.
+-
+-Patch:
+-
+-*** ../bash-3.2-patched/subst.c	Tue Apr  3 16:47:19 2007
+---- bash-3.2/subst.c	Tue Jul 17 09:45:11 2007
+-***************
+-*** 3975,3979 ****
+-      patstr++;
+-  
+-!   pattern = getpattern (patstr, quoted, 1);
+-  
+-    temp1 = (char *)NULL;		/* shut up gcc */
+---- 4008,4016 ----
+-      patstr++;
+-  
+-!   /* Need to pass getpattern newly-allocated memory in case of expansion --
+-!      the expansion code will free the passed string on an error. */
+-!   temp1 = savestring (patstr);
+-!   pattern = getpattern (temp1, quoted, 1);
+-!   free (temp1);
+-  
+-    temp1 = (char *)NULL;		/* shut up gcc */
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 22
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 23
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-024 package/bash/bash32-024
+--- package/bash.ORIG/bash32-024	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-024	1969-12-31 17:00:00.000000000 -0700
+@@ -1,77 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-024
+-
+-Bug-Reported-by:	Peter Volkov <torre_cremata@mail.ru>
+-Bug-Reference-ID:	<1178376645.9063.25.camel@localhost>
+-Bug-Reference-URL:	http://bugs.gentoo.org/177095
+-
+-Bug-Description:
+-
+-The readline display code miscalculated the screen position when performing
+-a redisplay in which the new text occupies more screen space that the old,
+-but takes fewer bytes to do so (e.g., when replacing a shorter string
+-containing multibyte characters with a longer one containing only ASCII).
+-
+-Patch:
+-
+-*** ../bash-3.2-patched/lib/readline/display.c	Thu Apr 26 11:38:22 2007
+---- bash-3.2/lib/readline/display.c	Thu Jul 12 23:10:10 2007
+-***************
+-*** 1519,1527 ****
+-        /* Non-zero if we're increasing the number of lines. */
+-        int gl = current_line >= _rl_vis_botlin && inv_botlin > _rl_vis_botlin;
+-        /* Sometimes it is cheaper to print the characters rather than
+-  	 use the terminal's capabilities.  If we're growing the number
+-  	 of lines, make sure we actually cause the new line to wrap
+-  	 around on auto-wrapping terminals. */
+-!       if (_rl_terminal_can_insert && ((2 * col_temp) >= col_lendiff || _rl_term_IC) && (!_rl_term_autowrap || !gl))
+-  	{
+-  	  /* If lendiff > prompt_visible_length and _rl_last_c_pos == 0 and
+---- 1568,1596 ----
+-        /* Non-zero if we're increasing the number of lines. */
+-        int gl = current_line >= _rl_vis_botlin && inv_botlin > _rl_vis_botlin;
+-+       /* If col_lendiff is > 0, implying that the new string takes up more
+-+ 	 screen real estate than the old, but lendiff is < 0, meaning that it
+-+ 	 takes fewer bytes, we need to just output the characters starting
+-+ 	 from the first difference.  These will overwrite what is on the
+-+ 	 display, so there's no reason to do a smart update.  This can really
+-+ 	 only happen in a multibyte environment. */
+-+       if (lendiff < 0)
+-+ 	{
+-+ 	  _rl_output_some_chars (nfd, temp);
+-+ 	  _rl_last_c_pos += _rl_col_width (nfd, 0, temp);
+-+ 	  /* If nfd begins before any invisible characters in the prompt,
+-+ 	     adjust _rl_last_c_pos to account for wrap_offset and set
+-+ 	     cpos_adjusted to let the caller know. */
+-+ 	  if (current_line == 0 && wrap_offset && ((nfd - new) <= prompt_last_invisible))
+-+ 	    {
+-+ 	      _rl_last_c_pos -= wrap_offset;
+-+ 	      cpos_adjusted = 1;
+-+ 	    }
+-+ 	  return;
+-+ 	}
+-        /* Sometimes it is cheaper to print the characters rather than
+-  	 use the terminal's capabilities.  If we're growing the number
+-  	 of lines, make sure we actually cause the new line to wrap
+-  	 around on auto-wrapping terminals. */
+-!       else if (_rl_terminal_can_insert && ((2 * col_temp) >= col_lendiff || _rl_term_IC) && (!_rl_term_autowrap || !gl))
+-  	{
+-  	  /* If lendiff > prompt_visible_length and _rl_last_c_pos == 0 and
+-*** ../bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 23
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 24
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-025 package/bash/bash32-025
+--- package/bash.ORIG/bash32-025	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-025	1969-12-31 17:00:00.000000000 -0700
+@@ -1,79 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-025
+-
+-Bug-Reported-by:	Tom Bjorkholm <tom.bjorkholm@ericsson.com>
+-Bug-Reference-ID:	<AEA1A32F001C6B4F98614B5B80D7647D01C075E9@esealmw115.eemea.ericsson.se>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-readline/2007-04/msg00004.html
+-
+-Bug-Description:
+-
+-An off-by-one error in readline's input buffering caused readline to drop
+-each 511th character of buffered input (e.g., when pasting a large amount
+-of data into a terminal window).
+-
+-Patch:
+-
+-*** bash-3.2-patched/lib/readline/input.c	Wed Aug 16 15:15:16 2006
+---- bash-3.2/lib/readline/input.c	Tue Jul 17 09:24:21 2007
+-***************
+-*** 134,139 ****
+-  
+-    *key = ibuffer[pop_index++];
+-! 
+-    if (pop_index >= ibuffer_len)
+-      pop_index = 0;
+-  
+---- 134,142 ----
+-  
+-    *key = ibuffer[pop_index++];
+-! #if 0
+-    if (pop_index >= ibuffer_len)
+-+ #else
+-+   if (pop_index > ibuffer_len)
+-+ #endif
+-      pop_index = 0;
+-  
+-***************
+-*** 251,255 ****
+-  	{
+-  	  k = (*rl_getc_function) (rl_instream);
+-! 	  rl_stuff_char (k);
+-  	  if (k == NEWLINE || k == RETURN)
+-  	    break;
+---- 254,259 ----
+-  	{
+-  	  k = (*rl_getc_function) (rl_instream);
+-! 	  if (rl_stuff_char (k) == 0)
+-! 	    break;			/* some problem; no more room */
+-  	  if (k == NEWLINE || k == RETURN)
+-  	    break;
+-***************
+-*** 374,378 ****
+---- 378,386 ----
+-      }
+-    ibuffer[push_index++] = key;
+-+ #if 0
+-    if (push_index >= ibuffer_len)
+-+ #else
+-+   if (push_index > ibuffer_len)
+-+ #endif
+-      push_index = 0;
+-  
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 24
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 25
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-026 package/bash/bash32-026
+--- package/bash.ORIG/bash32-026	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-026	1969-12-31 17:00:00.000000000 -0700
+@@ -1,82 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-026
+-
+-Bug-Reported-by:	Chet Ramey <chet.ramey@case.edu>
+-Bug-Reference-ID:
+-Bug-Reference-URL:
+-
+-Bug-Description:
+-
+-This keeps the Apple linker from attempting to link bash against Apple's
+-readline library "replacement" rather than the one shipped with bash.  It
+-extends the configure workaround to Mac OS X Leopard (10.5).
+-
+-As a side effect, the patch updates the copyright date displayed in the
+-version string.
+-
+-You must re-run configure after applying the patch, and before rebuilding
+-bash.
+-
+-Patch:
+-
+-*** bash-3.2-patched/configure.in	2007-03-06 11:07:38.000000000 -0500
+---- bash-3.2/configure.in	2007-11-23 15:37:41.000000000 -0500
+-***************
+-*** 519,523 ****
+-  		# dynamic version
+-  		case "${host_os}" in
+-! 		darwin8*)	READLINE_LIB='${READLINE_LIBRARY}' ;;
+-  		*)		READLINE_LIB=-lreadline ;;
+-  		esac
+---- 519,523 ----
+-  		# dynamic version
+-  		case "${host_os}" in
+-! 		darwin[[89]]*)	READLINE_LIB='${READLINE_LIBRARY}' ;;
+-  		*)		READLINE_LIB=-lreadline ;;
+-  		esac
+-*** bash-3.2-patched/configure	2007-03-24 14:51:22.000000000 -0400
+---- bash-3.2/configure	2007-11-23 15:46:15.000000000 -0500
+-***************
+-*** 4872,4876 ****
+-  		# dynamic version
+-  		case "${host_os}" in
+-! 		darwin8*)	READLINE_LIB='${READLINE_LIBRARY}' ;;
+-  		*)		READLINE_LIB=-lreadline ;;
+-  		esac
+---- 4872,4876 ----
+-  		# dynamic version
+-  		case "${host_os}" in
+-! 		darwin[89]*)	READLINE_LIB='${READLINE_LIBRARY}' ;;
+-  		*)		READLINE_LIB=-lreadline ;;
+-  		esac
+-*** bash-3.2-patched/version.c	2005-05-16 11:58:34.000000000 -0400
+---- bash-3.2/version.c	2007-11-23 16:03:40.000000000 -0500
+-***************
+-*** 80,83 ****
+-    printf ("GNU bash, version %s (%s)\n", shell_version_string (), MACHTYPE);
+-    if (extended)
+-!     printf (_("Copyright (C) 2005 Free Software Foundation, Inc.\n"));
+-  }
+---- 80,83 ----
+-    printf ("GNU bash, version %s (%s)\n", shell_version_string (), MACHTYPE);
+-    if (extended)
+-!     printf (_("Copyright (C) 2007 Free Software Foundation, Inc.\n"));
+-  }
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 25
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 26
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-027 package/bash/bash32-027
+--- package/bash.ORIG/bash32-027	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-027	1969-12-31 17:00:00.000000000 -0700
+@@ -1,85 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-027
+-
+-Bug-Reported-by:	dAniel hAhler <ubuntu@thequod.de>
+-Bug-Reference-ID:	<4702ED8A.5000503@thequod.de>
+-Bug-Reference-URL:	https://bugs.launchpad.net/ubuntu/+source/bash/+bug/119938
+-
+-Bug-Description:
+-
+-When updating the display after displaying, for instance, a list of possible
+-completions, readline will place the cursor at the wrong position if the
+-prompt contains invisible characters and a newline.
+-
+-Patch:
+-
+-*** bash-3.2.25/lib/readline/display.c	Mon Aug  6 14:26:29 2007
+---- bash-3.2/lib/readline/display.c	Wed Oct 10 22:43:58 2007
+-***************
+-*** 1049,1053 ****
+-  	      else
+-  		tx = nleft;
+-! 	      if (_rl_last_c_pos > tx)
+-  		{
+-  	          _rl_backspace (_rl_last_c_pos - tx);	/* XXX */
+---- 1049,1053 ----
+-  	      else
+-  		tx = nleft;
+-! 	      if (tx >= 0 && _rl_last_c_pos > tx)
+-  		{
+-  	          _rl_backspace (_rl_last_c_pos - tx);	/* XXX */
+-***************
+-*** 1205,1209 ****
+-  {
+-    register char *ofd, *ols, *oe, *nfd, *nls, *ne;
+-!   int temp, lendiff, wsatend, od, nd;
+-    int current_invis_chars;
+-    int col_lendiff, col_temp;
+---- 1205,1209 ----
+-  {
+-    register char *ofd, *ols, *oe, *nfd, *nls, *ne;
+-!   int temp, lendiff, wsatend, od, nd, o_cpos;
+-    int current_invis_chars;
+-    int col_lendiff, col_temp;
+-***************
+-*** 1466,1469 ****
+---- 1466,1471 ----
+-      }
+-  
+-+   o_cpos = _rl_last_c_pos;
+-+ 
+-    /* When this function returns, _rl_last_c_pos is correct, and an absolute
+-       cursor postion in multibyte mode, but a buffer index when not in a
+-***************
+-*** 1475,1479 ****
+-       invisible characters in the prompt string.  Let's see if setting this when
+-       we make sure we're at the end of the drawn prompt string works. */
+-!   if (current_line == 0 && MB_CUR_MAX > 1 && rl_byte_oriented == 0 && _rl_last_c_pos == prompt_physical_chars)
+-      cpos_adjusted = 1;
+-  #endif
+---- 1477,1483 ----
+-       invisible characters in the prompt string.  Let's see if setting this when
+-       we make sure we're at the end of the drawn prompt string works. */
+-!   if (current_line == 0 && MB_CUR_MAX > 1 && rl_byte_oriented == 0 && 
+-!       (_rl_last_c_pos > 0 || o_cpos > 0) &&
+-!       _rl_last_c_pos == prompt_physical_chars)
+-      cpos_adjusted = 1;
+-  #endif
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 26
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 27
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-028 package/bash/bash32-028
+--- package/bash.ORIG/bash32-028	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-028	1969-12-31 17:00:00.000000000 -0700
+@@ -1,60 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-028
+-
+-Bug-Reported-by:	dAniel hAhler <ubuntu@thequod.de>
+-Bug-Reference-ID:
+-Bug-Reference-URL:
+-
+-Bug-Description:
+-
+-Under some circumstances, readline will incorrectly display a prompt string
+-containing invisible characters after the final newline.
+-
+-Patch:
+-
+-*** bash-3.2-patched/lib/readline/display.c	2007-08-25 13:47:08.000000000 -0400
+---- bash-3.2/lib/readline/display.c	2007-11-10 17:51:29.000000000 -0500
+-***************
+-*** 392,396 ****
+-        local_prompt = expand_prompt (p, &prompt_visible_length,
+-  				       &prompt_last_invisible,
+-! 				       (int *)NULL,
+-  				       &prompt_physical_chars);
+-        c = *t; *t = '\0';
+---- 420,424 ----
+-        local_prompt = expand_prompt (p, &prompt_visible_length,
+-  				       &prompt_last_invisible,
+-! 				       &prompt_invis_chars_first_line,
+-  				       &prompt_physical_chars);
+-        c = *t; *t = '\0';
+-***************
+-*** 399,403 ****
+-        local_prompt_prefix = expand_prompt (prompt, &prompt_prefix_length,
+-  						   (int *)NULL,
+-! 						   &prompt_invis_chars_first_line,
+-  						   (int *)NULL);
+-        *t = c;
+---- 427,431 ----
+-        local_prompt_prefix = expand_prompt (prompt, &prompt_prefix_length,
+-  						   (int *)NULL,
+-! 						   (int *)NULL,
+-  						   (int *)NULL);
+-        *t = c;
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 27
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 28
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-029 package/bash/bash32-029
+--- package/bash.ORIG/bash32-029	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-029	1969-12-31 17:00:00.000000000 -0700
+@@ -1,52 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-029
+-
+-Bug-Reported-by:	Tomas Janousek <tjanouse@redhat.com>
+-Bug-Reference-ID:	<20071102104034.GA26893@redhat.com>
+-Bug-Reference-URL:	https://bugzilla.redhat.com/show_bug.cgi?id=286861
+-
+-Bug-Description:
+-
+-When the bash arithmetic expression evaluator has temporarily turned off
+-evalation, such as when parsing a pre- or post-decrement or -increment
+-operator, and an error occurs, evaluation is not re-enabled.
+-
+-Patch:
+-
+-*** bash-3.2-patched/expr.c	2007-08-25 13:47:05.000000000 -0400
+---- bash-3.2/expr.c	2007-10-18 08:08:44.000000000 -0400
+-***************
+-*** 287,290 ****
+---- 287,292 ----
+-      }
+-    free (expr_stack[expr_depth]);	/* free the allocated EXPR_CONTEXT */
+-+ 
+-+   noeval = 0;	/* XXX */
+-  }
+-  
+-***************
+-*** 320,323 ****
+---- 322,326 ----
+-  
+-    val = 0;
+-+   noeval = 0;
+-  
+-    FASTCOPY (evalbuf, oevalbuf, sizeof (evalbuf));
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 28
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 29
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-030 package/bash/bash32-030
+--- package/bash.ORIG/bash32-030	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-030	1969-12-31 17:00:00.000000000 -0700
+@@ -1,50 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-030
+-
+-Bug-Reported-by:	Paul Eggert <eggert@cs.ucla.edu> Andreas Schwab <schwab@suse.de>
+-Bug-Reference-ID:	<877il0nu84.fsf_-_@penguin.cs.ucla.edu> <m28x5gparz.fsf@igel.home>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2007-11/msg00023.html http://lists.gnu.org/archive/html/bug-bash/2007-11/msg00022.htmlhttp://lists.gnu.org/archive/html/bug-bash/2007-11/msg00022.html
+-
+-Bug-Description:
+-
+-If redirections attached to a compound command fail, bash does not set the
+-command's exit status correctly.  This only happens when the command is the
+-first in a sequential list.
+-
+-Patch:
+-
+-*** bash-3.2-patched/execute_cmd.c	2007-03-24 14:51:05.000000000 -0400
+---- bash-3.2/execute_cmd.c	2007-11-05 22:31:14.000000000 -0500
+-***************
+-*** 615,619 ****
+-        redirection_undo_list = (REDIRECT *)NULL;
+-        dispose_exec_redirects ();
+-!       return (EXECUTION_FAILURE);
+-      }
+-  
+---- 620,624 ----
+-        redirection_undo_list = (REDIRECT *)NULL;
+-        dispose_exec_redirects ();
+-!       return (last_command_exit_value = EXECUTION_FAILURE);
+-      }
+-
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 29
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 30
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+-
+-  
+diff -urN package/bash.ORIG/bash32-031 package/bash/bash32-031
+--- package/bash.ORIG/bash32-031	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-031	1969-12-31 17:00:00.000000000 -0700
+@@ -1,62 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-031
+-
+-Bug-Reported-by:	Miroslav Lichvar <mlichvar@redhat.com>
+-Bug-Reference-ID:	Fri, 02 Nov 2007 14:07:45 +0100
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-readline/2007-11/msg00000.html
+-
+-Bug-Description:
+-
+-In certain cases when outputting characters at the end of the line,
+-e.g., when displaying the prompt string, readline positions the cursor
+-incorrectly if the prompt string contains invisible characters and the
+-text being drawn begins before the last invisible character in the line.
+-
+-Patch:
+-
+-*** bash-3.2-patched/lib/readline/display.c	2007-08-25 13:47:08.000000000 -0400
+---- bash-3.2/lib/readline/display.c	2007-11-10 17:51:29.000000000 -0500
+-***************
+-*** 1566,1574 ****
+-  	  else
+-  	    {
+-- 	      /* We have horizontal scrolling and we are not inserting at
+-- 		 the end.  We have invisible characters in this line.  This
+-- 		 is a dumb update. */
+-  	      _rl_output_some_chars (nfd, temp);
+-  	      _rl_last_c_pos += col_temp;
+-  	      return;
+-  	    }
+---- 1619,1632 ----
+-  	  else
+-  	    {
+-  	      _rl_output_some_chars (nfd, temp);
+-  	      _rl_last_c_pos += col_temp;
+-+ 	      /* If nfd begins before any invisible characters in the prompt,
+-+ 		 adjust _rl_last_c_pos to account for wrap_offset and set
+-+ 		 cpos_adjusted to let the caller know. */
+-+ 	      if (current_line == 0 && wrap_offset && ((nfd - new) <= prompt_last_invisible))
+-+ 		{
+-+ 		  _rl_last_c_pos -= wrap_offset;
+-+ 		  cpos_adjusted = 1;
+-+ 		}
+-  	      return;
+-  	    }
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 30
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 31
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-032 package/bash/bash32-032
+--- package/bash.ORIG/bash32-032	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-032	1969-12-31 17:00:00.000000000 -0700
+@@ -1,47 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-032
+-
+-Bug-Reported-by:	Uwe Doering <gemini@geminix.org>
+-Bug-Reference-ID:	<46F3DD72.2090801@geminix.org>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2007-09/msg00102.html
+-
+-Bug-Description:
+-
+-There is an off-by-one error in the code that buffers characters received
+-very quickly in succession, causing characters to be dropped.
+-
+-Patch:
+-
+-*** bash-3.2-patched/lib/readline/input.c	2007-08-25 13:47:10.000000000 -0400
+---- bash-3.2/lib/readline/input.c	2007-10-12 22:55:25.000000000 -0400
+-***************
+-*** 155,159 ****
+-        pop_index--;
+-        if (pop_index < 0)
+-! 	pop_index = ibuffer_len - 1;
+-        ibuffer[pop_index] = key;
+-        return (1);
+---- 155,159 ----
+-        pop_index--;
+-        if (pop_index < 0)
+-! 	pop_index = ibuffer_len;
+-        ibuffer[pop_index] = key;
+-        return (1);
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 31
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 32
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+diff -urN package/bash.ORIG/bash32-033 package/bash/bash32-033
+--- package/bash.ORIG/bash32-033	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-033	1969-12-31 17:00:00.000000000 -0700
+@@ -1,88 +0,0 @@
+-			     BASH PATCH REPORT
+-			     =================
+-
+-Bash-Release: 3.2
+-Patch-ID: bash32-033
+-
+-Bug-Reported-by:	Christophe Martin <schplurtz@free.fr>
+-Bug-Reference-ID:	<465ABA4A.3030805@free.fr>
+-Bug-Reference-URL:	http://lists.gnu.org/archive/html/bug-bash/2007-05/msg00104.html
+-
+-Bug-Description:
+-
+-References made within a function to an uninitialized local array variable
+-using the [*] subscript in a double-quoted string  can result in spurious
+-ASCII 127 characters in the expanded value.
+-
+-Patch:
+-
+-*** bash-3.2-patched/arrayfunc.c	2007-08-25 13:47:05.000000000 -0400
+---- bash-3.2/arrayfunc.c	2007-05-31 11:55:46.000000000 -0400
+-***************
+-*** 723,727 ****
+-      {
+-        if (rtype)
+-! 	*rtype = 1;
+-        if (allow_all == 0)
+-  	{
+---- 723,727 ----
+-      {
+-        if (rtype)
+-! 	*rtype = (t[0] == '*') ? 1 : 2;
+-        if (allow_all == 0)
+-  	{
+-*** bash-3.2-patched/subst.c	2007-08-25 13:47:08.000000000 -0400
+---- bash-3.2/subst.c	2007-11-14 15:43:00.000000000 -0500
+-***************
+-*** 4908,4915 ****
+-    intmax_t arg_index;
+-    SHELL_VAR *var;
+-!   int atype;
+-  
+-    ret = 0;
+-    temp = 0;
+-  
+-    /* Handle multiple digit arguments, as in ${11}. */  
+---- 4973,4981 ----
+-    intmax_t arg_index;
+-    SHELL_VAR *var;
+-!   int atype, rflags;
+-  
+-    ret = 0;
+-    temp = 0;
+-+   rflags = 0;
+-  
+-    /* Handle multiple digit arguments, as in ${11}. */  
+-***************
+-*** 4944,4947 ****
+---- 5010,5015 ----
+-   		  ? quote_string (temp)
+-   		  : quote_escapes (temp);
+-+       else if (atype == 1 && temp && QUOTED_NULL (temp) && (quoted & (Q_DOUBLE_QUOTES|Q_HERE_DOCUMENT)))
+-+ 	rflags |= W_HASQUOTEDNULL;
+-      }
+-  #endif
+-***************
+-*** 4971,4974 ****
+---- 5039,5043 ----
+-        ret = alloc_word_desc ();
+-        ret->word = temp;
+-+       ret->flags |= rflags;
+-      }
+-    return ret;
+-*** bash-3.2/patchlevel.h	Thu Apr 13 08:31:04 2006
+---- bash-3.2/patchlevel.h	Mon Oct 16 14:22:54 2006
+-***************
+-*** 26,30 ****
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 32
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+---- 26,30 ----
+-     looks for to find the patch level (for the sccs version string). */
+-  
+-! #define PATCHLEVEL 33
+-  
+-  #endif /* _PATCHLEVEL_H_ */
+-
+diff -urN package/bash.ORIG/bash32-make-makefile-non-parallel.patch package/bash/bash32-make-makefile-non-parallel.patch
+--- package/bash.ORIG/bash32-make-makefile-non-parallel.patch	1969-12-31 17:00:00.000000000 -0700
++++ package/bash/bash32-make-makefile-non-parallel.patch	2011-04-26 19:57:16.000000000 -0600
+@@ -0,0 +1,12 @@
++diff -urN bash-3.1.ORIG/Makefile.in bash-3.1/Makefile.in
++--- bash-3.1.ORIG/Makefile.in	2005-10-25 12:37:52.000000000 -0600
+++++ bash-3.1/Makefile.in	2011-04-26 19:48:36.000000000 -0600
++@@ -19,6 +19,8 @@
++ # Make sure the first target in the makefile is the right one
++ all: .made
++ 
+++.NOTPARALLEL:
+++
++ PACKAGE = @PACKAGE_NAME@
++ VERSION = @PACKAGE_VERSION@
++ 
+diff -urN package/bash.ORIG/bash32-remove-bzero-dependancy.patch package/bash/bash32-remove-bzero-dependancy.patch
+--- package/bash.ORIG/bash32-remove-bzero-dependancy.patch	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash32-remove-bzero-dependancy.patch	1969-12-31 17:00:00.000000000 -0700
+@@ -1,64 +0,0 @@
+-diff -upr bash-3.2.orig/config.h.in bash-3.2/config.h.in
+---- bash-3.2.orig/config.h.in	2006-09-12 22:00:54.000000000 +0200
+-+++ bash-3.2/config.h.in	2007-08-08 14:15:12.000000000 +0200
+-@@ -504,9 +504,6 @@
+- /* Define if you have the bcopy function.  */
+- #undef HAVE_BCOPY
+- 
+--/* Define if you have the bzero function.  */
+--#undef HAVE_BZERO
+--
+- /* Define if you have the confstr function.  */
+- #undef HAVE_CONFSTR
+- 
+-diff -upr bash-3.2.orig/configure.in bash-3.2/configure.in
+---- bash-3.2.orig/configure.in	2006-09-26 17:05:45.000000000 +0200
+-+++ bash-3.2/configure.in	2007-08-08 14:14:36.000000000 +0200
+-@@ -702,7 +702,7 @@ AC_CHECK_FUNCS(dup2 eaccess fcntl getdta
+- AC_REPLACE_FUNCS(rename)
+- 
+- dnl checks for c library functions
+--AC_CHECK_FUNCS(bcopy bzero confstr fnmatch \
+-+AC_CHECK_FUNCS(bcopy confstr fnmatch \
+- 		getaddrinfo gethostbyname getservbyname getservent inet_aton \
+- 		memmove pathconf putenv raise regcomp regexec \
+- 		setenv setlinebuf setlocale setvbuf siginterrupt strchr \
+-diff -upr bash-3.2.orig/CWRU/misc/sigstat.c bash-3.2/CWRU/misc/sigstat.c
+---- bash-3.2.orig/CWRU/misc/sigstat.c	2002-04-17 19:41:40.000000000 +0200
+-+++ bash-3.2/CWRU/misc/sigstat.c	2007-08-08 14:11:36.000000000 +0200
+-@@ -86,7 +86,7 @@ int	sig;
+- init_signames()
+- {
+- 	register int i;
+--	bzero(signames, sizeof(signames));
+-+	memset(signames, 0, sizeof(signames));
+- 
+- #if defined (SIGHUP)		/* hangup */
+-   	signames[SIGHUP] = "SIGHUP";
+-diff -upr bash-3.2.orig/lib/sh/oslib.c bash-3.2/lib/sh/oslib.c
+---- bash-3.2.orig/lib/sh/oslib.c	2001-12-06 19:26:21.000000000 +0100
+-+++ bash-3.2/lib/sh/oslib.c	2007-08-08 14:11:44.000000000 +0200
+-@@ -170,23 +170,6 @@ bcopy (s,d,n)
+- }
+- #endif /* !HAVE_BCOPY */
+- 
+--#if !defined (HAVE_BZERO)
+--#  if defined (bzero)
+--#    undef bzero
+--#  endif
+--void
+--bzero (s, n)
+--     char *s;
+--     int n;
+--{
+--  register int i;
+--  register char *r;
+--
+--  for (i = 0, r = s; i < n; i++)
+--    *r++ = '\0';
+--}
+--#endif
+--
+- #if !defined (HAVE_GETHOSTNAME)
+- #  if defined (HAVE_UNAME)
+- #    include <sys/utsname.h>
+diff -urN package/bash.ORIG/bash.mk package/bash/bash.mk
+--- package/bash.ORIG/bash.mk	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/bash.mk	2011-04-26 20:16:36.000000000 -0600
+@@ -3,11 +3,11 @@
+ # bash
+ #
+ #############################################################
+-BASH_VERSION:=3.2
+-BASH_SOURCE:=bash-$(BASH_VERSION).tar.gz
+-BASH_SITE:=$(BR2_GNU_MIRROR)/bash
+-BASH_CAT:=$(ZCAT)
+-BASH_DIR:=$(BUILD_DIR)/bash-$(BASH_VERSION)
++BASH_VER:=3.1
++BASH_SOURCE:=bash-$(BASH_VER).tar.gz
++BASH_SITE:=http://ftp.gnu.org/pub/gnu/bash
++BASH_CAT:=zcat
++BASH_DIR:=$(BUILD_DIR)/bash-$(BASH_VER)
+ BASH_BINARY:=bash
+ BASH_TARGET_BINARY:=bin/bash
+ 
+@@ -17,24 +17,19 @@
+ bash-source: $(DL_DIR)/$(BASH_SOURCE)
+ 
+ bash-unpacked: $(BASH_DIR)/.unpacked
+-
+ $(BASH_DIR)/.unpacked: $(DL_DIR)/$(BASH_SOURCE)
+ 	$(BASH_CAT) $(DL_DIR)/$(BASH_SOURCE) | tar -C $(BUILD_DIR) $(TAR_OPTIONS) -
+-	toolchain/patch-kernel.sh $(BASH_DIR) package/bash/ bash??-\*
++	toolchain/patch-kernel.sh $(BASH_DIR) package/bash/ bash??-*
+ 	# This is broken when -lintl is added to LIBS
+ 	$(SED) 's,LIBS_FOR_BUILD =.*,LIBS_FOR_BUILD =,g' \
+ 		$(BASH_DIR)/builtins/Makefile.in
+-	# using target's LDFLAGS as LDFLAGS_FOR_BUILD is b0rked
+-	-$(SED) '/^LDFLAGS_FOR_BUILD/d' $(BASH_DIR)/{,*/{,*/}}Makefile.in
+-	$(CONFIG_UPDATE) $(BASH_DIR)/support
+-	touch $@
++	touch $(BASH_DIR)/.unpacked
+ 
+ $(BASH_DIR)/.configured: $(BASH_DIR)/.unpacked
+-	# bash_cv_have_mbstate_t=yes
++	#		bash_cv_have_mbstate_t=yes
+ 	(cd $(BASH_DIR); rm -rf config.cache; \
+ 		$(TARGET_CONFIGURE_OPTS) \
+-		$(TARGET_CONFIGURE_ARGS) \
+-		CCFLAGS_FOR_BUILD="$(HOST_CFLAGS)" \
++		CFLAGS="$(TARGET_CFLAGS)" \
+ 		ac_cv_func_setvbuf_reversed=no \
+ 		./configure \
+ 		--target=$(GNU_TARGET_NAME) \
+@@ -44,55 +39,42 @@
+ 		--exec-prefix=/usr \
+ 		--bindir=/usr/bin \
+ 		--sbindir=/usr/sbin \
+-		--libdir=/lib \
+ 		--libexecdir=/usr/lib \
+ 		--sysconfdir=/etc \
+ 		--datadir=/usr/share \
+ 		--localstatedir=/var \
+-		--mandir=/usr/share/man \
+-		--infodir=/usr/share/info \
+-		--includedir=/usr/include \
++		--mandir=/usr/man \
++		--infodir=/usr/info \
+ 		$(DISABLE_NLS) \
+ 		$(DISABLE_LARGEFILE) \
+ 		--with-curses \
+ 		--enable-alias \
+ 		--without-bash-malloc \
+-		$(ENABLE_DEBUG) \
+-	)
+-	touch $@
++	);
++	touch $(BASH_DIR)/.configured
+ 
+ $(BASH_DIR)/$(BASH_BINARY): $(BASH_DIR)/.configured
+-	$(MAKE1) CC=$(TARGET_CC) CC_FOR_BUILD="$(HOSTCC)" -C $(BASH_DIR)
++	$(MAKE) CC=$(TARGET_CC) CC_FOR_BUILD="$(HOSTCC)" -C $(BASH_DIR)
+ 
+ $(TARGET_DIR)/$(BASH_TARGET_BINARY): $(BASH_DIR)/$(BASH_BINARY)
+-	mkdir -p $(TARGET_DIR)/bin
+-	$(MAKE1) DESTDIR=$(TARGET_DIR) CC=$(TARGET_CC) -C $(BASH_DIR) install
++	$(MAKE) DESTDIR=$(TARGET_DIR) CC=$(TARGET_CC) -C $(BASH_DIR) install
+ 	rm -f $(TARGET_DIR)/bin/bash*
+ 	mv $(TARGET_DIR)/usr/bin/bash* $(TARGET_DIR)/bin/
+ 	(cd $(TARGET_DIR)/bin; /bin/ln -fs bash sh)
+-ifneq ($(BR2_HAVE_INFOPAGES),y)
+-	rm -rf $(TARGET_DIR)/usr/share/info
+-endif
+-ifneq ($(BR2_HAVE_MANPAGES),y)
+-	rm -rf $(TARGET_DIR)/usr/share/man
+-endif
+-	rm -rf $(TARGET_DIR)/share/locale
+-	rm -rf $(TARGET_DIR)/usr/share/doc
++	rm -rf $(TARGET_DIR)/share/locale $(TARGET_DIR)/usr/info \
++		$(TARGET_DIR)/usr/man $(TARGET_DIR)/usr/share/doc
+ 
+-# If both bash and busybox are selected, make certain bash wins
+-# the fight over who gets to own the /bin/sh symlink.
++#If both bash and busybox are selected, make certain bash wins
++#the fight over who gets to own the /bin/sh symlink
+ ifeq ($(BR2_PACKAGE_BUSYBOX),y)
+ bash: ncurses uclibc busybox $(TARGET_DIR)/$(BASH_TARGET_BINARY)
+ else
+ bash: ncurses uclibc $(TARGET_DIR)/$(BASH_TARGET_BINARY)
+ endif
+ 
+-# If both bash and busybox are selected, the /bin/sh symlink
+-# may need to be reinstated by the clean targets.
+ bash-clean:
+-	-$(MAKE1) DESTDIR=$(TARGET_DIR) CC=$(TARGET_CC) -C $(BASH_DIR) uninstall
+-	rm -f $(TARGET_DIR)/$(BASH_TARGET_BINARY)
+-	-$(MAKE1) -C $(BASH_DIR) clean
++	$(MAKE) DESTDIR=$(TARGET_DIR) CC=$(TARGET_CC) -C $(BASH_DIR) uninstall
++	-$(MAKE) -C $(BASH_DIR) clean
+ 
+ bash-dirclean:
+ 	rm -rf $(BASH_DIR)
+diff -urN package/bash.ORIG/Config.in package/bash/Config.in
+--- package/bash.ORIG/Config.in	2008-06-20 01:15:58.000000000 -0600
++++ package/bash/Config.in	2011-04-26 20:16:36.000000000 -0600
+@@ -1,7 +1,6 @@
+ config BR2_PACKAGE_BASH
+ 	bool "bash"
+ 	default n
+-	select BR2_PACKAGE_NCURSES
+ 	help
+ 	  The standard GNU Bourne again shell.
+ 

@@ -1,0 +1,189 @@
+#!/bin/sh
+#
+#
+# Copyright (C) 2006 Oxford Semiconductor Inc.
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+# 
+
+# This script should repair a disk from a RAID set that has suffered some kind
+# of transitory failure. This script is not neccesssarly part of the Web-UI
+# so can't rely on it's resources.
+
+################################################################################
+PERL=/usr/local/bin/perl
+
+quit() {
+    echo "RAID repair: $*" > /dev/console
+    exit 1
+}
+
+create_partitions()
+{
+    local disk=$1
+
+    dd if=/dev/zero of=$1 bs=1M count=32
+
+    /sbin/parted $disk mklabel gpt
+    /sbin/parted $disk mkpart primary 65536s 4259839s
+    /sbin/parted $disk set 1 raid on
+    /sbin/parted $disk mkpart primary 4259840s 5308415s
+    /sbin/parted $disk set 2 raid on
+    /sbin/parted $disk mkpart primary 5308416s 9502719s
+    /sbin/parted $disk set 3 raid on
+    /sbin/parted $disk mkpart primary 9502720s 100%
+    /sbin/parted $disk set 4 raid on
+
+    wait
+}
+
+write_bootrom_directions()
+{
+    local disk=$1
+
+    $PERL <<EOF | dd of="$disk" bs=512
+        print "\x00" x 0x1a4;
+        print "\x00\x5f\x01\x00";
+        print "\x00\xdf\x00\x00";
+        print "\x00\x80\x00\x00";
+        print "\x00" x (0x1b0 -0x1a4 -12 );
+        print "\x22\x80\x00\x00";
+        print "\x22\x00\x00\x00";
+        print "\x00\x80\x00\x00";
+EOF
+}
+
+################################################################################
+raidrepair() {
+    unset defective_disk
+    unset good_disk
+    
+    serial_numbers="/var/oxsemi/disk_serial_numbers"
+    
+    # delete the temporary files without warnings if they don't exist
+    rm -f /tmp/mdadm.?
+
+    # check if there are two drives on the internal ports
+    [ -e "/sys/devices/platform/oxnassata.0/host0/target0:0:0" ] &&
+    [ -e "/sys/devices/platform/oxnassata.0/host1/target1:0:0" ] ||
+    quit "not enough disks"
+    
+    # establish the defectve disk by checking all the RAID drives until a failed
+    # one is found.
+    for raid_dev in 1 2 3 4
+    do
+        # get the raid info and store it in a file
+        tempfile="/tmp/mdadm.$raid_dev"
+        mdadm --query --detail /dev/md$raid_dev > "$tempfile"
+    
+        # Is it a raid 1 device? If, not ignore it and move onto the next device.
+        grep -q "raid1" "$tempfile" || continue
+        
+        # Is it OK or already resynching?  If, so ignore it and move onto the next
+        # device.
+        grep -q "State : clean, degraded$" "$tempfile" || continue
+    
+        # if "spare rebuilding" crops up the RAID device is in the queue to rebuild,
+        # ignore.
+        grep -q "spare rebuilding" "$tempfile" && continue
+        
+        # by process of deduction, the good disk is X so the bad is Y
+        good_disk_line=`grep "active sync" "$tempfile"`
+        [ -z "$good_disk_line" ] && continue
+        good_disk=`echo "$good_disk_line"|grep -o "/dev/sd." `
+        [ -z "$good_disk" ] && continue
+        [ "$good_disk" == "/dev/sda" ] && defective_disk="/dev/sdb"
+        [ "$good_disk" == "/dev/sdb" ] && defective_disk="/dev/sda"
+        
+        # if we've found a defective disk, stop looking
+        [ -n $defective_disk ] && break
+    done
+    [ -z "$good_disk" ] && quit "no bad disk"
+    [ -z "$defective_disk" ] && quit "no bad disk"
+    
+    # check that the defective disk is known to us
+    bad_disk_sn=`hdparm -I $defective_disk | grep "Serial Number"`
+    [ -z "$bad_disk_sn" ] && quit "couldn't get the bad disk's serial number"
+    grep -q "$bad_disk_sn" "$serial_numbers" || quit  "bad disk isn't known to us"
+    
+    # check that a working user-data partition exists and is already mounted
+    grep -q "/dev/md4" "/etc/mtab" || quit "user data partition isn't mounted"
+    
+    # Create GPT partition table on the defective disk
+    create_partitions $defective_disk
+    
+    # Write bootrom loading directions into MSDOS MBR unused fields
+    write_bootrom_directions $defective_disk
+    
+    # Copy hidden sectors data (loaders, kernel, etc.) to defective disk
+    dd if=$good_disk of=$defective_disk bs=512 skip=34 seek=34 count=65502
+    
+    # loop through all the raid devices
+    for raid_dev in 1 2 3 4
+    do
+        sleep 3
+        tempfile="/tmp/mdadm.$raid_dev"
+        [ -r $tempfile ] || mdadm --query --detail /dev/md$raid_dev > "$tempfile"
+        
+        # Is it a raid 1 device? If, not ignore it and move onto the next device.
+        grep -q "raid1" "$tempfile" || continue
+        
+        # Is it OK or already resynching?  If, so ignore it and move onto the next
+        # device.
+        grep -q "State : clean, degraded$" "$tempfile" || continue
+    
+        # if "spare rebuilding" crops up the RAID device is in the que to rebuild,
+        # ignore.
+        grep -q "spare rebuilding" "$tempfile" && continue
+        
+        # restore raid partitions
+        mdadm --manage /dev/md$raid_dev --add "$defective_disk$raid_dev"
+    done
+    
+    # delete the temp files
+    rm /tmp/mdadm.?
+}
+################################################################################
+
+start() {
+    echo "RAID device check / repair."
+    raidrepair
+}
+
+stop() {
+    echo -n
+}
+
+restart() {
+        stop
+        start
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart|reload)
+        restart
+        ;;
+  *)
+        echo $"Usage: $0 {start|stop|restart}"
+        exit 1
+esac
+
+exit $?

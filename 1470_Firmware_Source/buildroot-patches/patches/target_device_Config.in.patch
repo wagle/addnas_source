@@ -1,0 +1,10 @@
+--- target/device/Config.in.orig	2008-06-18 12:40:14.000000000 +0100
++++ target/device/Config.in	2008-06-18 12:40:37.000000000 +0100
+@@ -14,6 +14,7 @@
+ source "target/device/valka/Config.in"
+ source "target/device/Via/Config.in"
+ 
++source "target/device/Oxsemi/Config.in"
+ comment "Generic Architecture support"
+ 
+ source "target/device/ARM/Config.in"

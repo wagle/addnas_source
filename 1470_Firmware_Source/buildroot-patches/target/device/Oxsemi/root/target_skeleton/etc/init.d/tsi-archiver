@@ -1,0 +1,100 @@
+#!/usr/local/bin/perl -w
+
+use strict;
+
+use POSIX qw(strftime);
+
+my $version = 1;
+
+sub usage() {
+	print STDERR "error\n";
+}
+
+my @files;
+push @files, "var/oxsemi/nas.ini";
+push @files, "var/oxsemi/mlpath";
+push @files, "var/oxsemi/network-settings";
+push @files, "var/oxsemi/shares.inc";
+push @files, "etc/smb.conf";
+push @files, "var/private/smbpasswd";
+push @files, "var/private/lighttpd.htdigest.user";
+push @files, "etc/passwd";
+push @files, "etc/group";
+push @files, "etc/shadow";
+
+my $files = join(" ",@files);
+
+sub is_clean($) {
+	my ($comment) = @_;
+	return 0 if $comment =~/\t/;
+        return 0 if $comment =~/\n/;
+	return 1;
+}
+
+sub is_an_archive_file($$) {
+	my ($disk,$id) = @_;
+	return -e "$disk/opt/backups/$id.tar.gz";
+}
+
+sub is_a_potential_archive_disk($) {
+	my ($disk) = @_;
+	return 1 if $disk =~ m,/shares/external/[^/]+,;
+###	return 1 if $disk =~ m,/tmp,;
+	return 0;
+}
+
+sub is_an_actual_archive_disk($) {
+	my ($disk) = @_;
+	return 0 unless is_a_potential_archive_disk($disk);
+	return -e "$disk/opt/backups/INDEX";
+}
+
+sub tsi_init($) {
+	my ($disk) = @_;
+	system "mkdir -p $disk/opt/backups"; exit $? if $? != 0;
+	system "echo $version > $disk/opt/backups/INDEX"; exit $? if $? != 0;
+}
+
+sub tsi_list($) {
+	my ($disk) = @_;
+	system "tail -n +2 $disk/opt/backups/INDEX"; exit $? if $? != 0;
+}
+
+sub tsi_backup($$) {
+	my ($disk,$comment) = @_;
+	my $id = strftime "%Y%m%d-%H%M%S", localtime;
+	system "tar c --ignore-failed-read -C / -f $disk/opt/backups/$id.tar.gz $files"; exit $? if $? != 0;
+        system "echo -e '$id\t$comment' >> $disk/opt/backups/INDEX"; exit $? if $? != 0;
+}
+
+sub tsi_delete($$) {
+	my ($disk,$id) = @_;
+	system "rm $disk/opt/backups/$id.tar.gz "; exit $? if $? != 0;
+	system "sed -i '/^$id\t/d' $disk/opt/backups/INDEX";
+}
+
+sub tsi_restore($$) {
+	my ($disk,$id) = @_;
+#        system "/etc/init.d/network_servers.sh stop";
+#        system "/etc/init.d/mlnet.sh resetpw";
+#        system "/etc/init.d/mlnet.sh stop";
+	system "tar x -C / -f $disk/opt/backups/$id.tar.gz";
+#        system "/etc/init.d/network_servers.sh start";
+#	system "reboot";
+}
+
+if (@ARGV == 2 && is_a_potential_archive_disk($ARGV[0]) && ! is_an_actual_archive_disk($ARGV[0]) && $ARGV[1] eq "init") {
+	tsi_init($ARGV[0]);
+} elsif (@ARGV == 2 && is_an_actual_archive_disk($ARGV[0]) && $ARGV[1] eq "list") {
+	tsi_list($ARGV[0]);
+} elsif (@ARGV == 3 && is_an_actual_archive_disk($ARGV[0]) && $ARGV[1] eq "backup" && is_clean($ARGV[2])) {
+	tsi_backup($ARGV[0],$ARGV[2]);
+} elsif (@ARGV == 3 && is_an_actual_archive_disk($ARGV[0]) && $ARGV[1] eq "delete" && is_an_archive_file($ARGV[0],$ARGV[2])) {
+	tsi_delete($ARGV[0],$ARGV[2]);
+} elsif (@ARGV == 3 && is_an_actual_archive_disk($ARGV[0]) && $ARGV[1] eq "restore" && is_an_archive_file($ARGV[0],$ARGV[2])) {
+	tsi_restore($ARGV[0], $ARGV[2]);
+} else {
+	usage();
+	exit 1;
+}
+exit 0;

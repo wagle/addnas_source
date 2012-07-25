@@ -1,0 +1,17 @@
+--- package/samba/samba.mk.ORIG	2011-09-30 01:36:22.000000000 -0600
++++ package/samba/samba.mk	2011-09-30 12:38:29.000000000 -0600
+@@ -59,12 +59,12 @@
+ 	touch $@
+ 
+ $(SAMBA_PREALLOC_DIR)/.patched: $(SAMBA_PREALLOC_DIR)/.unpacked
+-	@script/patch-kernel.sh $(@D) package/apps/samba-prealloc samba-\*.patch
++	@toolchain/patch-kernel.sh $(@D) $(SAMBA_PREALLOC_DIR) samba-\*.patch
+ 	@touch $@
+ 
+ $(SAMBA_PREALLOC_DIR)/.unpacked:
+ 	@cd $(BUILD_DIR);	\
+-		(tar -xvf $(SDK_DIR)/$(SAMBA_PREALLOC_SOURCE))
++		(tar -xvf $(DL_DIR)/$(SAMBA_PREALLOC_SOURCE))
+ 	@touch $@
+ 
+ samba-prealloc-clean:

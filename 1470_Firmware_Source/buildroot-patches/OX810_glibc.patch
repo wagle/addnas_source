@@ -1,0 +1,546 @@
+diff -Naur ../buildroot-old/toolchain/Config.in.2 ../buildroot/toolchain/Config.in.2
+--- ../buildroot-old/toolchain/Config.in.2	2008-06-20 08:15:11.000000000 +0100
++++ ../buildroot/toolchain/Config.in.2	2008-10-21 11:42:25.000000000 +0100
+@@ -81,3 +81,11 @@
+ 	  cross toolchain dir under <arch>-linux-uclibc/target_utils/.
+ 
+ endif
++
++if(! BR2_TOOLCHAIN_SOURCE)
++config BR2_USE_WCHAR
++	bool "Enable WCHAR support"
++	default y
++	help
++	   Enable WCHAR. WCHAR support needed for several packages
++endif
+diff -Naur ../buildroot-old/toolchain/external-toolchain/ext-tool.mk ../buildroot/toolchain/external-toolchain/ext-tool.mk
+--- ../buildroot-old/toolchain/external-toolchain/ext-tool.mk	2008-06-20 08:15:10.000000000 +0100
++++ ../buildroot/toolchain/external-toolchain/ext-tool.mk	2008-10-23 16:01:21.000000000 +0100
+@@ -54,3 +54,9 @@
+ 	for libs in $(strip $(subst ",, $(BR2_TOOLCHAIN_EXTERNAL_LIBS))); do \
+ 		$(call copy_toolchain_lib_root, $$libs, /lib, $(BR2_TOOLCHAIN_EXTERNAL_STRIP)); \
+ 	done
++
++# make a soft link to the library file
++	(cd $(TARGET_DIR)/lib ;\
++	ln -s libc.so.6 libc.so.0 ;\
++	);
++
+diff -Naur ../buildroot-old/package/bash/bash.mk ../buildroot/package/bash/bash.mk
+--- ../buildroot-old/package/bash/bash.mk   2008-10-23 17:51:45.000000000 +0100
++++ ../buildroot/package/bash/bash.mk     2008-10-21 11:57:47.000000000 +0100
+@@ -30,6 +30,7 @@
+	(cd $(BASH_DIR); rm -rf config.cache; \
+		$(TARGET_CONFIGURE_OPTS) \
+		CFLAGS="$(TARGET_CFLAGS)" \
++ 		LDFLAGS=-L$(BUILD_AREA)/buildroot/build_arm/staging_dir/lib \
+		ac_cv_func_setvbuf_reversed=no \
+		./configure \
+		--target=$(GNU_TARGET_NAME) \
+diff -Naur ../buildroot-old/package/bonnie/bonnie_glibc.patch ../buildroot/package/bonnie/bonnie_glibc.patch
+--- ../buildroot-old/package/bonnie/bonnie_glibc.patch      1970-01-01 01:00:00.000000000 +0100
++++ ../buildroot/package/bonnie/bonnie_glibc.patch        2008-10-21 15:12:52.000000000 +0100
+@@ -0,0 +1,11 @@
++--- ../../../buildroot/build_arm/bonnie/Makefile       2008-10-21 13:26:06.000000000 +0100
+++++ ../../../buildroot-trial/build_arm/bonnie/Makefile 2008-10-21 12:49:05.000000000 +0100
++@@ -20,7 +20,7 @@
++ 
++ # If you are running a cross compiler, you may want to set this
++ # to something more interesting, like "powerpc-linux-".
++-CROSS = ../../build_arm/staging_dir/usr/bin/arm-linux-uclibcgnueabi-
+++CROSS = arm-none-linux-gnueabi-
++ CC = $(CROSS)gcc
++ AR = $(CROSS)ar
++ STRIPTOOL = $(CROSS)strip
+diff -Naur ../buildroot-old/package/bonnie/bonnie.mk ../buildroot/package/bonnie/bonnie.mk
+--- ../buildroot-old/package/bonnie/bonnie.mk       2008-09-23 13:27:05.000000000 +0100
++++ ../buildroot/package/bonnie/bonnie.mk 2008-10-21 15:14:54.000000000 +0100
+@@ -20,7 +20,8 @@
+ 	$(BONNIE_CAT) $(DL_DIR)/$(BONNIE_SOURCE) | tar -C $(BUILD_DIR) $(TAR_OPTIONS) -
+ 	(cd $(BONNIE_DIR) ;\
+ 		patch -p 1 < $(BASE_DIR)/package/bonnie/bonnie-1.4-builtroot.patch ;\
+-		patch -p 1 < $(BASE_DIR)/package/bonnie/bonnie-1.patch \
++		patch -p 1 < $(BASE_DIR)/package/bonnie/bonnie-1.patch ;\
++		patch  < $(BASE_DIR)/package/bonnie/bonnie_glibc.patch \
+ 	);
+ 	touch $(BONNIE_DIR)/.unpacked
+ 
+diff -Naur ../buildroot-old/package/bzip2/bzip2.mk ../buildroot/package/bzip2/bzip2.mk
+--- ../buildroot-old/package/bzip2/bzip2.mk 2008-06-20 08:15:53.000000000 +0100
++++ ../buildroot/package/bzip2/bzip2.mk   2008-10-21 15:29:27.000000000 +0100
+@@ -37,6 +37,7 @@
+	$(MAKE) CC=$(TARGET_CC) RANLIB=$(TARGET_RANLIB) AR=$(TARGET_AR) \
+		-C $(BZIP2_DIR) libbz2.a
+	cp $(BZIP2_DIR)/bzlib.h $(STAGING_DIR)/usr/include/
++	mkdir $(STAGING_DIR)/usr/lib
+	cp $(BZIP2_DIR)/libbz2.so.$(BZIP2_VERSION) $(STAGING_DIR)/usr/lib/
+	cp $(BZIP2_DIR)/libbz2.a $(STAGING_DIR)/usr/lib/
+	(cd $(STAGING_DIR)/usr/lib/; \
+diff -Naur ../buildroot-old/package/grep/grep_glibc.patch ../buildroot/package/grep/grep_glibc.patch
+--- ../buildroot-old/package/grep/grep_glibc.patch  1970-01-01 01:00:00.000000000 +0100
++++ ../buildroot/package/grep/grep_glibc.patch      2008-10-21 16:39:53.000000000 +0100
+@@ -0,0 +1,29 @@
++--- ../../../buildroot/build_arm/grep-2.5.1/src/Makefile       2008-10-21 16:28:11.000000000 +0100
+++++ ../../../buildroot-trial/build_arm/grep-2.5.1/src/Makefile 2008-10-21 16:29:59.000000000 +0100
++@@ -106,7 +106,7 @@
++ 
++ noinst_HEADERS = grep.h dfa.h kwset.h getpagesize.h system.h
++ 
++-LDADD =  ../lib/libgreputils.a
+++LDADD =  $(BUILD_AREA)/buildroot/build_arm/staging_dir/usr/lib/libintl.a ../lib/libgreputils.a
++ localedir = $(datadir)/locale
++ INCLUDES = -I../intl -I$(top_srcdir)/lib -DLOCALEDIR=\"$(localedir)\"
++ 
++@@ -125,7 +125,7 @@
++       search$U.$(OBJEXT) grepmat$U.$(OBJEXT)
++ grep_OBJECTS = $(am_grep_OBJECTS)
++ grep_LDADD = $(LDADD)
++-grep_DEPENDENCIES = ../lib/libgreputils.a
+++grep_DEPENDENCIES = $(BUILD_AREA)/buildroot/build_arm/staging_dir/usr/lib/libintl.a ../lib/libgreputils.a
++ grep_LDFLAGS =
++ SCRIPTS = $(bin_SCRIPTS)
++ 
++@@ -133,7 +133,7 @@
++ DEFS = -DHAVE_CONFIG_H
++ DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
++ CPPFLAGS = 
++-LDFLAGS = 
+++LDFLAGS =
++ LIBS = 
++ depcomp =
++ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+diff -Naur ../buildroot-old/package/grep/grep.mk ../buildroot/package/grep/grep.mk
+--- ../buildroot-old/package/grep/grep.mk   2008-06-20 08:16:13.000000000 +0100
++++ ../buildroot/package/grep/grep.mk     2008-10-21 16:35:11.000000000 +0100
+@@ -49,6 +49,9 @@
+		--disable-perl-regexp \
+		--without-included-regex \
+	)
++	(cd $(GNUGREP_DIR)/src ;\
++		patch < $(BASE_DIR)/package/grep/grep_glibc.patch ;\
++	);
+	touch $@
+
+ $(GNUGREP_DIR)/$(GNUGREP_BINARY): $(GNUGREP_DIR)/.configured
+diff -Naur ../buildroot-old/package/lighttpd/lighttpd.mk ../buildroot/package/lighttpd/lighttpd.mk
+--- ../buildroot-old/package/lighttpd/lighttpd.mk   2008-06-20 08:16:19.000000000 +0100
++++ ../buildroot/package/lighttpd/lighttpd.mk     2008-10-21 16:50:19.000000000 +0100
+@@ -11,6 +11,7 @@
+ LIGHTTPD_DEPENDENCIES = uclibc
+ LIGHTTPD_CONF_ENV =
+ LIGHTTPD_CONF_OPT = \
++	LDFLAGS=-L$(BUILD_AREA)/buildroot/project_build_arm/OX810/root/usr/lib/ \
+	--target=$(GNU_TARGET_NAME) \
+	--host=$(GNU_TARGET_NAME) \
+	--build=$(GNU_HOST_NAME) \
+diff -Naur ../buildroot-old/package/openssh/openssh.mk ../buildroot/package/openssh/openssh.mk
+--- ../buildroot-old/package/openssh/openssh.mk     2008-10-23 17:51:45.000000000 +0100
++++ ../buildroot/package/openssh/openssh.mk       2008-10-21 16:57:05.000000000 +0100
+@@ -22,6 +22,7 @@
+		$(TARGET_CONFIGURE_OPTS) \
+		$(TARGET_CONFIGURE_ARGS) \
+		LD=$(TARGET_CROSS)gcc \
++		LDFLAGS=-L$(BUILD_AREA)/buildroot/project_build_arm/OX810/root/usr/lib/ \
+		./configure \
+		--target=$(GNU_TARGET_NAME) \
+		--host=$(GNU_TARGET_NAME) \
+diff -Naur ../buildroot-old/package/parted/parted.mk ../buildroot/package/parted/parted.mk
+--- ../buildroot-old/package/parted/parted.mk       2008-09-23 13:27:04.000000000 +0100
++++ ../buildroot/package/parted/parted.mk 2008-10-21 17:03:18.000000000 +0100
+@@ -30,6 +30,7 @@
+		$(TARGET_CONFIGURE_OPTS) \
+		$(TARGET_CONFIGURE_ARGS) \
+		CFLAGS="$(TARGET_CFLAGS)" \
++		LDFLAGS=-L$(BUILD_AREA)/buildroot/project_build_arm/OX810/root/lib \
+		./configure \
+		--target=$(GNU_TARGET_NAME) \
+		--host=$(GNU_TARGET_NAME) \
+diff -Naur ../buildroot-old/package/pciutils/pciutils.mk ../buildroot/package/pciutils/pciutils.mk
+--- ../buildroot-old/package/pciutils/pciutils.mk   2008-06-20 08:16:00.000000000 +0100
++++ ../buildroot/package/pciutils/pciutils.mk     2008-10-21 17:09:57.000000000 +0100
+@@ -30,6 +30,7 @@
+
+ $(PCIUTILS_DIR)/.compiled: $(PCIUTILS_DIR)/.unpacked
+	$(MAKE1) CC=$(TARGET_CC) OPT="$(TARGET_CFLAGS)" -C $(PCIUTILS_DIR) \
++		LDFLAGS=-L$(BUILD_AREA)/buildroot/build_arm/staging_dir/usr/lib \
+		SHAREDIR="/usr/share/misc" \
+	PREFIX=/usr
+	touch $(PCIUTILS_DIR)/.compiled
+diff -Naur ../buildroot-old/package/popt/popt.mk ../buildroot/package/popt/popt.mk
+--- ../buildroot-old/package/popt/popt.mk   2008-06-20 08:16:19.000000000 +0100
++++ ../buildroot/package/popt/popt.mk     2008-10-21 17:16:20.000000000 +0100
+@@ -11,7 +11,8 @@
+ POPT_CONF_ENV = ac_cv_va_copy=yes
+
+
+-POPT_CONF_OPT = --target=$(GNU_TARGET_NAME) --host=$(REAL_GNU_TARGET_NAME) \
++POPT_CONF_OPT = LDFLAGS=-L$(BUILD_AREA)/buildroot/project_build_arm/OX810/root/usr/lib \
++		--target=$(GNU_TARGET_NAME) --host=$(REAL_GNU_TARGET_NAME) \
+		--build=$(GNU_HOST_NAME) --prefix=/usr
+
+ POPT_INSTALL_TARGET_OPT=DESTDIR=$(TARGET_DIR) install
+diff -Naur ../buildroot-old/package/procps/procps.mk ../buildroot/package/procps/procps.mk
+--- ../buildroot-old/package/procps/procps.mk       2008-06-20 08:16:37.000000000 +0100
++++ ../buildroot/package/procps/procps.mk 2008-10-21 17:22:50.000000000 +0100
+@@ -19,7 +19,8 @@
+ 	touch $(PROCPS_DIR)/.source
+ 
+ $(PROCPS_DIR)/$(PROCPS_BINARY): $(PROCPS_DIR)/.source
+-	$(TARGET_CONFIGURE_OPTS) $(MAKE) -C $(PROCPS_DIR)
++	$(TARGET_CONFIGURE_OPTS) $(MAKE) -C $(PROCPS_DIR) \
++	LDFLAGS=-L$(BUILD_AREA)/buildroot/build_arm/staging_dir/lib
+ 
+ $(TARGET_DIR)/$(PROCPS_TARGET_BINARY): $(PROCPS_DIR)/$(PROCPS_BINARY)
+ 	$(MAKE) $(TARGET_CONFIGURE_OPTS) DESTDIR=$(TARGET_DIR) \
+diff -Naur ../buildroot-old/package/rsync/rsync.mk ../buildroot/package/rsync/rsync.mk
+--- ../buildroot-old/package/rsync/rsync.mk 2008-06-20 08:15:35.000000000 +0100
++++ ../buildroot/package/rsync/rsync.mk   2008-10-21 17:25:18.000000000 +0100
+@@ -26,6 +26,7 @@
+	(cd $(RSYNC_DIR); rm -rf config.cache; \
+		$(TARGET_CONFIGURE_OPTS) \
+		$(TARGET_CONFIGURE_ARGS) \
++		LDFLAGS=-L$(BUILD_AREA)/buildroot/project_build_arm/OX810/root/usr/lib \
+		./configure \
+		--target=$(GNU_TARGET_NAME) \
+		--host=$(GNU_TARGET_NAME) \
+diff -Naur ../buildroot-old/package/samba/samba.mk ../buildroot/package/samba/samba.mk
+--- ../buildroot-old/package/samba/samba.mk 2008-06-20 08:16:12.000000000 +0100
++++ ../buildroot/package/samba/samba.mk   2008-10-23 16:02:47.000000000 +0100
+@@ -96,10 +96,11 @@
+ 	for file in $(SAMBA_TARGETS_y); do \
+ 		$(STRIPCMD) $(STRIP_STRIP_UNNEEDED) $(TARGET_DIR)/$$file; \
+ 	done
+-	$(INSTALL) -m 0755 package/samba/S91smb $(TARGET_DIR)/etc/init.d
+-	@if [ ! -f $(TARGET_DIR)/etc/samba/smb.conf ]; then \
+-		$(INSTALL) -m 0755 -D package/samba/simple.conf $(TARGET_DIR)/etc/samba/smb.conf; \
+-	fi
++#      $(INSTALL) -m 0755 package/samba/S91smb $(TARGET_DIR)/etc/init.d
++#      @if [ ! -f $(TARGET_DIR)/etc/samba/smb.conf ]; then \
++#              $(INSTALL) -m 0755 -D package/samba/simple.conf $(TARGET_DIR)/etc/samba/smb.conf; \
++#      fi
++	chmod +x $(TARGET_DIR)/etc/init.d/S27create_public_share
+ 	rm -rf $(TARGET_DIR)/var/cache/samba
+ 	rm -rf $(TARGET_DIR)/var/lib/samba
+ 
+@@ -114,7 +114,7 @@
+ 	for file in $(SAMBA_TARGETS_y); do \
+ 		rm -f $(TARGET_DIR)/$$file; \
+ 	done
+-	rm -f $(TARGET_DIR)/etc/init.d/S91smb
++#      rm -f $(TARGET_DIR)/etc/init.d/S91smb
+ 	rm -rf $(TARGET_DIR)/etc/samba
+ 	-$(MAKE) -C $(SAMBA_DIR) clean
+ 
+diff -Naur ../buildroot-old/package/samba/samba_preallocate.patch ../buildroot/package/samba/samba_preallocate.patch
+--- ../buildroot-old/package/samba/samba_preallocate.patch  1970-01-01 01:00:00.000000000 +0100
++++ ../buildroot/package/samba/samba_preallocate.patch    2008-10-23 16:06:09.000000000 +0100
+@@ -0,0 +1,230 @@
++diff -Naur samba-3.0.28a/source/modules/vfs_default.c /samba-3.0.28a_new/source/modules/vfs_default.c
++--- samba-3.0.28a/source/modules/vfs_default.c 2008-03-08 15:56:27.000000000 +0000
+++++ samba-3.0.28a_new/source/modules/vfs_default.c     2008-10-20 15:52:34.000000000 +0100
++@@ -20,6 +20,7 @@
++ */
++ 
++ #include "includes.h"
+++#define __NR_SYSCALL_BASE 0
++ 
++ #undef DBGC_CLASS
++ #define DBGC_CLASS DBGC_VFS
++@@ -702,6 +703,77 @@
++ 	return 0;
++ }
++ 
+++#include <unistd.h>
+++typedef struct xfs_flock64 {
+++	short         l_type;
+++	short         l_whence;
+++	long long     l_start;
+++	long long     l_len;    /* len == 0 means until end of file */
+++	long          l_sysid;
+++	unsigned long l_pid;
+++	long          l_pad[4]; /* reserve area */
+++} xfs_flock64_t;
+++
+++static int preallocate_ftruncate(vfs_handle_struct *handle, files_struct *fsp, int fd, SMB_OFF_T len)
+++{
+++	SMB_STRUCT_STAT st;
+++	SMB_OFF_T       currpos = SMB_VFS_LSEEK(fsp, fd, 0, SEEK_CUR);
+++	xfs_flock64_t   info;
+++	char c = 0;
+++	int ret = 0;
+++
+++	if (currpos == -1)
+++		return -1;
+++
+++	if (SMB_VFS_FSTAT(fsp, fd, &st) == -1)
+++		return -1;
+++
+++#ifdef S_ISFIFO
+++	if (S_ISFIFO(st.st_mode))
+++		return 0;
+++#endif
+++
+++	/* No change in size required */
+++	if (st.st_size == len)
+++		return 0;
+++
+++	/* Shrink - just ftruncate. */
+++	if (st.st_size > len)
+++		return sys_ftruncate(fd, len);
+++
+++	DEBUG(10,("preallocate_ftruncate: preallocate to file %s from len %.0f to len %.0f (%.0f bytes)\n",
+++		fsp->fsp_name, (double)st.st_size, (double)len, (double)len - st.st_size));
+++
+++	/* Preallocate to new end of file */
+++	info.l_whence = 0;
+++	info.l_start  = st.st_size;
+++	info.l_len    = len - st.st_size;
+++
+++	/* Do I need to fill in these fields? */
+++	info.l_type = 0;
+++	info.l_sysid = 0;
+++	info.l_pid = 0;
+++
+++	ret = syscall(__NR_SYSCALL_BASE+353, fsp->fh->fd, &info);
+++	if (ret) {
+++		DEBUG(10,("preallocate_ftruncate: syscall for file %s failed and returned %d\n", fsp->fsp_name, ret));
+++	}
+++
+++	/* Write a single byte to new end of file to cause file length to be updated */
+++	if (SMB_VFS_LSEEK(fsp, fd, len-1, SEEK_SET) != (len-1))
+++		return -1;
+++
+++	if (SMB_VFS_WRITE(fsp, fd, &c, 1) != 1)
+++		goto done;
+++
+++	/* Seek to where we were */
+++	if (SMB_VFS_LSEEK(fsp, fd, currpos, SEEK_SET) != currpos)
+++		return -1;
+++
+++done:
+++	return ret;
+++}
+++
++ static int vfswrap_ftruncate(vfs_handle_struct *handle, files_struct *fsp, int fd, SMB_OFF_T len)
++ {
++ 	int result = -1;
++@@ -711,7 +783,12 @@
++ 
++ 	START_PROFILE(syscall_ftruncate);
++ 
++-	if (lp_strict_allocate(SNUM(fsp->conn))) {
+++	if (lp_preallocate(SNUM(fsp->conn))) {
+++		result = preallocate_ftruncate(handle, fsp, fd, len);
+++		END_PROFILE(syscall_ftruncate);
+++		return result;
+++	} else if (lp_strict_allocate(SNUM(fsp->conn))) {
+++
++ 		result = strict_allocate_ftruncate(handle, fsp, fd, len);
++ 		END_PROFILE(syscall_ftruncate);
++ 		return result;
++diff -Naur samba-3.0.28a/source/param/loadparm.c samba-3.0.28a_new/source/param/loadparm.c
++--- samba-3.0.28a/source/param/loadparm.c      2008-03-08 15:56:27.000000000 +0000
+++++ samba-3.0.28a_new/source/param/loadparm.c  2008-10-20 15:55:48.000000000 +0100
++@@ -425,6 +425,7 @@
++ 	BOOL bSymlinks;
++ 	BOOL bSyncAlways;
++ 	BOOL bStrictAllocate;
+++	BOOL bPreallocate;
++ 	BOOL bStrictSync;
++ 	char magic_char;
++ 	BOOL *copymap;
++@@ -568,6 +569,7 @@
++ 	True,			/* bSymlinks */
++ 	False,			/* bSyncAlways */
++ 	False,			/* bStrictAllocate */
+++	False,			/* bPreallocate */
++ 	False,			/* bStrictSync */
++ 	'~',			/* magic char */
++ 	NULL,			/* copymap */
++@@ -1037,6 +1039,7 @@
++  
++ 	{"socket options", P_GSTRING, P_GLOBAL, user_socket_options, NULL, NULL, FLAG_ADVANCED}, 
++ 	{"strict allocate", P_BOOL, P_LOCAL, &sDefault.bStrictAllocate, NULL, NULL, FLAG_ADVANCED | FLAG_SHARE}, 
+++	{"preallocate", P_BOOL, P_LOCAL, &sDefault.bPreallocate, NULL, NULL, FLAG_ADVANCED | FLAG_SHARE}, 
++ 	{"strict sync", P_BOOL, P_LOCAL, &sDefault.bStrictSync, NULL, NULL, FLAG_ADVANCED | FLAG_SHARE}, 
++ 	{"sync always", P_BOOL, P_LOCAL, &sDefault.bSyncAlways, NULL, NULL, FLAG_ADVANCED | FLAG_SHARE}, 
++ 	{"use mmap", P_BOOL, P_GLOBAL, &Globals.bUseMmap, NULL, NULL, FLAG_ADVANCED}, 
++@@ -2114,6 +2117,7 @@
++ FN_LOCAL_BOOL(lp_symlinks, bSymlinks)
++ FN_LOCAL_BOOL(lp_syncalways, bSyncAlways)
++ FN_LOCAL_BOOL(lp_strict_allocate, bStrictAllocate)
+++FN_LOCAL_BOOL(lp_preallocate, bPreallocate)
++ FN_LOCAL_BOOL(lp_strict_sync, bStrictSync)
++ FN_LOCAL_BOOL(lp_map_system, bMap_system)
++ FN_LOCAL_BOOL(lp_delete_readonly, bDeleteReadonly)
++diff -Naur samba-3.0.28a/source/smbd/fileio.c samba-3.0.28a_new/source/smbd/fileio.c
++--- samba-3.0.28a/source/smbd/fileio.c 2008-03-08 15:33:36.000000000 +0000
+++++ samba-3.0.28a_new/source/smbd/fileio.c     2008-10-20 15:57:26.000000000 +0100
++@@ -125,7 +125,12 @@
++ 		ret = vfs_write_data(fsp, data, n);
++ 	} else {
++ 		fsp->fh->pos = pos;
++-		if (pos && lp_strict_allocate(SNUM(fsp->conn))) {
+++		if (pos && lp_preallocate(SNUM(fsp->conn))) {
+++			if (vfs_fallocate(fsp, pos) == -1) {
+++				return -1;
+++			}
+++		} else if (pos && lp_strict_allocate(SNUM(fsp->conn))) {
+++
++ 			if (vfs_fill_sparse(fsp, pos) == -1) {
++ 				return -1;
++ 			}
++diff -Naur samba-3.0.28a/source/smbd/vfs.c samba-3.0.28a_new/source/smbd/vfs.c
++--- samba-3.0.28a/source/smbd/vfs.c    2008-03-08 15:33:36.000000000 +0000
+++++ samba-3.0.28a_new/source/smbd/vfs.c        2008-10-20 15:59:28.000000000 +0100
++@@ -24,6 +24,7 @@
++ */
++ 
++ #include "includes.h"
+++#define __NR_SYSCALL_BASE 0
++ 
++ #undef DBGC_CLASS
++ #define DBGC_CLASS DBGC_VFS
++@@ -591,6 +592,63 @@
++ 	return 0;
++ }
++ 
+++#include <unistd.h>
+++typedef struct xfs_flock64 {
+++	short         l_type;
+++	short         l_whence;
+++	long long     l_start;
+++	long long     l_len;    /* len == 0 means until end of file */
+++	long          l_sysid;
+++	unsigned long l_pid;
+++	long          l_pad[4]; /* reserve area */
+++} xfs_flock64_t;
+++
+++/**
+++ * len originates at start of file I believe and thus defines the size of the
+++ * file that should be preallocated, thus this function should preallocate from
+++ * EOF to len, if len > EOF
+++ */
+++int vfs_fallocate(files_struct *fsp, SMB_OFF_T len)
+++{
+++	SMB_STRUCT_STAT st;
+++	xfs_flock64_t   info;
+++	int             ret = 0;
+++
+++	release_level_2_oplocks_on_change(fsp);
+++	ret = SMB_VFS_FSTAT(fsp, fsp->fh->fd, &st);
+++	if (ret == -1) {
+++		return ret;
+++	}
+++
+++	if (len <= st.st_size) {
+++		return 0;
+++	}
+++
+++	DEBUG(10,("vfs_fallocate: preallocate to file %s from len %.0f to len %.0f (%.0f bytes)\n",
+++		fsp->fsp_name, (double)st.st_size, (double)len, (double)len - st.st_size));
+++
+++	flush_write_cache(fsp, SIZECHANGE_FLUSH);
+++
+++	/* Tell XFS of the region to preallocate */
+++	info.l_whence = 0;
+++	info.l_start  = st.st_size;
+++	info.l_len    = len - st.st_size;
+++
+++	/* Do I need to fill in these fields? */
+++	info.l_type = 0;
+++	info.l_sysid = 0;
+++	info.l_pid = 0;
+++
+++	ret = syscall(__NR_SYSCALL_BASE+353, fsp->fh->fd, &info);
+++	if (ret) {
+++		DEBUG(10,("vfs_fallocate: syscall for file %s failed and returned %d\n", fsp->fsp_name, ret));
+++	}
+++
+++	set_filelen_write_cache(fsp, len);
+++
+++	return 0;
+++}
+++
++ /****************************************************************************
++  Transfer some data (n bytes) between two file_struct's.
++ ****************************************************************************/
+diff -Naur ../buildroot-old/package/usbutils/usbutils.mk ../buildroot/package/usbutils/usbutils.mk
+--- ../buildroot-old/package/usbutils/usbutils.mk   2008-06-20 08:16:02.000000000 +0100
++++ ../buildroot/package/usbutils/usbutils.mk     2008-10-22 10:00:43.000000000 +0100
+@@ -26,6 +26,7 @@
+		$(TARGET_CONFIGURE_OPTS) \
+		$(TARGET_CONFIGURE_ARGS) \
+		ac_cv_func_malloc_0_nonnull=yes \
++		LDFLAGS=-L$(STAGING_DIR)/usr/lib \
+		./configure \
+		--target=$(GNU_TARGET_NAME) \
+		--host=$(GNU_TARGET_NAME) \
+diff -Naur ../buildroot-old/target/device/Oxsemi/root/target_skeleton/etc/inetd.conf ../buildroot/target/device/Oxsemi/root/target_skeleton/etc/inetd.conf
+--- ../buildroot-old/target/device/Oxsemi/root/target_skeleton/etc/inetd.conf       2008-09-23 13:27:04.000000000 +0100
++++ ../buildroot/target/device/Oxsemi/root/target_skeleton/etc/inetd.conf 2008-10-23 11:46:40.000000000 +0100
+@@ -1,4 +1,4 @@
+-netbios-ssn stream tcp nowait root /usr/local/samba/sbin/smbd smbd -s/etc/smb.conf -l/var/log -d0
++netbios-ssn stream tcp nowait root /usr/sbin/smbd smbd -s/etc/smb.conf -l/var/log -d0
+ #swat stream tcp nowait root /usr/local/samba/sbin/swat swat -a -d 1 -l /var/log
+ #tftp    dgram   udp     wait    root    /usr/sbin/in.tftpd in.tftpd -c -s /tftpboot
+ #ssh stream tcp nowait root /usr/sbin/sshd sshd -i
+diff -Naur ../buildroot-old/target/device/Oxsemi/OX810_DSE/target_skeleton/etc/init.d/S27create_public_share ../buildroot/target/device/Oxsemi/OX810_DSE/target_skeleton/etc/init.d/S27create_public_share
+--- ../buildroot-old/target/device/Oxsemi/OX810_DSE/target_skeleton/etc/init.d/S27create_public_share    1970-01-01 01:00:00.000000000 +0100
++++ ../buildroot/target/device/Oxsemi/OX810_DSE/target_skeleton/etc/init.d/S27create_public_share      2008-10-23 11:53:50.000000000 +0100
+@@ -0,0 +1,30 @@
++#!/bin/sh
++PUBLIC_SHARE_DIR=/shares/internal/PUBLIC
++SHARES_INC=/var/oxsemi/shares.inc
++
++if [ ! -e "/shares/internal/PUBLIC" ]; then
++       mkdir /shares/internal/PUBLIC
++       chown www-data:www-data /shares/internal/PUBLIC
++       chmod u+rwx $PUBLIC_SHARE_DIR
++       chmod og-rwx $PUBLIC_SHARE_DIR
++fi
++
++if [ ! -e "/var/oxsemi/shares.inc" ]; then
++       touch /var/oxsemi/shares.inc
++       echo "[PUBLIC]" > $SHARES_INC
++       echo "path=/shares/internal/PUBLIC" >> $SHARES_INC
++       echo "force user=www-data" >> $SHARES_INC
++       echo "valid users=www-data" >> $SHARES_INC
++       echo "write list=www-data" >> $SHARES_INC
++       echo "guest ok=Yes" >> $SHARES_INC
++       echo "preallocate=Yes" >> $SHARES_INC
++fi
++
++if [ ! -e "/var/private/smbpasswd" ]; then
++       touch /var/private/smbpasswd
++       /usr/bin/smbpasswd -c /etc/smb.conf -L -a -s www-data << EOF
++       www-data
++       www-data
++EOF
++fi
++
+diff -Naur ../buildroot-old/target/device/Oxsemi/OX810_SE/target_skeleton/etc/init.d/S27create_public_share ../buildroot/target/device/Oxsemi/OX810_SE/target_skeleton/etc/init.d/S27create_public_share
+--- ../buildroot-old/target/device/Oxsemi/OX810_SE/target_skeleton/etc/init.d/S27create_public_share    1970-01-01 01:00:00.000000000 +0100
++++ ../buildroot/target/device/Oxsemi/OX810_SE/target_skeleton/etc/init.d/S27create_public_share      2008-10-23 11:53:50.000000000 +0100
+@@ -22,7 +22,7 @@
+ 
+ if [ ! -e "/var/private/smbpasswd" ]; then
+ 	touch /var/private/smbpasswd
+-	/usr/local/samba/bin/smbpasswd -c /etc/smb.conf -L -a -s www-data << EOF
++	/usr/bin/smbpasswd -c /etc/smb.conf -L -a -s www-data << EOF
+ 	www-data
+ 	www-data
+ EOF
+diff -Naur ../buildroot-old/target/device/Oxsemi/root/target_skeleton/etc/init.d/samba.sh ../buildroot/target/device/Oxsemi/root/target_skeleton/etc/init.d/samba.sh
+--- ../buildroot-old/target/device/Oxsemi/root/target_skeleton/etc/init.d/samba.sh  2008-09-23 13:27:04.000000000 +0100
++++ ../buildroot/target/device/Oxsemi/root/target_skeleton/etc/init.d/samba.sh    2008-10-23 16:17:26.000000000 +0100
+@@ -11,7 +11,7 @@
+ 	then
+ 		mv $NMBD_LOG ${NMBD_LOG}.old
+ 	fi
+-	/usr/local/samba/sbin/nmbd -D -s/etc/smb.conf -l${LOGS} -d0
++	/usr/sbin/nmbd -D -s/etc/smb.conf -l${LOGS} -d0
+ }
+ 
+ stop() {
+

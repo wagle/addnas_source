@@ -1,0 +1,12 @@
+--- Makefile.orig	2008-09-10 12:05:42.150535942 +0100
++++ Makefile	2008-09-10 11:58:36.456633122 +0100
+@@ -314,6 +314,9 @@
+ $(PROJECT_BUILD_DIR)/.root:
+ 	mkdir -p $(TARGET_DIR)
+ 	if ! [ -d "$(TARGET_DIR)/bin" ]; then \
++		if [ -d "$(BASE_TARGET_SKELETON)" ]; then \
++			cp -fa $(BASE_TARGET_SKELETON)/* $(TARGET_DIR)/; \
++		fi; \
+ 		if [ -d "$(TARGET_SKELETON)" ]; then \
+ 			cp -fa $(TARGET_SKELETON)/* $(TARGET_DIR)/; \
+ 		fi; \

@@ -1,0 +1,8 @@
+default_ip=192.168.1.128
+default_msk=16
+default_hostname=OXNAS
+default_ntp=pool.ntp.org
+default_time=120100002006.00
+default_network_mode=dhcp
+default_workgroup=workgroup
+developer_mode=no

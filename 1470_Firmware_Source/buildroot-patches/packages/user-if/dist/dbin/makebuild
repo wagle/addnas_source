@@ -1,0 +1,18 @@
+#!/usr/bin/perl -w
+# Program: makebuild
+# Purpose: Create Build.PL script
+# Author : $Author: B.James$
+# Version: $Revision: $
+# Date   : $Date: $
+#
+use Module::Build;
+my $build = Module::Build->new
+(
+module_name => 'OXSemi::NAS',
+license  => 'perl',
+requires => {
+	  'perl' => 		'5.6.1',
+	  'Template' => 	'1.23',
+	 },
+);
+$build->create_build_script;

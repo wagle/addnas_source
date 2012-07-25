@@ -1,0 +1,111 @@
+# /etc/inittab
+#
+# Copyright (C) 2001 Erik Andersen <andersen@codepoet.org>
+#
+# Note: BusyBox init doesn't support runlevels.  The runlevels field is
+# completely ignored by BusyBox init. If you want runlevels, use
+# sysvinit.
+#
+# Format for each entry: <id>:<runlevels>:<action>:<process>
+#
+# id        == tty to run on, or empty for /dev/console
+# runlevels == ignored
+# action    == one of sysinit, respawn, askfirst, wait, and once
+# process   == program to run
+
+# Startup the system
+::sysinit:/bin/mount /proc
+::sysinit:/bin/mount -a
+::sysinit:/bin/mount -o remount,rw,noatime /
+::sysinit:/bin/ln -s /proc/mounts /etc/mtab
+::sysinit:/sbin/swapon -a
+
+::sysinit:/etc/RAID0-prep.sh
+
+::sysinit:/bin/chown www-data:www-data /shares/internal
+::sysinit:/bin/chmod 755 /shares/internal
+
+::sysinit:/bin/chown www-data:www-data /shares/external
+::sysinit:/bin/chmod 755 /shares/external
+
+#::sysinit:/bin/chown www-data:www-data /shares/internal/PUBLIC
+
+#::sysinit:/etc/init.d/_S28shares_cleanup start
+#::sysinit:/usr/WebUI/nbin/createPublic.sh
+#::sysinit:/bin/chown www-data:www-data /var/oxsemi/ftp_shares.inc
+
+# Update ownership and modes for cups and samba
+::sysinit:/bin/chgrp sys /var/spool/cups
+::sysinit:/bin/chmod g+rws /var/spool/cups
+::sysinit:/bin/chmod 1777 /var/spool/samba
+::sysinit:/bin/chgrp users /var/spool/samba
+
+# Give lighttpd ownership of it's log directory
+::sysinit:/bin/chown -R www-data:www-data /var/log/lighttpd
+
+# Give the WebUI ownership of /etc/smb.conf /var/oxsemi/mt-daapd.conf
+::sysinit:/bin/chown -R www-data:www-data /etc/smb.conf
+#::sysinit:/bin/chown -R www-data:www-data /var/oxsemi/mt-daapd.conf
+
+# Load kernel modules
+# Network
+::sysinit:/sbin/modprobe gmac mac_adr=$mac_adr
+# Temperature control
+::sysinit:/sbin/modprobe thermAndFan
+# RTC
+::sysinit:/bin/ln -s /dev/rtc0 /dev/rtc > /dev/null 2>&1
+::sysinit:/sbin/modprobe rtc-ds1307
+::sysinit:/sbin/modprobe i2c-oxnas-bitbash
+# USB
+::sysinit:/sbin/modprobe ehci-hcd
+::sysinit:/sbin/modprobe usb-storage
+# Code Page for VFAT
+::sysinit:/sbin/modprobe nls_cp437
+# Power Button
+::sysinit:/bin/sh /etc/init.d/load_power_button_module.sh
+
+# Mount the USB filesystem
+::sysinit:/bin/mount -t usbfs usbfs /proc/bus/usb
+
+# Run any rc scripts
+::sysinit:/etc/init.d/rcS
+
+#::respawn:/sbin/nasresponder
+#::respawn:/sbin/ipc_notifier
+
+# Set up a couple of getty's
+#tty1::respawn:/sbin/getty 38400 tty1
+#tty2::respawn:/sbin/getty 38400 tty2
+
+# Put a getty on the serial port
+ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100
+#ttyS1::respawn:/sbin/getty -L ttyS1 115200 vt100
+#ttyS2::respawn:/sbin/getty -L ttyS2 115200 vt100
+
+# Logging junk
+::sysinit:/bin/touch /var/log/messages
+null::respawn:/sbin/syslogd -n -m 0
+null::respawn:/sbin/klogd -n
+#tty3::respawn:/usr/bin/tail -f /var/log/messages
+
+# Stuff to do for the 3-finger salute
+::ctrlaltdel:/sbin/reboot
+
+# Stuff to do before rebooting
+# tidy up using start scripts.
+::shutdown:/etc/init.d/rcK
+# Unload modules
+::shutdown:/sbin/rmmod power_button
+::shutdown:/sbin/rmmod nls_cp437
+::shutdown:/sbin/rmmod usb-storage
+::shutdown:/sbin/rmmod ehci-hcd
+::shutdown:/sbin/rmmod i2c-oxnas-bitbash
+::shutdown:/sbin/rmmod rtc-ds1307
+::shutdown:/sbin/rmmod thermAndFan
+::shutdown:/sbin/rmmod gmac
+# make sure everything else stops.
+::shutdown:/bin/sync
+::shutdown:/usr/bin/killall klogd
+::shutdown:/usr/bin/killall syslogd
+::shutdown:/sbin/swapoff -a
+::shutdown:/bin/umount -a -r

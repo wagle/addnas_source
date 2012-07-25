@@ -1,0 +1,24 @@
+--- scripts/copy.sh.orig	2008-06-18 08:53:21.000000000 +0100
++++ scripts/copy.sh	2008-06-18 08:48:28.000000000 +0100
+@@ -2,11 +2,20 @@
+ 
+ STAGING_DIR=$1
+ TARGET_DIR=$2
++CPLUSPLUS_INCLUDE_DIR=${TARGET_DIR}/usr/include/c++
+ 
+ echo "Copying development files to target..."
+-
+ cp -a ${STAGING_DIR}/usr/include ${TARGET_DIR}/usr
+ 
++if [ ! -d "${CPLUSPLUS_INCLUDE_DIR}" ]
++then
++	echo "Creating C++ development files directory"
++	mkdir ${CPLUSPLUS_INCLUDE_DIR}
++fi
++
++echo "Copying C++ development files to target..."
++cp -a ${STAGING_DIR}/usr/arm-linux-uclibcgnueabi/include/c++/4.2.4/* ${TARGET_DIR}/usr/include/c++/
++
+ for LIBSDIR in /lib /usr/lib; do
+ 	for WILDCARD in *.a *.la; do
+ 		for FILE_PATH in `find ${STAGING_DIR}${LIBSDIR} -name ${WILDCARD}`; do

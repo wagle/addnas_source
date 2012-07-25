@@ -1,0 +1,7 @@
+config BR2_PACKAGE_PERL
+	bool "Natively compiled pre-built perl"
+    default y
+	help
+		Pre-compiled binary perl installation
+	
+

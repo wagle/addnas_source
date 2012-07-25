@@ -1,0 +1,64 @@
+#!/bin/sh
+#
+# Complete pending upgrade the upgrade ....
+#
+UPGRADE_SCRIPT=/var/upgrade/upgrade2.sh
+
+clean () {
+	rm -f /var/upgrade/*
+	rm -f /tmp/active_upgrade
+}
+
+start() {
+
+	ERROR="none"
+	ls /tmp 
+	ls /var/upgrade
+	# resume partial upgrade - assume power failed during upgrade
+	# use status flags to work out at which point to resume.
+	# only works if downloaded successfully and upgrade is active.
+	if [ -e /tmp/active_upgrade ] 
+	then 
+		# OK so downloaded
+		# has it been unpacked successfully? yes move on otherwise try unpacking, remove if it fails. 
+		if [ !  -e /var/upgrade/md5pass  ] 
+		then
+			if /usr/www/nbin/checkupgrade.sh
+			then
+				touch /var/upgrade/md5pass
+			else
+				clean
+				touch /var/upgrade/md5fail
+			fi
+		fi 
+			
+		if [ -e /var/upgrade/md5pass ] 
+		then
+				/usr/www/nbin/applyupgrade.sh
+		fi 
+		
+	    rm -f /tmp/active_upgrade 
+	fi
+
+    if [ -f $UPGRADE_SCRIPT ]
+    then
+       . $UPGRADE_SCRIPT
+    fi
+}
+
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    ;;
+  restart|reload|cleanup)
+    ;;
+  *)
+    echo $"Usage: $0 start"
+    exit 1
+esac
+
+exit $?
+

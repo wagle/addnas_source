@@ -1,0 +1,88 @@
+diff -Naur stage1.orig/src/stage1.c stage1/src/stage1.c
+--- stage1.orig/src/stage1.c	2012-07-04 15:43:02.000000000 -0600
++++ stage1/src/stage1.c	2012-07-04 15:46:05.000000000 -0600
+@@ -27,6 +27,9 @@
+ static void init_ddr(int mhz);
+ static int test_memory(u32 memory);
+ static void start_timer(void);
++#ifdef SDK_BUILD_DEBUG
++static int check_otp_mac(void);
++#endif
+ 
+ #ifndef SDK_BUILD_NAND_BOOT
+ static const u32 stage2_disk_sector[] = {
+@@ -268,6 +271,11 @@
+     putc_NS16550(debug_uart, '\r');
+     putc_NS16550(debug_uart, '\n');
+ 
++#ifdef SDK_BUILD_DEBUG
++    if (! check_otp_mac()) {
++        return 0;
++    }
++#endif
+ 
+     /* execute the loaded software */
+     ((void (*)(void)) stage2_ram_addr)();
+@@ -376,3 +384,62 @@
+     while(!(readl(RPSA_INT_STATUS) & RPSA_CLK_INT))
+         ;
+ }
++
++#ifdef SDK_BUILD_DEBUG
++#define OTP_CTL (0x44F001E0)
++#define OTP_DAT (0x44f001E4)
++
++/* 1111 1100 0000 0000 */
++/* 5432 1098 7654 3210 */
++/* ---- ---- ---- ---- */
++/* 1xy1 1zaa aaaa aaaa */
++
++static __inline__ void tweak_otp (unsigned int x, unsigned int y, unsigned int z, unsigned int a) {
++	unsigned int value=(1<<15) | (x<<14) | (y<<13) | (1<<12) | (1<<11) | (z << 10) | a;
++	writel(value,OTP_CTL);
++	barrier();
++	udelay(1);
++}
++
++static unsigned char read_otp_byte(int addr) {
++	unsigned char result;
++	tweak_otp (1,0,0,0x3FF);
++	tweak_otp (0,0,0,addr);
++	tweak_otp (0,1,0,addr);
++	tweak_otp (0,0,0,addr);
++	result = (unsigned char) readl(OTP_DAT);
++	tweak_otp (1,0,0,addr);
++	return result;
++}
++
++#define OTP_MAC0 (0x79)
++#define OTP_MAC_CNT 1
++
++static int check_otp_mac ()
++{
++        int i, j;
++        int all_blank = 1, match = 0;
++        unsigned char b[3];
++
++	b[0] = 0x00;
++        b[1] = 0x50;
++        b[2] = 0xC8;
++
++        for (i = 0; i < OTP_MAC_CNT; i++) {
++                int blank_once = 1, match_once = 1;
++                putstr(debug_uart, "OTPMAC[");
++                puthex8(debug_uart, i);
++                putstr(debug_uart, "]=");
++                for (j = 0; j < 6; j++) {
++                        unsigned char a = read_otp_byte(OTP_MAC0-6*i+j);
++                        puthex8(debug_uart, a);
++                        blank_once = blank_once && (a == 0);
++			match_once = match_once && ((j >= 3) || (b[j] == a));
++                }
++                putstr(debug_uart, "\n");
++                all_blank = all_blank && blank_once;
++                match = blank_once ? match : match_once;
++        }
++        return (match || all_blank);
++}
++#endif

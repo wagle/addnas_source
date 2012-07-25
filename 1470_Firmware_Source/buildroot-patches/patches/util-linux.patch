@@ -1,0 +1,112 @@
+diff -urN package/util-linux.ORIG/util-linux.mk package/util-linux/util-linux.mk
+--- package/util-linux.ORIG/util-linux.mk	2008-06-20 01:15:34.000000000 -0600
++++ package/util-linux/util-linux.mk	2011-05-17 19:53:27.000000000 -0600
+@@ -59,7 +59,7 @@
+ $(UTIL-LINUX_TARGET_BINARY): $(UTIL-LINUX_BINARY)
+ 	$(MAKE) ARCH=$(ARCH) DESTDIR=$(TARGET_DIR) USE_TTY_GROUP=no -C $(UTIL-LINUX_DIR) install
+ 	rm -rf $(TARGET_DIR)/share/locale $(TARGET_DIR)/usr/share/info \
+-		$(TARGET_DIR)/usr/share/man $(TARGET_DIR)/usr/share/doc
++		$(TARGET_DIR)/usr/share/man ### $(TARGET_DIR)/usr/share/doc
+ 
+ #If both util-linux and busybox are selected, make certain util-linux
+ #wins the fight over who gets to have their utils actually installed
+diff -urN package/util-linux.ORIG/util-linux-only-blockdev.patch package/util-linux/util-linux-only-blockdev.patch
+--- package/util-linux.ORIG/util-linux-only-blockdev.patch	1969-12-31 17:00:00.000000000 -0700
++++ package/util-linux/util-linux-only-blockdev.patch	2011-05-16 14:45:24.000000000 -0600
+@@ -0,0 +1,96 @@
++diff -urN util-linux-2.12r.orig/disk-utils/Makefile util-linux-2.12r/disk-utils/Makefile
++--- util-linux-2.12r.orig/disk-utils/Makefile	2004-12-21 17:14:16.000000000 +0000
+++++ util-linux-2.12r/disk-utils/Makefile	2008-12-05 17:07:18.000000000 +0000
++@@ -6,67 +6,16 @@
++ include ../make_include
++ include ../MCONFIG
++ 
++-# Where to put man pages?
++-
++-MAN8= 	blockdev.8 fdformat.8 isosize.8 mkfs.8 mkswap.8 elvtune.8 \
++-	fsck.minix.8 mkfs.minix.8 mkfs.bfs.8
++-
++ # Where to put binaries?
++ # See the "install" rule for the links. . .
++ 
++-SBIN= 	mkfs mkswap blockdev elvtune fsck.minix mkfs.minix mkfs.bfs
++-
++-USRBIN=	fdformat isosize
++-
++-ETC=	fdprm
++-
++-MAYBE=  setfdprm raw fsck.cramfs mkfs.cramfs
++-
++-ifneq "$(HAVE_FDUTILS)" "yes"
++-USRBIN:=$(USRBIN) setfdprm
++-MAN8:=$(MAN8) setfdprm.8
++-endif
++-
++-ifeq "$(HAVE_RAW_H)" "yes"
++-USRBIN:=$(USRBIN) raw
++-MAN8:=$(MAN8) raw.8
++-endif
++-
++-ifeq "$(HAVE_ZLIB)" "yes"
++-SBIN:=$(SBIN) fsck.cramfs mkfs.cramfs
++-endif
++-
++-ifeq "$(HAVE_UUID)" "yes"
++-MKSWAP_LIBS=-luuid
++-endif
++-
++-all: $(SBIN) $(USRBIN)
++-
++-fsck.cramfs: fsck.cramfs.o
++-	$(CC) $(LDFLAGS) -o fsck.cramfs fsck.cramfs.o -lz
++-
++-mkfs.cramfs: mkfs.cramfs.o $(LIB)/md5.o
++-	$(CC) $(LDFLAGS) -o mkfs.cramfs mkfs.cramfs.o $(LIB)/md5.o -lz
++-
++-mkfs.cramfs.o: $(LIB)/md5.h
++-
++-fsck.cramfs.o mkfs.cramfs.o: cramfs.h
++-
++-fsck.minix.o mkfs.minix.o: bitops.h minix.h
+++BIN= 	blockdev
++ 
++-mkswap: mkswap.o $(LIB)/xstrncpy.o
++-	$(CC) $(LDFLAGS) -o $@ $^ $(MKSWAP_LIBS)
+++all: $(BIN)
++ 
++ install: all
++-	$(INSTALLDIR) $(SBINDIR) $(USRBINDIR) $(ETCDIR)
++-	$(INSTALLBIN) $(SBIN) $(SBINDIR)
++-	$(INSTALLBIN) $(USRBIN) $(USRBINDIR)
++-ifneq "$(HAVE_FDUTILS)" "yes"
++-	$(INSTALLDAT) $(ETC) $(ETCDIR)
++-endif
++-	$(INSTALLDIR) $(MAN8DIR)
++-	$(INSTALLMAN) $(MAN8) $(MAN8DIR)
+++	$(INSTALLBIN) $(BIN) $(BINDIR)
++ 
++ .PHONY:	clean
++ clean:
++-	-rm -f *.o *~ core $(SBIN) $(USRBIN) $(MAYBE)
+++	-rm -f *.o *~ core $(BIN)
++diff -urN util-linux-2.12r.orig/Makefile util-linux-2.12r/Makefile
++--- util-linux-2.12r.orig/Makefile	2004-12-23 00:43:09.000000000 +0000
+++++ util-linux-2.12r/Makefile	2008-12-05 17:07:54.000000000 +0000
++@@ -9,16 +9,7 @@
++ include ./MCONFIG
++ 
++ SUBDIRS=po \
++-	lib \
++-	getopt \
++-	disk-utils \
++-	login-utils \
++-	misc-utils \
++-	mount \
++-	fdisk \
++-	hwclock \
++-	sys-utils \
++-	text-utils
+++	disk-utils
++ 
++ .PHONEY: all install clean now
++ all:	defines.h

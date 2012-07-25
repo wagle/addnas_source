@@ -1,0 +1,11 @@
+--- package/ncurses.orig/ncurses.mk	2009-09-23 17:59:50.000000000 +0100
++++ package/ncurses/ncurses.mk	2009-09-21 16:11:23.000000000 +0100
+@@ -113,7 +113,7 @@
+ ifeq ($(strip $(BR2_PACKAGE_NCURSES_TARGET_MENU)),y)
+ 	cp -dpf $(NCURSES_DIR)/lib/libmenu.so* $(TARGET_DIR)/usr/lib/
+ endif
+-	ln -sf /usr/share/terminfo $(TARGET_DIR)/usr/lib/terminfo
++	ln -sf $(TARGET_DIR)/usr/share/terminfo $(TARGET_DIR)/usr/lib/
+ 	mkdir -p $(TARGET_DIR)/usr/share/terminfo/x
+ 	cp -dpf $(STAGING_DIR)/usr/share/terminfo/x/xterm $(TARGET_DIR)/usr/share/terminfo/x
+ 	cp -dpf $(STAGING_DIR)/usr/share/terminfo/x/xterm-color $(TARGET_DIR)/usr/share/terminfo/x

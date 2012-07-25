@@ -1,0 +1,12 @@
+diff -urN package/portmap.orig/portmap.mk package/portmap/portmap.mk
+--- package/portmap.orig/portmap.mk	2008-06-20 08:15:34.000000000 +0100
++++ package/portmap/portmap.mk	2008-06-20 16:26:21.000000000 +0100
+@@ -26,7 +26,7 @@
+ 
+ $(TARGET_DIR)/$(PORTMAP_TARGET_BINARY): $(PORTMAP_DIR)/$(PORTMAP_BINARY)
+ 	$(INSTALL) -D $(PORTMAP_DIR)/$(PORTMAP_BINARY) $(TARGET_DIR)/$(PORTMAP_TARGET_BINARY)
+-	$(INSTALL) -m 0755 package/portmap/S13portmap $(TARGET_DIR)/etc/init.d
++#	$(INSTALL) -m 0755 package/portmap/S13portmap $(TARGET_DIR)/etc/init.d
+ 
+ portmap: uclibc $(TARGET_DIR)/$(PORTMAP_TARGET_BINARY)
+ 

@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+#
+# Copyright (C) 2007 Oxford Semiconductor Inc.
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+# 
+# 
+# This file provides semaphore methods for the hotplug scripts. It works under
+# the assumption that symbolic link creation is atomic. It stores the process id
+# in the lockfile so that stale locks (those left behind by dead processes) can 
+# be detected and removed.
+
+
+################################################################################
+# semaphore locking using symbolic links
+# $1 = lockfile
+down() {
+    # lots of different locks can symbolically link to this one file
+    [ -e /tmp/locktarget ] || touch /tmp/locktarget
+    
+    # assuming sybolic link creation is atomic
+    until ln -s /tmp/locktarget "$1"
+    do
+        sleep 1;
+    done
+    echo $$ >"$1"
+}
+
+################################################################################
+# finished with the semaphore
+# $1 = lockfile
+up() {
+    rm "$1"
+}
+
+################################################################################
+# clears stale locks
+# $1 = lockfile
+cleanuplocks() {
+    # check for a stale lock file. It is considered stale if the process that 
+    # created it is no longer active. 
+    if [ -e "$1" ]
+    then 
+        [ -e /proc/`cat "$1"` ] || rm "$1"
+    fi
+}
+
+################################################################################
+# break the lock, do once early at boottime
+# cleanuplocks above will deadlock if another process has the same pid
+# note that this is the same as up()
+# $1 = lockfile
+breaklocks() {
+	rm "$1"
+}

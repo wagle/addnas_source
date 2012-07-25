@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Copyright (C) 2008 Oxford Semiconductor Ltd
+#
+# Checks the cmdline arguments to see if we need to reset to default network 
+# settings
+#
+
+# recovery flag dd operations are in byte mode hence not affecting
+# upgrade flag - Second byte of 288th sector (512 bytes per sector)
+CONTROLLED_PD_FLAG_OFFSET=147458
+BS=1
+CONTROLLED_PD_FLAG=1
+RESET_CONTROLLED_PD_FLAG=0
+
+case "$1" in
+    start)
+        # find the power mode
+        pmode=`cat /proc/cmdline`
+        pmode=`expr "$pmode" : '.*powermode=\([^ ]*\)'`
+
+        if [ "${pmode}" = "controlledpdown" ]; then
+            
+            echo "performing Controlled Power Down"
+	    poweroff
+        fi
+
+	if [ "${pmode}" = "controlledpup" ]; then
+	# this is handled as a separate case to avoid resetting disk flag on every boot
+ 	    echo "Normal System Boot From Power Down - Resetting Controlled Power down flag"	
+	    echo -n $RESET_CONTROLLED_PD_FLAG | dd of=/dev/sda seek=${CONTROLLED_PD_FLAG_OFFSET} bs=${BS}
+	    sync
+        fi 
+	;;
+
+    *)
+	echo $"Usage: $0 {start}"
+	exit 1
+esac
+
+exit $?

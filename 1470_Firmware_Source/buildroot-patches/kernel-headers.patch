@@ -1,0 +1,19 @@
+--- toolchain/kernel-headers.orig/Config.in	2009-09-24 09:59:41.000000000 +0100
++++ toolchain/kernel-headers/Config.in	2009-09-24 09:54:40.000000000 +0100
+@@ -83,6 +83,9 @@
+ 	config BR2_KERNEL_HEADERS_2_6_25
+ 		bool "Linux 2.6.25.x kernel headers"
+ 
++	config BR2_KERNEL_HEADERS_2_6_31
++		bool "linux 2.6.31.x kernel headers"
++
+ 	config BR2_KERNEL_HEADERS_SNAP
+ 		bool "Linux 2.6 snapshot"
+ 
+@@ -138,5 +141,6 @@
+ 	default "2.6.23"	if BR2_KERNEL_HEADERS_2_6_23
+ 	default "2.6.24.7"	if BR2_KERNEL_HEADERS_2_6_24
+ 	default "2.6.25.6"	if BR2_KERNEL_HEADERS_2_6_25
++	default "2.6.31" 	if BR2_KERNEL_HEADERS_2_6_31
+ 	default "2.6"		if BR2_KERNEL_HEADERS_SNAP
+ 

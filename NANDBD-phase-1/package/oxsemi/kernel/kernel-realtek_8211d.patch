@@ -1,0 +1,155 @@
+Index: linux-kernel/drivers/net/gmac/gmac_phy.c
+===================================================================
+--- linux-kernel/drivers/net/gmac/gmac_phy.c	(revision 4669)
++++ linux-kernel/drivers/net/gmac/gmac_phy.c	(working copy)
+@@ -35,7 +35,6 @@
+ {
+ 	int i;
+ 
+-printk("gmac_phy_init() invoked\n");
+ 	for (i=0; i < CONFIG_OXNAS_MAX_GMAC_UNITS; ++i) {
+ 		spin_lock_init(&phy_access_spinlock[i]);
+ 	}
+@@ -235,8 +234,10 @@
+ 
+ void start_phy_reset(gmac_priv_t* priv)
+ {
+-    // Ask the PHY to reset
+-    priv->mii.mdio_write(priv->netdev, priv->mii.phy_id, MII_BMCR, BMCR_RESET);
++    // Ask the PHY to reset and allow autonegotiation (Realtek PHY requires
++    // auto-neg to be explicitly enabled at this point)
++    priv->mii.mdio_write(priv->netdev, priv->mii.phy_id,
++    	MII_BMCR, BMCR_RESET | BMCR_ANRESTART | BMCR_ANENABLE);
+ }
+ 
+ int is_phy_reset_complete(gmac_priv_t* priv)
+@@ -265,15 +266,15 @@
+     // Total time to wait for reset to complete
+     end = jiffies + MS_TO_JIFFIES(PHY_TRANSFER_TIMEOUT_MS);
+ 
+-    // Should apparently wait at least 50mS before reading back from PHY; this
+-    // could just be a nasty feature of the SMC91x MAC/PHY and not apply to us
+-    msleep(50);
+-
+     // Read back the status until it indicates reset, or we timeout
+     while (!(complete = is_phy_reset_complete(priv)) && time_before(jiffies, end)) {
+         msleep(1);
+     }
+ 
++    if (complete) {
++		post_phy_reset_action(dev);
++    }
++
+     return !complete;
+ }
+ 
+Index: linux-kernel/drivers/net/gmac/gmac-napi.c
+===================================================================
+--- linux-kernel/drivers/net/gmac/gmac-napi.c	(revision 4669)
++++ linux-kernel/drivers/net/gmac/gmac-napi.c	(working copy)
+@@ -641,6 +641,9 @@
+ 		case PHY_TYPE_REALTEK_RTL8211BGR:
+ 			printk(KERN_INFO "%s: PHY is Realtek RTL8211BGR, type 0x%08x\n", priv->netdev->name, priv->phy_type);
+ 			break;
++		case PHY_TYPE_REALTEK_RTL8211D:
++			printk(KERN_INFO "%s: PHY is Realtek RTL8211D, type 0x%08x\n", priv->netdev->name, priv->phy_type);
++			break;
+ 		case PHY_TYPE_LSI_ET1011C:
+ 		case PHY_TYPE_LSI_ET1011C2:
+ 			{
+@@ -803,6 +806,24 @@
+     return !(priv->mii.mdio_read(priv->netdev, priv->mii.phy_id, MII_BMSR) & BMSR_ANEGCOMPLETE);
+ }
+ 
++static void wait_autoneg_complete(gmac_priv_t* priv)
++{
++	unsigned long end = jiffies + 10*HZ;
++	unsigned long tick_end = jiffies;
++
++	printk("Waiting for auto-negotiation to complete");
++	while (is_auto_negotiation_in_progress(priv) && time_before(jiffies, end)) {
++		if (time_after(jiffies, tick_end)) {
++			printk(".");
++			tick_end = jiffies + HZ/2;
++		}
++	}
++	if (!time_before(jiffies, end)) {
++		printk("\nTimed-out of wait");
++	}
++	printk("\n");
++}
++
+ static void watchdog_timer_action(unsigned long arg)
+ {
+     gmac_priv_t* priv = (gmac_priv_t*)arg;
+@@ -852,12 +873,14 @@
+                     if (!is_phy_reset_complete(priv)) {
+                         new_timeout = jiffies + RESET_INTERVAL;
+                     } else {
+-                        // Force or auto-negotiate PHY mode
+-                        set_phy_negotiate_mode(priv->netdev);
++                        post_phy_reset_action(priv->netdev);
+ 
+                         // Set PHY specfic features
+                         initialise_phy(priv);
+ 
++                        // Force or auto-negotiate PHY mode
++                        set_phy_negotiate_mode(priv->netdev);
++
+                         priv->watchdog_timer_state = WDS_NEGOTIATING;
+                         new_timeout = jiffies + AUTO_NEG_INTERVAL;
+                     }
+@@ -3293,6 +3316,9 @@
+         goto open_err_out;
+     }
+ 
++    // Allow some time for auto-negotiation to work
++    msleep(3000);
++
+ 	priv->interface_up = 1;
+     return 0;
+ 
+@@ -4371,3 +4397,16 @@
+ 	}
+ }
+ module_exit(gmac_module_cleanup);
++
++void post_phy_reset_action(struct net_device *dev)
++{
++    gmac_priv_t* priv = (gmac_priv_t*)netdev_priv(dev);
++
++	switch (priv->phy_type) {
++		case PHY_TYPE_REALTEK_RTL8211D:
++			// If we don't have this the Realtek RTL8211D can fail
++			wait_autoneg_complete(priv);
++			break;
++	}
++}
++
+Index: linux-kernel/drivers/net/gmac/gmac.h
+===================================================================
+--- linux-kernel/drivers/net/gmac/gmac.h	(revision 4669)
++++ linux-kernel/drivers/net/gmac/gmac.h	(working copy)
+@@ -390,5 +390,6 @@
+ #define SYS_CTRL_DELAY_RX_INC   (1 << (16 + 2))
+ #define SYS_CTRL_DELAY_RX_CLK   (1 << (16 + 3))
+ 
++extern void post_phy_reset_action(struct net_device *dev);
+ #endif        //  #if !defined(__GMAC_H__)
+ 
+Index: linux-kernel/drivers/net/gmac/gmac_phy.h
+===================================================================
+--- linux-kernel/drivers/net/gmac/gmac_phy.h	(revision 4669)
++++ linux-kernel/drivers/net/gmac/gmac_phy.h	(working copy)
+@@ -27,8 +27,9 @@
+ 
+ #define PHY_TYPE_NONE					0
+ #define PHY_TYPE_MICREL_KS8721BL		0x00221619
+-#define PHY_TYPE_VITESSE_VSC8201XVZ	0x000fc413
+-#define PHY_TYPE_REALTEK_RTL8211BGR	0x001cc912
++#define PHY_TYPE_VITESSE_VSC8201XVZ		0x000fc413
++#define PHY_TYPE_REALTEK_RTL8211BGR		0x001cc912
++#define PHY_TYPE_REALTEK_RTL8211D		0x001cc914
+ #define PHY_TYPE_LSI_ET1011C			0x0282f013
+ #define PHY_TYPE_LSI_ET1011C2			0x0282f014
+ #define PHY_TYPE_ICPLUS_IP1001_0		0x02430d90

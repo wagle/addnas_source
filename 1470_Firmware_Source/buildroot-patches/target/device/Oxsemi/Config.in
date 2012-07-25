@@ -1,0 +1,24 @@
+menuconfig BR2_TARGET_OXSEMI
+	bool "Oxford Semiconductor Device Support"
+	depends on BR2_arm
+	default n
+
+if BR2_TARGET_OXSEMI
+source "target/device/Oxsemi/OX810_Config.in"
+source "target/device/Oxsemi/OX820_Config.in"
+
+config BR2_BOARD_NAME
+        string
+        default "OX810_SE"	if	BR2_TARGET_OX810_SE
+        default "OX810_DSE"	if	BR2_TARGET_OX810_DSE
+        default "OX820_DSE"	if	BR2_TARGET_OX820_DSE
+
+config BR2_OXSEMI_PATH
+	string
+	default "target/device/Oxsemi"
+
+config BR2_BOARD_PATH
+        string
+        default "$(BR2_OXSEMI_PATH)/$(BR2_BOARD_NAME)"
+
+endif

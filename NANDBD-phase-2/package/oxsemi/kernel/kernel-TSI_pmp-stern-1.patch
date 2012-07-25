@@ -1,0 +1,164 @@
+diff -Naur linux-kernel.orig/drivers/scsi/scsi_scan.c linux-kernel.new/drivers/scsi/scsi_scan.c
+--- linux-kernel.orig/drivers/scsi/scsi_scan.c	2011-07-31 21:25:06.000000000 -0600
++++ linux-kernel.new/drivers/scsi/scsi_scan.c	2012-01-06 11:00:41.000000000 -0700
+@@ -1302,6 +1302,7 @@
+  *   LUNs even if it's older than SCSI-3.
+  *   If BLIST_NOREPORTLUN is set, return 1 always.
+  *   If BLIST_NOLUN is set, return 0 always.
++ *   If starget->no_report_luns is set, return 1 always.
+  *
+  * Return:
+  *     0: scan completed (or no memory, so further scanning is futile)
+@@ -1328,6 +1329,7 @@
+ 	 * Only support SCSI-3 and up devices if BLIST_NOREPORTLUN is not set.
+ 	 * Also allow SCSI-2 if BLIST_REPORTLUN2 is set and host adapter does
+ 	 * support more than 8 LUNs.
++	 * Don't attempt if the target doesn't support REPORT LUNS.
+ 	 */
+ 	if (bflags & BLIST_NOREPORTLUN)
+ 		return 1;
+@@ -1339,6 +1341,8 @@
+ 		return 1;
+ 	if (bflags & BLIST_NOLUN)
+ 		return 0;
++	if (starget->no_report_luns)
++		return 1;
+ 
+ 	if (!(sdev = scsi_device_lookup_by_target(starget, 0))) {
+ 		sdev = scsi_alloc_sdev(starget, 0, NULL);
+diff -Naur linux-kernel.orig/drivers/scsi/sd.c linux-kernel.new/drivers/scsi/sd.c
+--- linux-kernel.orig/drivers/scsi/sd.c	2011-07-31 21:25:06.000000000 -0600
++++ linux-kernel.new/drivers/scsi/sd.c	2012-01-06 11:00:41.000000000 -0700
+@@ -1847,7 +1847,7 @@
+ 	 * some USB ones crash on receiving them, and the pages
+ 	 * we currently ask for are for SPC-3 and beyond
+ 	 */
+-	if (sdp->scsi_level > SCSI_SPC_2)
++	if (sdp->scsi_level > SCSI_SPC_2 && !sdp->skip_vpd_pages)
+ 		return 1;
+ 	return 0;
+ }
+diff -Naur linux-kernel.orig/drivers/usb/storage/scsiglue.c linux-kernel.new/drivers/usb/storage/scsiglue.c
+--- linux-kernel.orig/drivers/usb/storage/scsiglue.c	2011-07-31 21:25:13.000000000 -0600
++++ linux-kernel.new/drivers/usb/storage/scsiglue.c	2012-01-06 11:03:10.000000000 -0700
+@@ -78,8 +78,6 @@
+ 
+ static int slave_alloc (struct scsi_device *sdev)
+ {
+-	struct us_data *us = host_to_us(sdev->host);
+-
+ 	/*
+ 	 * Set the INQUIRY transfer length to 36.  We don't use any of
+ 	 * the extra data and many devices choke if asked for more or
+@@ -104,18 +102,6 @@
+ 	 */
+ 	blk_queue_update_dma_alignment(sdev->request_queue, (512 - 1));
+ 
+-	/*
+-	 * The UFI spec treates the Peripheral Qualifier bits in an
+-	 * INQUIRY result as reserved and requires devices to set them
+-	 * to 0.  However the SCSI spec requires these bits to be set
+-	 * to 3 to indicate when a LUN is not present.
+-	 *
+-	 * Let the scanning code know if this target merely sets
+-	 * Peripheral Device Type to 0x1f to indicate no LUN.
+-	 */
+-	if (us->subclass == US_SC_UFI)
+-		sdev->sdev_target->pdt_1f_for_no_lun = 1;
+-
+ 	return 0;
+ }
+ 
+@@ -197,6 +183,9 @@
+ 		 * page x08, so we will skip it. */
+ 		sdev->skip_ms_page_8 = 1;
+ 
++		/* Some devices don't handle VPD pages correctly */
++		sdev->skip_vpd_pages = 1;
++
+ 		/* Some disks return the total number of blocks in response
+ 		 * to READ CAPACITY rather than the highest block number.
+ 		 * If this device makes that mistake, tell the sd driver. */
+@@ -213,16 +202,6 @@
+ 		if (sdev->scsi_level > SCSI_SPC_2)
+ 			us->fflags |= US_FL_SANE_SENSE;
+ 
+-		/* Some devices report a SCSI revision level above 2 but are
+-		 * unable to handle the REPORT LUNS command (for which
+-		 * support is mandatory at level 3).  Since we already have
+-		 * a Get-Max-LUN request, we won't lose much by setting the
+-		 * revision level down to 2.  The only devices that would be
+-		 * affected are those with sparse LUNs. */
+-		if (sdev->scsi_level > SCSI_2)
+-			sdev->sdev_target->scsi_level =
+-					sdev->scsi_level = SCSI_2;
+-
+ 		/* USB-IDE bridges tend to report SK = 0x04 (Non-recoverable
+ 		 * Hardware Error) when any low-level error occurs,
+ 		 * recoverable or not.  Setting this flag tells the SCSI
+@@ -275,6 +254,33 @@
+ 	return 0;
+ }
+ 
++static int target_alloc(struct scsi_target *starget)
++{
++	struct us_data *us = host_to_us(dev_to_shost(starget->dev.parent));
++
++	/*
++	 * Some USB drives don't support REPORT LUNS, even though they
++	 * report a SCSI revision level above 2.  Tell the SCSI layer
++	 * not to issue that command; it will perform a normal sequential
++	 * scan instead.
++	 */
++	starget->no_report_luns = 1;
++
++	/*
++	 * The UFI spec treats the Peripheral Qualifier bits in an
++	 * INQUIRY result as reserved and requires devices to set them
++	 * to 0.  However the SCSI spec requires these bits to be set
++	 * to 3 to indicate when a LUN is not present.
++	 *
++	 * Let the scanning code know if this target merely sets
++	 * Peripheral Device Type to 0x1f to indicate no LUN.
++	 */
++	if (us->subclass == USB_SC_UFI)
++		starget->pdt_1f_for_no_lun = 1;
++
++	return 0;
++}
++
+ /* queue a command */
+ /* This is always called with scsi_lock(host) held */
+ static int queuecommand(struct scsi_cmnd *srb,
+@@ -536,6 +542,7 @@
+ 
+ 	.slave_alloc =			slave_alloc,
+ 	.slave_configure =		slave_configure,
++	.target_alloc =			target_alloc,
+ 
+ 	/* lots of sg segments can be handled */
+ 	.sg_tablesize =			SG_ALL,
+diff -Naur linux-kernel.orig/include/scsi/scsi_device.h linux-kernel.new/include/scsi/scsi_device.h
+--- linux-kernel.orig/include/scsi/scsi_device.h	2011-07-31 21:25:23.000000000 -0600
++++ linux-kernel.new/include/scsi/scsi_device.h	2012-01-06 11:00:41.000000000 -0700
+@@ -133,6 +133,7 @@
+ 	unsigned use_10_for_ms:1; /* first try 10-byte mode sense/select */
+ 	unsigned skip_ms_page_8:1;	/* do not use MODE SENSE page 0x08 */
+ 	unsigned skip_ms_page_3f:1;	/* do not use MODE SENSE page 0x3f */
++	unsigned skip_vpd_pages:1;	/* do not read VPD pages */
+ 	unsigned use_192_bytes_for_3f:1; /* ask for 192 bytes from page 0x3f */
+ 	unsigned no_start_on_add:1;	/* do not issue start on add */
+ 	unsigned allow_restart:1; /* issue START_UNIT in error handler */
+@@ -234,8 +235,10 @@
+ 	unsigned int		single_lun:1;	/* Indicates we should only
+ 						 * allow I/O to one of the luns
+ 						 * for the device at a time. */
+-	unsigned int		pdt_1f_for_no_lun;	/* PDT = 0x1f */
+-						/* means no lun present */
++	unsigned int		pdt_1f_for_no_lun:1;	/* PDT = 0x1f
++						 * means no lun present. */
++	unsigned int		no_report_luns:1;	/* Don't use
++						 * REPORT LUNS for scanning. */
+ 	/* commands actually active on LLD. protected by host lock. */
+ 	unsigned int		target_busy;
+ 	/*

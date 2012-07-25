@@ -1,0 +1,52 @@
+--- package/busybox.orig/busybox-1.10.3-depmod.patch	1970-01-01 01:00:00.000000000 +0100
++++ package/busybox/busybox-1.10.3-depmod.patch	2009-09-30 14:50:30.000000000 +0100
+@@ -0,0 +1,49 @@
++--- busybox-1.10.3/modutils/modprobe.c.orig	2009-09-30 14:43:52.000000000 +0100
+++++ busybox-1.10.3/modutils/modprobe.c	2009-09-30 14:49:05.000000000 +0100
++@@ -15,6 +15,7 @@
++ #include <sys/utsname.h>
++ #include <fnmatch.h>
++ 
+++#define CONFIG_DEFAULT_MODULES_DIR "/lib/modules"
++ #define line_buffer bb_common_bufsiz1
++ 
++ struct mod_opt_t {	/* one-way list of options to pass to a module */
++@@ -612,7 +613,16 @@
++ 					else if (verbose) /* verbose and quiet are mutually exclusive */
++ 						argv[argc++] = (char*)"-v";
++ 				}
++-				argv[argc++] = list->m_path;
+++				if( (*(list->m_path + 1) == 'l') &&
+++						(*(list->m_path + 2) == 'i') &&
+++						(*(list->m_path + 3) == 'b') &&
+++						(*(list->m_path + 4) == '/') ) {
+++
+++					argv[argc++] = (list->m_path);
+++				} else {
+++					argv[argc++] = (list->m_path)+1;
+++				}
+++
++ 				if (ENABLE_FEATURE_CLEAN_UP)
++ 					argc_malloc = argc;
++ 				opts = list->m_options;
++@@ -861,6 +871,7 @@
++ {
++ 	int rc = EXIT_SUCCESS;
++ 	char *unused;
+++	struct utsname uts;
++ 
++ 	opt_complementary = "q-v:v-q";
++ 	getopt32(argv, MAIN_OPT_STR, &unused, &unused);
++@@ -870,6 +881,12 @@
++ 	if (option_mask32 & (RESTRICT_DIR | CONFIG_FILE))
++ 		bb_error_msg_and_die("-t and -C not supported");
++ 
+++	/* Goto modules location */
+++	xchdir(CONFIG_DEFAULT_MODULES_DIR);
+++	uname(&uts);
+++	xchdir(uts.release);
+++	xchdir("kernel");
+++
++ 	depend = build_dep();
++ 
++ 	if (!depend)

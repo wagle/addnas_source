@@ -1,0 +1,13 @@
+usr/www/lib/nas/mio_upgrade.pm
+usr/www/lib/nasMaster.pl
+usr/www/lib/nas/firmware_upgrade.pm
+usr/www/nbin/checkupgrade.sh
+usr/www/nbin/applyupgrade.sh
+usr/www/nbin/getupgrade.sh
+usr/www/lib/nasCommon.pm
+etc/sudoers
+usr/www/nbin/check_open_files.sh
+usr/www/nbin/inetdControl.sh
+usr/www/lib/nas/mio_ctrl_samba.pm
+usr/www/nbin/copy.sh
+usr/www/nbin/remove.sh

@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# S30network
+#
+# Network start/stop script
+#
+
+. /etc/default-settings
+. /var/oxsemi/network-settings
+
+SCRIPTS_PATH=/etc/init.d
+
+start() {
+	# Clean up any lock files that may have been left lying around due to
+	# shutting down by pulling out the power plug
+	$SCRIPTS_PATH/network_control.sh cleanup
+	$SCRIPTS_PATH/network_servers.sh cleanup
+	$SCRIPTS_PATH/post_network_start.sh cleanup
+
+	# Bring up the loopback interface
+	ip addr add 127.0.0.1/8 dev lo
+	ip link set dev lo up
+
+	# Configure tendency to evict apps from memory to speed up file serving
+	echo 60 > /proc/sys/vm/swappiness
+
+        # Make Linux keep more memory free
+        echo 8192 > /proc/sys/vm/min_free_kbytes
+
+	# Do everything else required to start the system
+	$SCRIPTS_PATH/network_control.sh start
+}
+
+stop() {
+	# Stop services started after network dependent servers
+	$SCRIPTS_PATH/post_network_start.sh stop
+
+	# Stop cron daemon
+	$SCRIPTS_PATH/cron-daemon.sh stop
+
+	# Stop servers dependent on networking
+	$SCRIPTS_PATH/network_control.sh stop
+
+	# Bring down the loopback interface
+	ip link set dev lo down
+	ip addr flush lo
+}
+
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart)
+		restart
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|restart}"
+		exit 1
+esac
+
+exit $?
+

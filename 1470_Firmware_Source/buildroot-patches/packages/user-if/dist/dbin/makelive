@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# sync's dev on this host to the actual device
+#
+
+OPTN=$1
+
+# Remote
+#
+RDIR=/usr/www
+RUSER=root
+RHOST=10.0.0.102
+
+# Local
+#
+LDIR=$(pwd)
+
+rsync $OPTN -vrutp --delete --exclude='.svn' $LDIR/lib $LDIR/nbin $LDIR/ptpl $RUSER@$RHOST:$RDIR
+
+rsync $OPTIN sudoers $RUSER@$RHOST:/etc
+
+#ssh $RUSER@$RHOST /etc/init.d/S99lighttpd restart

@@ -1,0 +1,29 @@
+--- package/bonnie.orig/bonnie.mk	2009-09-23 17:45:38.000000000 +0100
++++ package/bonnie/bonnie.mk	2009-09-22 13:25:55.000000000 +0100
+@@ -20,7 +20,8 @@
+ 	$(BONNIE_CAT) $(DL_DIR)/$(BONNIE_SOURCE) | tar -C $(BUILD_DIR) $(TAR_OPTIONS) -
+ 	(cd $(BONNIE_DIR) ;\
+ 		patch -p 1 < $(BASE_DIR)/package/bonnie/bonnie-1.4-builtroot.patch ;\
+-		patch -p 1 < $(BASE_DIR)/package/bonnie/bonnie-1.patch \
++		patch -p 1 < $(BASE_DIR)/package/bonnie/bonnie-1.patch ;\
++		patch -p 1 < $(BASE_DIR)/package/bonnie/bonnie-2.patch \
+ 	);
+ 	touch $(BONNIE_DIR)/.unpacked
+ 
+--- package/bonnie.orig/bonnie-2.patch	1970-01-01 01:00:00.000000000 +0100
++++ package/bonnie/bonnie-2.patch	2009-09-22 13:22:06.000000000 +0100
+@@ -0,0 +1,14 @@
++--- bonnie.orig/bonnie.c	2009-09-22 13:19:37.000000000 +0100
+++++ bonnie/bonnie.c	2009-09-22 13:20:15.000000000 +0100
++@@ -77,11 +77,6 @@
++ #include <sys/wait.h>
++ #include <stdlib.h>
++ 
++-#ifdef __linux__
++-/* for o_direct */
++-#include <asm/page.h>
++-#endif
++-
++ /* Need PAGE_MASK defined, but asm/page.h is not in
++  * our build for some reason */
++ #define PAGE_SHIFT 12

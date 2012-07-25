@@ -1,0 +1,49 @@
+#!/bin/sh -x
+#
+TEMP="tmp$$"
+SVN_DIR=$1
+SNAPSHOT_DIR=$2
+LOCAL_PKGS=${SVN_DIR}/packages
+STD_PKGS=${SNAPSHOT_DIR}/package
+STD_TOOLCHAIN=${SNAPSHOT_DIR}/toolchain
+
+# Copy local packages
+for i in `cd ${LOCAL_PKGS}; ls 2> /dev/null`; do
+	if [ ${i} != "Config.in" ]; then
+		tar -cj --exclude *.svn -f ${TEMP} -C ${LOCAL_PKGS} ${i}
+		tar -xjf ${TEMP} -C ${STD_PKGS}
+	fi
+done
+
+# Add local packages to Config.in
+grep -v endmenu ${STD_PKGS}/Config.in > ${TEMP}
+cat ${LOCAL_PKGS}/Config.in >> ${TEMP}
+if [ -e ${TEMP} ]; then
+	mv -f ${TEMP} ${STD_PKGS}/Config.in
+fi
+
+# Apply patches to standard packages
+for i in `cd ${SVN_DIR}/patches; ls 2> /dev/null`; do
+	patch -p0 -d ${SNAPSHOT_DIR} < ${SVN_DIR}/patches/${i}
+done
+
+# Add any uClibc patches
+cp -f ${SVN_DIR}/uClibc-*.patch ${STD_TOOLCHAIN}/uClibc/
+
+# Patch the kernel headers Config 
+	patch -p0 -d ${SNAPSHOT_DIR} < ${SVN_DIR}/kernel-headers.patch	
+
+# Patch the top level Buildroot makefile
+if [ -e ${SVN_DIR}/Makefile.patch ]; then
+	patch -p0 -d ${SNAPSHOT_DIR} < ${SVN_DIR}/Makefile.patch
+fi
+
+# Add the Oxsemi targets to the known set
+tar -C ${SVN_DIR} -c --exclude "*svn*" -f ${TEMP} target
+tar -C ${SNAPSHOT_DIR} -xf ${TEMP}
+
+# Clean up
+if [ -e ${TEMP} ]; then
+	rm ${TEMP}
+fi
+

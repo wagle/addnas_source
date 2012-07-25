@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# this script should execute once and then delete itself
+
+# delete debris from upgrader
+
+case "$1" in
+    start)
+	# don't operate if the first latch is still there
+	if [ ! -e /etc/init.d/S00post-upgrade-latch-1 ] ; then
+		# if can delete self, delete upgrader files
+		if rm $0 ; then
+	                echo "LATCH 2 deleted"
+        	        # wait for usb disk to mount
+        	        sleep 10
+			rm -rf /shares/external/*/{dev,opt/upgrader,fw.tar.gz}
+		fi
+	fi
+	;;
+
+    stop)
+	;;
+
+    restart|reload)
+	;;
+
+    *)
+	echo $"Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?

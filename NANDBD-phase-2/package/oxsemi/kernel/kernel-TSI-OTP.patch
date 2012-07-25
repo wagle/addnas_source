@@ -1,0 +1,399 @@
+diff -Naur linux-kernel/arch/arm/plat-oxnas/Kconfig linux-kernel+OTP/arch/arm/plat-oxnas/Kconfig
+--- linux-kernel/arch/arm/plat-oxnas/Kconfig	2011-07-31 21:24:44.000000000 -0600
++++ linux-kernel+OTP/arch/arm/plat-oxnas/Kconfig	2012-02-06 20:01:48.000000000 -0700
+@@ -154,6 +154,14 @@
+ 	int "The max. number of SG DMA descriptors to use in the single transfer"
+ 	default 64
+ 
++config OX820_OTP
++	tristate "OX820 on Chip OTP memory"
++	depends on ARCH_OX820
++        default n
++	help
++	  This module support the read/write on chip OTP memory via /dev/otp node and read/write MAC address
++	  via /proc/otp_mac.
++
+ config TACHO_THERM_AND_FAN
+ 	tristate "Include support for the temperature sensing, and automatic fan control"
+ 	depends on ARCH_OXNAS
+diff -Naur linux-kernel/arch/arm/plat-oxnas/Makefile linux-kernel+OTP/arch/arm/plat-oxnas/Makefile
+--- linux-kernel/arch/arm/plat-oxnas/Makefile	2012-01-09 21:59:59.000000000 -0700
++++ linux-kernel+OTP/arch/arm/plat-oxnas/Makefile	2012-02-06 20:01:48.000000000 -0700
+@@ -39,3 +39,4 @@
+ obj-$(CONFIG_VENDOR_SCSI_SMD_IF_MODULE)		+= vendor_scsi.o
+ obj-$(CONFIG_OXNAS_GPIO_TEST)			+= ox820_gpio.o
+ obj-$(CONFIG_MODE_SWITCH_MONITOR)		+= switch-mode.o
++obj-$(CONFIG_OX820_OTP)				+= ox820_otp.o
+diff -Naur linux-kernel/arch/arm/plat-oxnas/ox820_otp.c linux-kernel+OTP/arch/arm/plat-oxnas/ox820_otp.c
+--- linux-kernel/arch/arm/plat-oxnas/ox820_otp.c	1969-12-31 17:00:00.000000000 -0700
++++ linux-kernel+OTP/arch/arm/plat-oxnas/ox820_otp.c	2012-02-06 20:01:48.000000000 -0700
+@@ -0,0 +1,369 @@
++ /* Copyright (C) 2010 PLX Technology Inc
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/device.h>
++#include <linux/errno.h>
++#include <linux/fs.h>
++#include <linux/init.h>
++#include <linux/miscdevice.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/types.h>
++
++#include <asm/uaccess.h>
++#include <linux/proc_fs.h>
++#include <asm/io.h>
++#include <mach/hardware.h>
++#include <linux/delay.h>
++
++#define DRIVER_NAME "otp"
++
++/* OTP control registers */
++#define OTP_ADDR_PROG           (SEC_CONTROL_BASE + 0x1E0)
++#define OTP_READ_DATA           (SEC_CONTROL_BASE + 0x1E4)
++
++/* OTP bit control */
++#define OTP_ADDR_MASK           (0x03FF)
++#define OTP_PS                  (1<<10)
++#define OTP_PGENB               (1<<11)
++#define OTP_LOAD                (1<<12)
++#define OTP_STROBE              (1<<13)
++#define OTP_CSB                 (1<<14)
++#define FUSE_BLOWN              1
++/* the value of OTP_MAC_SET and OTP_MAC must be consistent with the value setting in U-boot*/
++#define OTP_MAC			(0x79)
++#define OTP_MAC_SET 		1
++
++static char mac_adr[6];
++static DEFINE_MUTEX(ox820_otp_lock);
++
++//#define DEBUG 
++#ifdef DEBUG
++#define db_print(...) printk(__VA_ARGS__)
++#else
++#define db_print(...)
++#endif
++
++/*
++ *	read_otp_byte  
++ */
++char read_otp_byte(int adr) {
++
++        uint32_t otp_control = ~OTP_STROBE;
++        char ret;
++
++        /* disable programming */
++        otp_control &= ~(OTP_PS);
++        writel(otp_control, OTP_ADDR_PROG);
++        msleep(1);
++//	db_print("otp control 0x%02x\n", otp_control);
++
++        /* enable core in read mode */
++        otp_control &= ~OTP_CSB;
++        /* set address */
++        otp_control &= ~(OTP_ADDR_MASK);
++        otp_control |= adr;
++        /* start read from address */
++        writel(otp_control, OTP_ADDR_PROG);
++        msleep(1);
++//	db_print("otp control 0x%02x\n", otp_control);
++
++        /* strobe data out */
++        otp_control |= OTP_STROBE;
++        writel(otp_control, OTP_ADDR_PROG);
++        msleep(1);
++//	db_print("otp control 0x%02x\n", otp_control);
++
++        otp_control &= ~OTP_STROBE;
++        writel(otp_control, OTP_ADDR_PROG);
++        msleep(1);
++//	db_print("otp control 0x%02x\n", otp_control);
++
++        /* get data */
++        ret = (unsigned char) readl(OTP_READ_DATA);
++
++        /* release core select */
++        otp_control |= OTP_CSB;
++        writel(otp_control, OTP_ADDR_PROG);
++//	db_print("otp control 0x%02x\n", otp_control);
++	db_print("OTP Data read = 0x%02x\n", ret);
++        return ret;
++}
++
++/*
++ *  ox820_otp_read - Read OTP pages
++ *
++ */
++static ssize_t ox820_otp_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
++{
++	char data;
++
++	db_print("%s():\n", __FUNCTION__);
++
++	if (mutex_lock_interruptible(&ox820_otp_lock))
++		return -ERESTARTSYS;
++
++	data = read_otp_byte(*pos);
++	db_print("Data read back = 0x%02x\n", data);
++	if (copy_to_user(buf, &data, 1)) {
++                return -EFAULT;
++        }
++
++	*pos += count;		
++	mutex_unlock(&ox820_otp_lock);
++
++	return count;
++
++}
++
++/*
++ *  set_otp_bit() - set a single bit in the OTP.
++ *  @adr           - bit address to set: byte[6:0], bit [9:7]
++ * 
++ */
++void set_otp_bit(int adr) 
++{
++	uint32_t otp_control = ~(OTP_STROBE | OTP_LOAD | OTP_PGENB );
++
++	/* enable programming mode */
++	writel(otp_control, OTP_ADDR_PROG);
++	msleep(1);
++//	db_print("otp control 0x%02x\n", otp_control);
++
++	/* core select and address */
++	otp_control &= ~OTP_ADDR_MASK;
++	otp_control &= ~OTP_CSB;
++	otp_control |= adr;
++	writel(otp_control, OTP_ADDR_PROG); 
++	msleep(1);
++//	db_print("otp control 0x%02x\n", otp_control);
++
++        /* strobe into OTP macro */
++        otp_control |= OTP_STROBE;
++	writel(otp_control, OTP_ADDR_PROG);
++        /* wait for fuse to burn */
++        msleep (1);
++//	db_print("otp control 0x%02x\n", otp_control);
++
++        otp_control &= ~OTP_STROBE;
++	writel(otp_control, OTP_ADDR_PROG);
++        msleep(1);
++//	db_print("otp control 0x%02x\n", otp_control);
++
++        otp_control |= OTP_CSB;
++	writel(otp_control, OTP_ADDR_PROG);
++//	db_print("otp control 0x%02x\n", otp_control);
++        return;
++}
++
++/*
++ *  write_otp_byte
++ *
++ */ 
++void write_otp_byte(char data, int adr)
++{
++	char cdata;
++	int i;
++	unsigned mask;
++
++	db_print("%s():\n", __FUNCTION__);
++
++	db_print("addr = 0x%02x\n", adr);	
++	cdata = read_otp_byte(adr);
++
++	db_print("cdata = 0x%02x\n", cdata);
++	/* are any programmed current bits going to be cleared? */	
++	if (cdata & ~data)
++		return;
++
++	cdata = ~cdata & data;
++
++	for (i=0, mask=1; i < 8; i++, mask<<=1)
++		if (cdata & mask){
++			db_print("set bit = 0x%02x\n", ((i<<7) | (adr & 0x7f)));
++			set_otp_bit((i<<7) | (adr & 0x7f));
++		}
++	cdata = read_otp_byte(adr);
++	db_print("Data written = 0x%02x\n", data);
++}
++
++/*
++ *  ox820_otp_write - Write OTP pages
++ *  .
++ */
++static ssize_t ox820_otp_write(struct file *filp, const char __user *buf, size_t count, loff_t *pos)
++{
++	char data;
++
++	db_print("%s():\n", __FUNCTION__);
++
++	if (mutex_lock_interruptible(&ox820_otp_lock))
++		return -ERESTARTSYS;
++
++	if (copy_from_user(&data, buf, 1)) {
++		return -EFAULT;
++	}
++
++	db_print("Data write = 0x%02x\n", data);
++	write_otp_byte(data,*pos);
++	mutex_unlock(&ox820_otp_lock);
++
++	*pos = count;
++
++	return count;
++}
++
++static int read_proc(char *page, char **start, off_t off, int count, int *eof, void *data)
++{
++        char *i, left;
++        char *p;
++	int k, j;
++	int OTP_MAC_DEC = OTP_MAC;
++	unsigned int otp_check;
++
++	/* Get valid MAC adress */
++	for ( k=(OTP_MAC_SET-1); k >= 0; k--) {
++		for ( j=0; j<6; j++){ 
++			otp_check += read_otp_byte((OTP_MAC - k*6)+j);
++		}
++		if (otp_check) {
++			OTP_MAC_DEC = (OTP_MAC - k * 6);
++			break;
++		} else {
++			otp_check = 0;
++		}
++	}
++
++	for ( j=0; j<6; j++) {
++		mac_adr[j] = read_otp_byte(OTP_MAC_DEC+j);
++	}
++        i = (char *) mac_adr;
++        left = sizeof(mac_adr)/sizeof(mac_adr[0]) - 1;
++
++        for (p = page, i = mac_adr; left--; i++) {
++                p += sprintf(p, "%02x:", *i);
++        }
++	p += sprintf(p, "%02x", *i);
++        *(p++) = '\n';
++        *eof = 1;
++        return (p - page);
++}
++
++static int write_proc(struct file *file, const char __user *buf, unsigned long count, void *data)
++{
++
++	char *tmpbuf;
++	int i, j=0; 
++	int OTP_MAC_DEC=0xdead;
++	unsigned int otp_check;
++
++	db_print("proc write =%ld\n",count);
++
++	tmpbuf = kmalloc(count, GFP_KERNEL);
++	
++	if (copy_from_user(tmpbuf, buf, count)) {
++		return -EFAULT;
++	}
++#ifdef DEBUG
++	for ( i=0; i< count; i++){
++		db_print("proc data input =%x\n", *(tmpbuf+i));
++		
++	}
++#endif
++
++	for (i=0; i < OTP_MAC_SET; i++) {
++		for (j=0; j< 6; j++) otp_check+=read_otp_byte((OTP_MAC-i*6)+j);
++		if (otp_check) {
++			otp_check = 0;
++		} else {
++			OTP_MAC_DEC = (OTP_MAC - i * 6);
++			break;
++		}
++	}
++
++	if (OTP_MAC_DEC == 0xdead) {
++		printk(KERN_ERR "OX820 OTP MAC address FULL!!\n");
++		return -1;
++	}
++
++	for (i=0; i < 6; i++) {
++		write_otp_byte(tmpbuf[i], OTP_MAC_DEC+i);
++	}
++
++	kfree(tmpbuf);
++	return count;
++}
++
++static struct file_operations ox820_otp_fops = {
++	.owner    = THIS_MODULE,
++	.read     = ox820_otp_read,
++	.write    = ox820_otp_write,
++};
++
++static struct miscdevice ox820_otp_misc_device = {
++	.minor    = MISC_DYNAMIC_MINOR,
++	.name     = DRIVER_NAME,
++	.fops     = &ox820_otp_fops,
++};
++
++/*
++ *  ox820_otp_init - Initialize module
++ *
++ */
++static int __init ox820_otp_init(void)
++{
++	int ret;
++	struct proc_dir_entry *ent;
++
++	printk("%s():\n", __FUNCTION__);
++
++	ret = misc_register(&ox820_otp_misc_device);
++	if (ret) {
++		printk("<0> unable to register a misc device\n");
++		return ret;
++	}
++
++	printk(KERN_INFO "OX820 OTP initialized\n");
++	
++	ent = create_proc_entry("otp_mac", S_IFREG | S_IRWXU, NULL);
++	if (!ent) {
++		printk("create proc child failed\n");
++	} else {
++		ent->write_proc = write_proc;
++		ent->read_proc = read_proc;
++	}
++
++	return 0;
++}
++
++/*
++ *  ox820_otp_exit - Deinitialize module
++ *  
++ */
++static void __exit ox820_otp_exit(void)
++{
++	printk("%s():\n", __FUNCTION__);
++	misc_deregister(&ox820_otp_misc_device);
++	remove_proc_entry("otp_mac", NULL);
++}
++
++module_init(ox820_otp_init);
++module_exit(ox820_otp_exit);
++
++MODULE_DESCRIPTION("OX820 OTP Interface");
++MODULE_LICENSE("GPL");
++

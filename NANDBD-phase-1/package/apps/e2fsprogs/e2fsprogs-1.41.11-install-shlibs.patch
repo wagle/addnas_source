@@ -1,0 +1,13 @@
+--- e2fsprogs-1.41.11/Makefile.in.orig	2010-07-19 17:22:46.000000000 -0700
++++ e2fsprogs-1.41.11/Makefile.in	2010-07-19 17:24:19.000000000 -0700
+@@ -70,6 +70,10 @@
+ 
+ uninstall-libs: uninstall-libs-recursive
+ 
++install-shlibs: install-shlibs-libs-recursive
++
++uninstall-shlibs: uninstall-shlibs-libs-recursive
++
+ TAGS clean-recursive distclean-recursive depend-recursive check-recursive \
+   mostlyclean-recursive realclean-recursive:
+ 	@for subdir in $(SUBDIRS); do \

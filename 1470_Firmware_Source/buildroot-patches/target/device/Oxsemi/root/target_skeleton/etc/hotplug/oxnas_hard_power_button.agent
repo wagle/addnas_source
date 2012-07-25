@@ -1,0 +1,69 @@
+#!/bin/sh
+
+cd /etc/hotplug
+. ./hotplug.functions
+
+debug_mesg oxnas user recovery
+resetconfigs()
+{
+	#first stop all daemons so that no config files are in use
+	/etc/init.d/network_servers.sh stop
+	/etc/init.d/mlnet.sh resetpw
+	
+	#now lets reset some configs to default copies
+	rm /var/oxsemi/nas.ini
+	rm /var/oxsemi/mlpath
+	rm /var/oxsemi/network-settings
+	rm /var/oxsemi/shares.inc
+	rm /etc/smb.conf
+	rm /var/private/smbpasswd
+	rm /var/private/lighttpd.htdigest.user
+	
+	touch /var/oxsemi/shares.inc
+	chmod 644 /var/osemi/shares/inc
+	chown www-data:www-data /var/oxsemi/shares.inc
+	
+	cp /var/oxsemi/network-settings.factory /var/oxsemi/network-settings
+	chmod 664 /var/oxsemi/network-settings
+	chown root:www-data /var/oxsemi/network-settings
+
+	cp /var/oxsemi/nas.ini.factory /var/oxsemi/nas.ini
+	chmod 666 /var/osemi/nas.ini
+	chown www-data:www-data /var/oxsemi/nas.ini
+
+	cp /etc/smb.conf.factory /etc/smb.conf
+	chmod 666 /etc/smb.conf
+	chown root:www-data /etc/smb.conf
+
+	cp /var/private/lighttpd.htdigest.user.factory /var/private/lighttpd.htdigest.user
+	chmod 644 /var/private/lighttpd.htdigest.user
+	chown root:root /var/private/lighttpd.htdigest.user
+	
+        cp /etc/passwd.factory /etc/passwd
+        chmod 644 /etc/passwd
+        chown root:root /etc/passwd
+
+	cp /etc/group.factory /etc/group
+	chmod 644 /etc/group
+	chown root:root /etc/group
+
+        cp /etc/shadow.factory /etc/shadow
+        chmod 644 /etc/shadow
+        chown root:root /etc/shadow
+
+}
+case $ACTION in
+
+offline)
+# offline implies that the recovery flag is set and no more the button press is monitored
+    debug_mesg oxnas user recovery add flag event
+    resetconfigs
+    reboot
+    ;;
+                                                                                                              
+*)                                                                              
+    debug_mesg oxnas user recovery $ACTION event not supported                  
+    exit 1                                                                      
+    ;;                                                                          
+                                                                                
+esac      

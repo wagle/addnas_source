@@ -1,0 +1,15 @@
+
+comment "Natively compiled pre-built packages"
+source "package/native-samba/Config.in"
+source "package/perl/Config.in"
+source "package/perl-modules/Config.in"
+source "package/ntfs-progs/Config.in"
+source "package/pvconnect/Config.in"
+
+comment "Local Oxsemi packages"
+source "package/bonnie/Config.in"
+source "package/user-if/Config.in"
+source "package/xdelta3/Config.in"
+source "package/parted/Config.in"
+
+endmenu

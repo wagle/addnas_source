@@ -1,0 +1,86 @@
+#!/bin/sh
+#
+# Copyright (C) 2008 Oxford Semiconductor Ltd
+#
+# Checks the cmdline arguments to see if we need to reset to default network 
+# settings
+#
+
+# recovery flag dd operations are in byte mode hence not affecting
+# upgrade flag - Second byte of 288th sector (512 bytes per sector)
+RECOVERY_FLAG_OFFSET=147457
+BS=1
+RESET_RECOVERY_FLAG=0
+
+case "$1" in
+    start)
+        # find the admin mode
+        admode=`cat /proc/cmdline`
+        admode=`expr "$admode" : '.*adminmode=\([^ ]*\)'`
+
+        if [ "${admode}" = "recovery" ]; then
+            
+            # reset network settings to defaults 
+            echo "performing system recovery"
+            
+            netSet="/var/oxsemi/network-settings"
+            
+            if [ ! -e "${netSet}" ]; then 
+                echo "Could not find network setting file: reverting to factory!"
+                echo "workgroup=workgroup"  >  "${netSet}" 
+                echo "hostname=OXNAS"       >> "${netSet}" 
+                echo "static_ntp="          >> "${netSet}" 
+            else
+                cp "${netSet}" "${netSet}.old"
+                sed -ie '/network_mode=.*/d'   "${netSet}" 
+                sed -ie '/static_ip=.*/d'      "${netSet}" 
+                sed -ie '/static_msk=.*/d'     "${netSet}" 
+                sed -ie '/static_gw=.*/d'      "${netSet}" 
+                sed -ie '/static_dns1=.*/d'    "${netSet}" 
+                sed -ie '/static_dns2=.*/d'    "${netSet}" 
+                sed -ie '/static_dns3=.*/d'    "${netSet}"  
+                sed -ie '/revert_to_dhcp=.*/d' "${netSet}" 
+            fi 
+            
+            echo "network_mode=dhcp"        >>  "${netSet}" 
+            echo "revert_to_dhcp=no"        >>  "${netSet}" 
+            echo "static_ip="               >>  "${netSet}" 
+            echo "static_msk="              >>  "${netSet}" 
+            echo "static_gw="               >>  "${netSet}" 
+            echo "static_dns1="             >>  "${netSet}" 
+            echo "static_dns2="             >>  "${netSet}" 
+            echo "static_dns3="             >>  "${netSet}" 
+            
+            # reset password to admin/admin 
+            adminpass="/var/private/lighttpd.htdigest.user"
+
+            #echo "admin:nas admin:f44d98ee672f223d609fc87c33f0acdc" > ${adminpass} # admin:123456 
+            #echo "admin:nas admin:f4770e2af935648fdaaf86cf5391fc19" > ${adminpass} # admin:admin
+            
+            if [ ! -e "${adminpass}" ]; then 
+                echo "Could not find password setting file: reverting to factory!"
+            else
+                mv "${adminpass}" "${adminpass}.old"
+                # sed -ie '/admin:nas admin:.*/d'   "${adminpass}" -- replace
+            fi
+            
+            echo "admin:nas admin:f44d98ee672f223d609fc87c33f0acdc" > ${adminpass}
+
+	    #clear the recovery flag off the disk
+	    echo -n $RESET_RECOVERY_FLAG | dd of=/dev/sda seek=${RECOVERY_FLAG_OFFSET} bs=${BS}
+	    sync
+        fi
+	;;
+
+    stop)
+	;;
+
+    restart|reload)
+	;;
+
+    *)
+	echo $"Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?

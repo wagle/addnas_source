@@ -1,0 +1,16 @@
+diff -urN bonnie.orig/bonnie.c bonnie/bonnie.c
+--- bonnie.orig/bonnie.c	2008-06-23 10:24:55.000000000 +0100
++++ bonnie/bonnie.c	2008-06-23 10:28:58.000000000 +0100
+@@ -82,6 +82,12 @@
+ #include <asm/page.h>
+ #endif
+ 
++/* Need PAGE_MASK defined, but asm/page.h is not in
++ * our build for some reason */
++#define PAGE_SHIFT 12
++#define PAGE_SIZE (1UL << PAGE_SHIFT)
++#define PAGE_MASK (~(PAGE_SIZE-1))
++
+ #ifdef unix
+ #include <signal.h>
+ #endif

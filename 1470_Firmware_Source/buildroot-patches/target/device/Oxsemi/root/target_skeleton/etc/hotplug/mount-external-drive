@@ -1,0 +1,202 @@
+#!/bin/sh
+#
+#
+# Copyright (C) 2006 Oxford Semiconductor Inc.
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+# 
+
+# This script should be run when a drive is "hot-attached", it explores the drive
+# looking for volume labels of a number of file systems. It uses either the 
+# volume label or the partition name to create a directory tree to mount all the
+# mountable directories. If a partition cannot be mounted, the system will try
+# again with the encryption/decryption system applied to see if the volume 
+# contains encrypted partitions. As it is mounting drives, the script creates an 
+# umount script in /var/run/block/ for cleaning up after the drive has been removed
+#
+# In a second mode, it can be run to only mount drives that are encrypted. This 
+# mode should be used when hot-plugging an iButton to try to decrypt already 
+# attached external drives. To activate this mode supply a second parameter.
+#
+# @param $1 device (sda, sdc, etc)
+
+. ./hotplug.functions
+
+LOCKFILE=/tmp/mount-external-drive
+. ./semaphore
+
+DEBUG=yes
+export DEBUG
+
+# mount with uid set to www-data
+FATMOUNTOPTIONS=uid=33,gid=33,fmask=0111,dmask=0000,flush
+UNIXMOUNTOPTIONS=nosuid
+
+################################################################################
+# creates a list of all the partitions on a disk
+# $1 is the disk device name, eg: sda, sdc, etc.
+get_partition_devices() {
+    temp=${PWD}
+    cd /sys/block/$1
+    partition_devices=`echo $1*`
+    cd ${temp}
+}
+###############################################################################
+# cleanup any unused directories / stray mount-points
+cleanupunuseddirectories() {
+    find /shares/external -xdev -depth -type d  \! -path /shares/external -exec rmdir {} \;
+}
+###############################################################################
+# Top level of script
+###############################################################################
+# @todo May bo able to try and remove these at the end of the script and rely on 
+# reference counting to keep the ones being used.
+#modprobe ntfs
+
+echo "$0: $1 -- beginning of script" > /dev/console
+
+###insmod /lib/ufsd.ko
+modprobe nls_iso8859-1
+modprobe nls_cp437
+modprobe vfat
+modprobe hfsplus
+
+
+cleanupunuseddirectories
+
+# return an error if we've not been given a device name
+if [ -z "$1" ] ; then
+    exit 1
+fi
+
+# exit if already mounted
+if [ `/bin/mount | /bin/grep -c /dev/$1` -gt 0 ] ; then
+    echo "$0: $1 -- already mounted, aborting!" > /dev/console
+    exit 1
+fi
+
+# enter critical section
+down "$LOCKFILE"
+
+# start blink LED during critical section
+/bin/echo 2 > /sys/kernel/timer_booting_flag 
+
+# create a temporary directory for mounting
+temp_mnt_dir=/tmp/mnt_"$1"
+[ -d "$temp_mnt_dir" ] || /bin/mkdir "$temp_mnt_dir"
+
+# remove any existing umount script and create a new one
+[ -d "/var/run/block/" ] || /bin/mkdir /var/run/block/
+
+# initialize removal script generation
+removal_script="/var/run/block/$1"
+temp_removal_script="/tmp/umount-$1-tac.sh"
+[ -e ${temp_removal_script} ] && rm ${temp_removal_script}
+touch ${temp_removal_script}
+
+# start writing removal script, last line first
+echo "rm $removal_script" > ${temp_removal_script}
+echo "/bin/echo 1 > /sys/kernel/timer_booting_flag" >>${temp_removal_script} 
+
+# set-global disk_name
+get_disk_name $1
+echo "$0: $1 -- disk name is ${disk_name}" > /dev/console
+
+# find how many partitions are there
+get_partition_devices $1
+echo "$0: $1 -- found the partitions ${partition_devices}" > /dev/console
+
+for partition in ${partition_devices} ; do
+    device="$(cat /sys/block/$1/$partition/dev)"
+
+    # try to mount the partition
+    mounted=false
+    unset changeown
+    unset mountmethod
+    unset uuid
+
+    echo "$0: $1 -- attempting mount /dev/${partition} $temp_mnt_dir" > /dev/console
+    if echo "$0: $1 -- trying mount -o ${FATMOUNTOPTIONS}" > /dev/console ; mount -o ${FATMOUNTOPTIONS} /dev/${partition} "$temp_mnt_dir" > /dev/console 2>&1 ; then
+	mounted=true
+       	changeown=false
+	mountmethod=fat
+        uuid=`/lib/udev/vol_id --uuid /dev/${partition}`
+    elif echo "$0: $1 -- trying mount with ntfs-3g" > /dev/console ; ntfs-3g /dev/${partition} "$temp_mnt_dir" -o usermapping=/etc/ntfs-3g/UserMapping > /dev/console 2>&1 ; then
+	sleep 10
+        mounted=true
+        changeown=false
+        mountmethod=ntfs
+        uuid=`/lib/udev/vol_id --uuid /dev/${partition}`
+    elif echo "$0: $1 -- trying mount -o ${UNIXMOUNTOPTIONS}" > /dev/console ; mount -o ${UNIXMOUNTOPTIONS} /dev/${partition} "$temp_mnt_dir" > /dev/console 2>&1 ; then
+	mounted=true
+	changeown=true
+	mountmethod=unix
+        uuid=`/lib/udev/vol_id --uuid /dev/${partition}`
+    fi
+
+    if ${mounted} ; then
+        echo "$0: $1 -- partition '$uuid' mounted with $mountmethod filesystem" > /dev/console
+	if [ -n "$uuid" ] ; then
+	    mountpoint="/shares/external/${uuid}"
+	    # mkdir/rmdir mount-point
+            /bin/mkdir "$mountpoint"
+            echo "rmdir /shares/external/${uuid}" >> ${temp_removal_script}
+
+	    # (de)install mount-point, passing major:minor device to mount-o-matic
+            mount -o move "$temp_mnt_dir" /shares/external/${uuid}
+            echo "sync" >> ${temp_removal_script}
+            echo "/etc/hotplug/mount-o-matic.\$1.sh $1 $partition $(cat /sys/block/$1/$partition/dev)" >>  ${temp_removal_script}
+
+	    # set ownership of top directory
+	    if $changeown ; then
+		chown www-data "$mountpoint"
+	    fi
+
+	    # Propagate the SUID/GUID state and set correct permissions
+	    chmod +rx,u+w,+s "$mountpoint"
+	fi
+
+        # just in case the move didn't work
+        /bin/umount "$temp_mnt_dir" 2>/dev/null
+    fi
+done
+
+# Reverse the order of commands in the temporary removal script and put them 
+# into the removal script
+echo "/bin/echo 2 > /sys/kernel/timer_booting_flag" >>${temp_removal_script}
+echo "set -e" >>${temp_removal_script}
+tac ${temp_removal_script} > ${removal_script}
+rm ${temp_removal_script}
+chmod 755 ${removal_script}
+
+###WAGLE### small, but significant, speedup of usb disks
+echo "$0: $1 -- max_sectors set to 1024" > /dev/console
+echo 1024 > /sys/block/$1/device/max_sectors
+
+echo "$0: $1 -- doing reannotate_samba_shares.pl" > /dev/console
+su www-data -c /etc/init.d/reannotate_samba_shares.pl
+
+echo "$0: $1 -- doing reEnableExternalShares.pl" > /dev/console
+su -c "/usr/local/bin/perl -I /usr/www/lib /usr/www/lib/reEnableExternalShares.pl" www-data
+
+echo "$0: $1 -- doing cleanupunuseddirectories" > /dev/console
+cleanupunuseddirectories
+
+# stop blink LED during critical section
+/bin/echo 1 > /sys/kernel/timer_booting_flag 
+
+up "$LOCKFILE"
+
+echo "$0: $1 -- end of script" > /dev/console

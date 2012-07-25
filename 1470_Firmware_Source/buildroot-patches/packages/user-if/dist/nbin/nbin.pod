@@ -1,0 +1,13 @@
+#!/usr/bin/perl
+#
+=pod
+
+=head1 nbin
+
+This directory contains binaries and shell scripts that will be run by the oxnas web UI.
+
+The majority of these will require root access to run. This is achieved by using SUDO.
+
+See the /etc/sudoers file for information.
+
+=cut

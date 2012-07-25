@@ -1,0 +1,64 @@
+#!/bin/sh
+#
+# Restore best guess at time before NTP available
+#
+NOW_FILE="/var/lib/now"
+
+. /etc/default-settings
+
+start() {
+    # Have time start from at least the first manufacture date
+    date $default_time
+ 
+    if [ -e $NOW_FILE ]
+    then
+        # Update time from value saved on last shutdown
+        date `cat $NOW_FILE`
+    fi
+
+    # Process Power Down time if available
+    pmode=`cat /proc/cmdline`
+    pmode=`expr "$pmode" : '.*timeINC=\([^ ]*\)'`
+    if [ ${pmode} ]; then
+        echo "Using powerdown time to update system time"
+	secs=`expr $pmode / 1000`                           
+        # add 20 s to account for delay in start and stop of system
+        totalsecs=`expr $secs + 20`                                
+        date -d "$totalsecs seconds" +%m%d%H%M%Y.%S > $NOW_FILE    
+        date `cat $NOW_FILE` 
+    fi
+    
+    # Update time from RTC if availale
+    hwclock -s
+}
+
+stop() {
+    # Save time before shutdown
+    date +%m%d%H%M%Y.%S > $NOW_FILE
+    
+    # Update the RTC from the system time
+    hwclock -w
+}
+
+restart() {
+    stop
+    start
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart|reload)
+    restart
+    ;;
+  *)
+    echo $"Usage: $0 {start|stop|restart}"
+    exit 1
+esac
+
+exit $?
+

@@ -1,0 +1,7 @@
+# standard crontab format for busybox cron daemon.
+# fields may be lists
+# min    hour day month wd  command
+#  *      *    *   *     *   dosomething
+
+# save the date every day at midnight
+0   0    *   *     *   date +%m%d%H%M%Y.%S > /var/lib/now

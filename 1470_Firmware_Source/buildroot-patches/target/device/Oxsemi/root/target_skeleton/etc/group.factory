@@ -1,0 +1,16 @@
+root:x:0:
+daemon:x:1:
+bin:x:2:
+sys:x:3:
+adm:x:4:
+tty:x:5:
+disk:x:6:
+lp:x:7:
+mail:x:8:
+www-data:x:33:
+backup:x:34:
+utmp:x:43:
+staff:x:50:
+nobody:x:99:
+users:x:500:
+default:x:1000:

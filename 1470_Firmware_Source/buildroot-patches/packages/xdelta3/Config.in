@@ -1,0 +1,6 @@
+config BR2_PACKAGE_XDELTA3
+	bool "xdelta3 patching tools"
+	default y
+	depends on BR2_arm926t
+    help
+		The xdelta3 patch tools. Allows incremental update of binary files.

@@ -1,0 +1,350 @@
+#!/bin/sh
+#
+#
+# Copyright (C) 2006 Oxford Semiconductor Inc.
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+# 
+
+# This script should be run when a drive is "hot-attached", it explores the drive
+# looking for volume labels of a number of file systems. It uses either the 
+# volume label or the partition name to create a directory tree to mount all the
+# mountable directories. If a partition cannot be mounted, the system will try
+# again with the encryption/decryption system applied to see if the volume 
+# contains encrypted partitions. As it is mounting drives, the script creates an 
+# umount script in /var/run/block/ for cleaning up after the drive has been removed
+#
+# In a second mode, it can be run to only mount drives that are encrypted. This 
+# mode should be used when hot-plugging an iButton to try to decrypt already 
+# attached external drives. To activate this mode supply a second parameter.
+#
+# @param $1 device (sda, sdc, etc)
+# @param $2 inhibits mounting of non-encrypted partitions if non-null
+
+. ./hotplug.functions
+
+LOCKFILE=/tmp/mount-external-drive
+. ./semaphore
+
+DEBUG=yes
+export DEBUG
+
+NFS_EXPORT_OPTIONS=rw,async
+NFS_CLIENTS=*
+
+# mount with uid set to www-data
+FATMOUNTOPTIONS=uid=33,gid=33,fmask=0111
+EXTMOUNTOPTIONS=nosuid
+
+################################################################################
+# $1 is the disk device name, eg: sda, sdc, etc.
+get_disk_name() {
+    # use vendor and device
+    disk_name=`cat /sys/block/$1/device/vendor``cat /sys/block/$1/device/model`
+    
+    #if both of these are null, then default to sdc, etc
+    if [ -z "$disk_name" ]
+    then
+        disk_name="removable-disk-$1"
+    else
+        # replace white space with dash
+        disk_name=`echo ${disk_name} |sed "s/ /-/g"`
+    fi
+    unset disk_name_suffix
+    while [ -d "/shares/external/${disk_name}${disk_name_suffix}" ]
+    do
+        if [ -z "$disk_name_suffix" ]
+        then
+            count=2
+        else
+            count=$((${count} + 1))
+        fi
+        disk_name_suffix=-${count}
+    done
+    disk_name=${disk_name}${disk_name_suffix}
+}
+
+################################################################################
+# creates a list of all the partitions on a disk
+# $1 is the disk device name, eg: sda, sdc, etc.
+get_partition_devices() {
+    temp=${PWD}
+    cd /sys/block/$1
+    partition_devices=`echo $1*`
+    cd ${temp}
+}
+
+################################################################################
+# $1 is the disk partition name, eg: sda2, sdc1, etc.
+get_partition_label() {
+    partition_label=`/sbin/e2label /dev/$1 2>/dev/null`
+
+    if [ -n "$partition_label" ]
+    then
+        # remove any space and replace with dash
+        partition_label=`echo ${partition_label} |sed "s/ /-/g"`
+        debug_mesg "ext2/3 label"
+        return 0
+    fi
+    
+    # ntfs
+    partition_label=`/usr/sbin/ntfslabel /dev/$1 2>/dev/null`
+
+    if [ -n "$partition_label" ]
+    then
+        # remove any space and replace with dash
+        partition_label=`echo ${partition_label} |sed "s/ /-/g"`
+        debug_mesg "ntfs label"
+        return 0
+    fi
+    
+#    partition_label=`/bin/xfs_admin -l /dev/$1 2>/dev/null`
+#
+#    if [ -n "$partition_label" ]
+#    then
+#        # remove any space and replace with dash
+#        partition_label=`echo ${partition_label} |sed "s/ /-/g"`
+#        debug_mesg "xfs label"
+#        return 0
+#    fi
+    
+    # msdos / vfat TODO
+
+    debug_mesg "no label"
+    partition_label=Partition-`echo $1 |egrep -o "[0-9]+"`
+    return 1
+}
+
+###############################################################################
+# Will ask far a key from the keyring
+# (no parameters)
+get_key_from_keyring() {
+    return 1
+}
+
+###############################################################################
+# cleanup any unused directories
+cleanupunuseddirectories() {
+    for dir in /shares/external/*
+    do
+        # make sure it's a directory
+        if [ -d "$dir" ]
+        then
+            grep -q -G "$dir/" /proc/mounts
+            if [ $? != 0 ]
+            then
+                # when here, we know it's not mounted so is probably a stray 
+                # directory. If it doesn't contain any files, then delete it
+                if [ -z `find "$dir" -type f` ]
+                then
+                    find "$dir" -type d -exec rm -rf "{}" \;
+                fi
+            fi
+        fi
+    done
+}
+
+###############################################################################
+# Top level of script
+###############################################################################
+
+# @todo May bo able to try and remove these at the end of the script and rely on 
+# reference counting to keep the ones being used.
+modprobe ntfs
+modprobe nls_iso8859-1
+modprobe nls_cp437
+modprobe vfat
+modprobe hfsplus
+
+# enter critical section
+down "$LOCKFILE"
+
+cleanupunuseddirectories
+
+if [ -z "$1" ]
+then
+    # return an error as we've not been given a device name
+    return 1
+fi
+
+# create a temporary directory for mounting
+temp_mnt_dir=/tmp/mnt"$1"
+[ -d "$temp_mnt_dir" ] || /bin/mkdir "$temp_mnt_dir"
+
+# remove any existing umount script and create a new one
+[ -d "/var/run/block/" ] || /bin/mkdir /var/run/block/
+
+removal_script="/var/run/block/$1"
+temp_removal_script="/tmp/umount-$1-tac.sh"
+[ -e ${temp_removal_script} ] && rm ${temp_removal_script}
+touch ${temp_removal_script}
+
+# if the removal script already exists then "tac" it into the temporary script 
+# as we want to add to the start of it
+if [ -e ${removal_script} ]
+then
+    tac ${removal_script} >> ${temp_removal_script}
+else
+    echo "rm /var/run/block/$1" >>${temp_removal_script}
+fi
+
+# record this drive as a removable/external drive if not already in the list
+grep -q $1 /etc/external-drives
+if [ $? -gt 0 ]
+then
+    echo $1 >> /etc/external-drives
+fi
+echo "sed '/$1/d' -i /etc/external-drives" >>${temp_removal_script}
+
+# find the disk name
+get_disk_name $1
+debug_mesg "disk name is ${disk_name}"
+
+# make disk directory 
+if [ ! -d "/shares/external/${disk_name}" ] 
+then
+    debug_mesg "making directory /shares/external/${disk_name}"
+    /bin/mkdir /shares/external/${disk_name}
+fi
+
+# removal instructions
+echo "rmdir /shares/external/${disk_name}" >>${temp_removal_script}
+
+# find how many partitions are there
+get_partition_devices $1
+debug_mesg "found the partitions ${partition_devices}"
+
+any_mounted=false;
+
+for partition in ${partition_devices}
+do
+    get_partition_label ${partition}
+    debug_mesg "partition ${partition} has label ${partition_label}"
+    
+    # try to mount the portition
+    mounted=false
+    unset changeown
+    if [ -z "$2" ]
+    then
+        if mount -o ${FATMOUNTOPTIONS} /dev/${partition} "$temp_mnt_dir"
+        then
+        	mounted=true
+        	changeown=false
+        elif mount -o ${EXTMOUNTOPTIONS} /dev/${partition} "$temp_mnt_dir"
+        then
+        	mounted=true
+        	changeown=true
+        fi
+    fi
+    
+    if ${mounted}
+    then
+        debug_mesg "Able to mount drive"
+        /bin/mkdir /shares/external/${disk_name}/${partition_label}
+
+        # removal instructions
+        echo "rmdir /shares/external/${disk_name}/${partition_label}" >>${temp_removal_script}
+
+        mount -o move "$temp_mnt_dir" /shares/external/${disk_name}/${partition_label}
+
+		if $changeown
+		then
+			chown www-data /shares/external/${disk_name}/${partition_label}
+		fi
+
+		# Propagate the SUID/GUID state and set correct permissions
+		chmod ug+s /shares/external/${disk_name}/${partition_label}
+
+        # umount instruction for removal script        
+		echo "sync" >>${temp_removal_script}
+        echo "/bin/umount -l /shares/external/${disk_name}/${partition_label}" >> ${temp_removal_script}
+        
+        # just in case the move didn't work
+        /bin/umount "$temp_mnt_dir" 2>/dev/null
+        
+        # export the file system using nfs
+        # /usr/sbin/exportfs -o ${NFS_EXPORT_OPTIONS} ${NFS_CLIENTS}:/shares/external/${disk_name}/${partition_label}
+        # echo "/usr/sbin/exportfs -u ${NFS_CLIENTS}:/shares/external/${disk_name}/${partition_label}" >> ${temp_removal_script}
+
+		any_mounted=true;
+    else
+        debug_mesg "Could not mount drive unencrypted"
+        
+        # check the partition is not already encrypted
+        /usr/sbin/dmsetup ls | grep -q ${partition}
+        if [ $? -gt 0 ]
+        then
+        
+            # may be an encrypted volume
+            # speculatively try to see if the drive is encrpted
+            get_key_from_keyring
+            if [ $? -lt 1 ]
+            then
+                debug_mesg "got a key from the iButton"
+            
+                # fire up the encrypted drive
+                echo 0 `cat /sys/block/$1/${partition}/size` ox-crypt ${encryption_key} 0 /dev/${partition} 0 | /usr/sbin/dmsetup create dm${partition}
+                
+                encrypted_partition=mapper/dm${partition}
+            
+                # get partition label
+                get_partition_label ${encrypted_partition}
+                debug_mesg "encrypted partition ${encrypted_partition} has label ${partition_label}"
+    
+                # try to mount the portition
+                mount /dev/${encrypted_partition} "$temp_mnt_dir"
+                if [ $? -gt 0 ]
+                then
+                    # didn't work, remove from encryption system                
+                    debug_mesg "no mountable drive on the partition ${encrypted_partition}"
+                    /usr/sbin/dmsetup remove dm${partition}
+                else
+                    debug_mesg "Found and mounted an encrypted partition $1 plaintext ${encrypted_partition} as /shares/external/${disk_name}/${partition_label}"
+                    /bin/mkdir /shares/external/${disk_name}/${partition_label}
+    
+                    # removal instructions
+                    echo "rmdir /shares/external/${disk_name}/${partition_label}" >>${temp_removal_script}
+    
+                    /bin/mount -o move "$temp_mnt_dir" /shares/external/${disk_name}/${partition_label}
+            
+                    # removal instructions
+                    echo "/usr/sbin/dmsetup remove dm${partition}" >>${temp_removal_script}
+    
+                    # umount instruction for removal script        
+                    echo "sync" >>${temp_removal_script}
+                    echo "/bin/umount -l /shares/external/${disk_name}/${partition_label} " >> ${temp_removal_script}
+
+                    # export the file system using nfs
+                    # /usr/sbin/exportfs -o ${NFS_EXPORT_OPTIONS} ${NFS_CLIENTS}:/shares/external/${disk_name}/${partition_label}
+                    # echo "/usr/sbin/exportfs -u ${NFS_CLIENTS}:/shares/external/${disk_name}/${partition_label}" >> ${temp_removal_script}
+
+					any_mounted=true;
+                fi
+            fi
+        fi
+    fi
+done
+
+# Reverse the order of commands in the temporary removal script and put them 
+# into the removal script
+echo "set -e" >>${temp_removal_script}
+tac ${temp_removal_script} > ${removal_script}
+rm ${temp_removal_script}
+chmod 755 ${removal_script}
+
+cleanupunuseddirectories
+
+up "$LOCKFILE"
+

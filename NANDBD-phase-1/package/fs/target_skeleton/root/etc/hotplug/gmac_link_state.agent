@@ -1,0 +1,24 @@
+#!/bin/sh
+
+cd /etc/hotplug
+. ./hotplug.functions
+
+debug_mesg gmac link state change
+case $ACTION in
+
+offline)
+    debug_mesg gmac link down event
+#    $(echo "GMAC link down" >> /var/log/gmac.log)
+    ;;
+                                                                                
+online)
+    debug_mesg gmac link up event
+#    $(echo "GMAC link up" >> /var/log/gmac.log)
+    ;;
+                                                                                
+*)
+    debug_mesg gmac link $ACTION event not supported
+    exit 1
+    ;;
+
+esac

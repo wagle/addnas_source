@@ -1,0 +1,7 @@
+config BR2_PACKAGE_USERIF
+	bool "web user interface"
+	default y
+	depends on BR2_PACKAGE_SAMBA && BR2_PACKAGE_PERL && BR2_PACKAGE_PERL_MODULES
+    help
+		The user interface. Allows client control of NAS system through
+		a web browser.

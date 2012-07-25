@@ -1,0 +1,12 @@
+system_type=2nc
+network_mode=dhcp
+hostname=OXNAS
+workgroup=workgroup
+static_ip=
+static_msk=
+static_gw=
+static_dns1=
+static_dns2=
+static_dns3=
+static_ntp=
+revert_to_dhcp=no

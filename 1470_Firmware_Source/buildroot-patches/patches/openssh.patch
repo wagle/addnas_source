@@ -1,0 +1,14 @@
+diff -urN package/openssh.orig/openssh.mk package/openssh/openssh.mk
+--- package/openssh.orig/openssh.mk	2008-06-20 08:16:03.000000000 +0100
++++ package/openssh/openssh.mk	2008-06-20 16:24:49.000000000 +0100
+@@ -64,8 +64,8 @@
+ $(TARGET_DIR)/usr/bin/ssh: $(OPENSSH_DIR)/ssh
+ 	$(MAKE) DESTDIR=$(TARGET_DIR) -C $(OPENSSH_DIR) install
+ 	mkdir -p $(TARGET_DIR)/etc/init.d
+-	cp package/openssh/S50sshd $(TARGET_DIR)/etc/init.d/
+-	chmod a+x $(TARGET_DIR)/etc/init.d/S50sshd
++#	cp package/openssh/S50sshd $(TARGET_DIR)/etc/init.d/
++#	chmod a+x $(TARGET_DIR)/etc/init.d/S50sshd
+ 	rm -rf $(TARGET_DIR)/usr/info $(TARGET_DIR)/usr/man $(TARGET_DIR)/usr/share/doc
+ 
+ openssh: openssl zlib $(TARGET_DIR)/usr/bin/ssh

@@ -1,0 +1,17 @@
+--- package/parted.orig/parted-1.patch	1970-01-01 01:00:00.000000000 +0100
++++ package/parted/parted-1.patch	2009-09-29 10:07:56.000000000 +0100
+@@ -0,0 +1,14 @@
++--- parted-1.8.8/libparted/arch/linux.c.orig	2009-09-28 11:44:48.000000000 +0100
+++++ parted-1.8.8/libparted/arch/linux.c	2009-09-28 11:45:27.000000000 +0100
++@@ -36,6 +36,11 @@
++ #include <sys/stat.h>
++ #include <sys/types.h>
++ #include <sys/utsname.h>        /* for uname() */
+++
+++#ifndef u8
+++#define u8 unsigned char
+++#endif
+++
++ #include <scsi/scsi.h>
++ #ifdef ENABLE_DEVICE_MAPPER
++ #include <libdevmapper.h>

@@ -1,0 +1,505 @@
+diff -Naur stage1.orig/include/debug.h stage1/include/debug.h
+--- stage1.orig/include/debug.h	2010-03-03 03:30:51.000000000 -0800
++++ stage1/include/debug.h	2010-06-23 09:54:31.000000000 -0700
+@@ -23,6 +23,9 @@
+ extern char* ustohex(unsigned short num);
+ extern char* uctohex(unsigned char num);
+ extern void puthex32(NS16550_t uart, unsigned long val);
++#ifdef SDK_BUILD_DEBUG
++extern void puthex8(NS16550_t uart, unsigned char val);
++#endif
+ 
+ #endif        //  #if !defined(__DEBUG_H__)
+ 
+diff -Naur stage1.orig/include/nand.h stage1/include/nand.h
+--- stage1.orig/include/nand.h	1969-12-31 16:00:00.000000000 -0800
++++ stage1/include/nand.h	2010-06-23 09:55:42.000000000 -0700
+@@ -0,0 +1,54 @@
++#ifndef _NAND_H_
++#define _NAND_H_
++
++#define NAND_BUSY_BITS   ((1<<6)|(1<<5))
++
++#define NAND_SMALL_BADBLOCK_POS     5
++#define NAND_LARGE_BADBLOCK_POS     0
++
++#define NAND_CMD_READ0		0
++#define NAND_CMD_READ1		1
++#define NAND_CMD_STATUS		0x70
++#define NAND_CMD_READID		0x90
++#define NAND_CMD_RESET		0xff
++#define NAND_CMD_READOOB    0x50
++
++#define NAND_CMD_READSTART  0x30
++
++#define STATIC_NAND_ENABLE0  0x01fff000
++
++#define STATIC_CS0_BASE_PA      0x41000000
++#define STATIC_CS1_BASE_PA      0x41400000
++
++#define CFG_NAND_BASE   STATIC_CS0_BASE_PA
++#define CFG_NAND_ADDRESS_LATCH  CFG_NAND_BASE + (1<<18)
++#define CFG_NAND_COMMAND_LATCH  CFG_NAND_BASE + (1<<19)
++
++#define NAND_ENCODE_SCALING	8
++
++struct nand_t {
++	u8 page_shift;
++	u8 block_shift;
++	u8 page;
++	u8 block;
++	u32 block_mask;
++	u32 block_size;
++	u32 page_mask;
++	u16 badblockpos;
++	u16 spare;
++};
++
++extern void nand_init(void *);
++extern u32 nand_read(struct nand_t *, u32, u32, u8 *);
++extern void nand_print_bad(u32, struct nand_t *);
++
++#ifndef SDK_BUILD_NAND_STAGE2_BLOCK
++#define SDK_BUILD_NAND_STAGE2_BLOCK	2
++#endif
++
++#ifndef SDK_BUILD_NAND_STAGE2_BLOCK2
++#define SDK_BUILD_NAND_STAGE2_BLOCK2	18
++#endif
++
++#endif
++
+diff -Naur stage1.orig/src/debug.c stage1/src/debug.c
+--- stage1.orig/src/debug.c	2010-03-03 03:48:43.000000000 -0800
++++ stage1/src/debug.c	2010-06-23 09:54:31.000000000 -0700
+@@ -109,3 +109,20 @@
+     
+     putstr(uart, str);
+ }
++
++#ifdef SDK_BUILD_DEBUG
++void puthex8(NS16550_t uart, unsigned char val)
++{
++    const char *C_HEX = "0123456789ABCDEF";
++    char str[3];
++    int i;
++
++    for (i=0;i<2;i++)
++        str[i] = C_HEX[(val & (0xF << (4 - (i*4)))) >> (4 - (i*4))];
++    
++    str[2] = 0;
++    
++    putstr(uart, str);
++}
++#endif
++
+diff -Naur stage1.orig/src/nand.c stage1/src/nand.c
+--- stage1.orig/src/nand.c	1969-12-31 16:00:00.000000000 -0800
++++ stage1/src/nand.c	2010-06-23 09:55:59.000000000 -0700
+@@ -0,0 +1,219 @@
++
++#include "types.h"
++#include "oxnas.h"
++#include "debug.h"
++#include "nand.h"
++
++static void wait_nand_busy(void)
++{
++	u8 status;
++	
++	writeb(NAND_CMD_STATUS, CFG_NAND_COMMAND_LATCH);
++	do {
++		status = (0x7f & readb(CFG_NAND_BASE));
++	} while (!(status  == NAND_BUSY_BITS));
++}
++
++static void get_sig(void *data)
++{
++	struct nand_t *nand = data;
++	u8 chip, org, tech;
++
++	writeb(NAND_CMD_RESET, CFG_NAND_COMMAND_LATCH);
++	wait_nand_busy();
++	writeb(NAND_CMD_READID, CFG_NAND_COMMAND_LATCH);
++	writeb(0x00, CFG_NAND_ADDRESS_LATCH);
++	chip = readb(CFG_NAND_BASE);	/* maker ID */
++	chip = readb(CFG_NAND_BASE);	/* devide ID */
++	tech = readb(CFG_NAND_BASE);	/* technology (cell type) */
++	org = readb(CFG_NAND_BASE);	/* organisation (page & block size) */
++	nand->page = org & 0x3;
++	nand->block = (org >> 4) & 0x3;
++	switch (nand->page) {
++	case 0:		/* 1k pages */
++		nand->page_shift = 10;
++		nand->page_mask = 0x3FF;
++		break;
++	case 1:		/* 2k pages */
++		nand->page_shift = 11;
++		nand->page_mask = 0x7ff;
++		break;
++	case 2:		/* 4k pages */
++		nand->page_shift = 12;
++		nand->page_mask = 0xfff;
++		break;
++	case 3:		/* 8k pages */
++		nand->page_shift = 13;
++		nand->page_mask = 0x1fff;
++		break;
++	}
++	switch (nand->block) {
++	case 0:		/* 64 k bytes */
++		nand->block_shift = 16;
++		nand->block_mask = 0xFFFF;
++		break;
++	case 1:		/* 128 k bytes */
++		nand->block_shift = 17;
++		nand->block_mask = 0x1ffff;
++		break;
++	case 2:		/* 256 k bytes */
++		nand->block_shift = 18;
++		nand->block_mask = 0x3ffff;
++		break;
++	case 3:		/* 512 k bytes */
++		nand->block_shift = 19;
++		nand->block_mask = 0x7ffff;
++		break;
++
++	}
++	nand->block_size = (1 << nand->block_shift);
++	nand->spare = 0x1 & (org >> 2);
++	nand->badblockpos = ((1 << nand->page_shift) > 512) ?
++	   NAND_LARGE_BADBLOCK_POS :
++	   NAND_SMALL_BADBLOCK_POS;
++}
++
++static void set_nand_start_address(u32 page, u16 column)
++{
++
++	writeb(NAND_CMD_READ0, CFG_NAND_COMMAND_LATCH);
++	writeb(column & 0xff, CFG_NAND_ADDRESS_LATCH);
++	writeb(column >> 8, CFG_NAND_ADDRESS_LATCH);
++	writeb((page & 0xff), CFG_NAND_ADDRESS_LATCH);
++	writeb(((page >> 8) & 0xff), CFG_NAND_ADDRESS_LATCH);
++	/* One more address cycle for devices > 128MiB */
++	writeb(((page >> 16) & 0xff), CFG_NAND_ADDRESS_LATCH);
++	
++	writeb(NAND_CMD_READSTART, CFG_NAND_COMMAND_LATCH);
++
++	udelay(100);
++}
++
++void nand_init(void *data)
++{
++	/*enable static bus to device_select */
++	/* enable secondary functions for: gpioa12 .. gpioa 19 (data bus), 
++	 * gpioa20(we) gpioa21(oe), gpioa 22(cs 0)
++	 */
++	writel(STATIC_NAND_ENABLE0, SYS_CTRL_SECONDARY_SEL);
++
++	/* enable clock and release static block reset */
++	writel((1<<SYS_CTRL_CKEN_STATIC_BIT), SYS_CTRL_CKEN_SET_CTRL);
++	writel((1<<SYS_CTRL_RSTEN_STATIC_BIT), SYS_CTRL_RSTEN_CLR_CTRL);
++
++	/* configure sys_ctrl static bus parameters (no operation use 
++	 * hardware defaults) 
++	 * get NAND device configuration 
++	 */
++	get_sig(data);
++}
++
++static int nand_bad_block(u32 offs, struct nand_t * nand)
++{
++	/* Read bad block marker from the chip */
++	u32 page = (u32)(offs >> nand->page_shift);
++	u32 column = nand->badblockpos + (1 << nand->page_shift);
++
++	writeb(NAND_CMD_READ0, CFG_NAND_COMMAND_LATCH);
++	writeb(column & 0xff, CFG_NAND_ADDRESS_LATCH);
++	writeb(column >> 8, CFG_NAND_ADDRESS_LATCH);
++	writeb((page & 0xff), CFG_NAND_ADDRESS_LATCH);
++	writeb(((page >> 8) & 0xff), CFG_NAND_ADDRESS_LATCH);
++	/* One more address cycle for devices > 128MiB */
++	writeb(((page >> 16) & 0xff), CFG_NAND_ADDRESS_LATCH);
++	
++	writeb(NAND_CMD_READSTART, CFG_NAND_COMMAND_LATCH);
++
++	udelay(100);
++
++	if (readb(CFG_NAND_BASE) != 0xff)
++		return 1;
++
++	return 0;
++}
++
++static int error_correct(u8 val)
++{
++	u8 errors = 0;
++	u8 mask = 1;
++	u8 i;
++
++	val = val ^ 0xAA;
++
++	for (i = 0; i < 8; i++) {
++		errors += (val & mask) ? 1 : 0;
++		mask <<= 1;
++	}
++
++	if (errors < 3) {
++		return 1;
++	}
++	if (errors > 5) {
++		return 0;
++	}
++
++	return 2;
++}
++
++u32 nand_read(struct nand_t *nand, u32 address, u32 length, u8 *to)
++{
++	u8 val;
++	u8 out = 0;
++	u8 mask = 1;
++
++	u32 block, current_block = 0xffffffff;
++	u32 page;
++	u32 offset;
++	u32 count;
++
++	u32 bytes_read = 0;
++
++	/* convert BYTE address to nand device format for device */
++	count = length * NAND_ENCODE_SCALING;
++	while (count > 0) {
++		offset = address & nand->page_mask;
++		block = address >> nand->block_shift;
++		page = address >> nand->page_shift;
++		/* Check bad block only if the block is changed */
++		if (current_block != block) {
++			if (1 == nand_bad_block(address, nand)) {
++				address += (1 << nand->block_shift);
++				putstr(debug_uart, "\r\nbad block found at ");
++				puthex32(debug_uart, (address & (~nand->block_mask)));
++				continue;
++			}
++			current_block = block;
++		}
++		if (!offset) {
++			set_nand_start_address(page, offset);
++		}
++
++		val = readb(CFG_NAND_BASE);
++		if ((val ^ 0x55) == 0) {
++			out |= mask;
++		} else if ((val ^ 0xAA) != 0) {
++			switch (error_correct(val)) {
++				case 0:
++					out |= mask;
++				case 1:
++					break;
++				default:
++					putstr(debug_uart, "\r\nFailed to correct error");
++					return bytes_read;
++			}
++		}
++		mask <<= 1;
++		if ((0xFF & mask) == 0) {
++			*to = out;
++			to++;
++			bytes_read++;
++			out = 0;
++			mask = 1;
++		}
++		count--;
++		address++;
++	}
++
++	return bytes_read;
++}
++
+diff -Naur stage1.orig/Makefile stage1/Makefile
+--- stage1.orig/Makefile	2010-07-26 00:50:47.000000000 -0700
++++ stage1/Makefile	2010-08-17 15:22:23.000000000 -0700
+@@ -56,8 +56,6 @@
+ 
+ OBJECTS = $(OBJDIR)/start.o \
+ 	  $(OBJDIR)/stage1.o \
+-	  $(OBJDIR)/sata.o \
+-	  $(OBJDIR)/dma.o \
+ 	  $(OBJDIR)/pll.o \
+ 	  $(OBJDIR)/ns16550.o \
+ 	  $(OBJDIR)/debug.o \
+@@ -65,6 +63,23 @@
+ 	  $(OBJDIR)/build.o \
+ 	  $(OBJDIR)/ddr_oxsemi.o 
+ 
++ifndef SDK_BUILD_NAND_BOOT
++OBJECTS += $(OBJDIR)/sata.o $(OBJDIR)/dma.o
++else
++OBJECTS += $(OBJDIR)/nand.o
++CCOPTS += -DSDK_BUILD_NAND_BOOT
++endif
++ifdef SDK_BUILD_DEBUG
++CCOPTS += -DSDK_BUILD_DEBUG
++endif
++
++ifneq ($(strip $(SDK_BUILD_NAND_STAGE2_BLOCK)), )
++CCOPTS += -DSDK_BUILD_NAND_STAGE2_BLOCK=$(SDK_BUILD_NAND_STAGE2_BLOCK)
++endif
++ifneq ($(strip $(SDK_BUILD_NAND_STAGE2_BLOCK2)), )
++CCOPTS += -DSDK_BUILD_NAND_STAGE2_BLOCK2=$(SDK_BUILD_NAND_STAGE2_BLOCK2)
++endif
++
+ all : stage1.wrapped $(OBJDIR)/. tools/packager
+ 
+ $(OBJDIR)/%.o : $(SRCDIR)/%.c Makefile
+diff -Naur stage1.orig/src/stage1.c stage1/src/stage1.c
+--- stage1.orig/src/stage1.c	2010-07-26 00:50:47.000000000 -0700
++++ stage1/src/stage1.c	2010-08-17 15:22:23.000000000 -0700
+@@ -13,7 +13,11 @@
+ * Copyright:       Oxford Semiconductor Ltd, 2009
+ */
+ #include "oxnas.h"
++#ifndef SDK_BUILD_NAND_BOOT
+ #include "sata.h"
++#else
++#include "nand.h"
++#endif
+ #include "debug.h"
+ #include "crc32.h"
+ #include "ddr_oxsemi.h"
+@@ -24,12 +28,20 @@
+ static int test_memory(u32 memory);
+ static void start_timer(void);
+ 
++#ifndef SDK_BUILD_NAND_BOOT
+ static const u32 stage2_disk_sector[] = {
+     SECTOR_BOOT_STAGE2,
+     SECTOR_RECOVERY_STAGE2
+ };
+ static const u32 numStage2Images = sizeof(stage2_disk_sector) / sizeof(u32);
+ static u32 stage2_blocks;
++#else
++static const u32 stage2_nand_block[] = {
++	SDK_BUILD_NAND_STAGE2_BLOCK,
++	SDK_BUILD_NAND_STAGE2_BLOCK2
++};
++static const u32 numStage2Images = sizeof(stage2_nand_block) / sizeof(u32);
++#endif
+ static u32 stage2_ram_addr;
+ static u32 *header_length;
+ static u32 *header_crc;
+@@ -98,14 +110,21 @@
+ 
+ int main(void)
+ {
+-    int disk;
+     int stage2ImageNumber;
++#ifndef SDK_BUILD_NAND_BOOT
++    int disk;
+     int blocks_read;
++#else
++	struct nand_t nand;
++	u32 bytes_read;
++#endif
+     unsigned int keeplooping;
+     int baud_divisor_x16;
+-    
++
++#ifndef SDK_BUILD_NAND_BOOT
+     /* software is assumed to be a maximum of 256kib */
+     stage2_blocks = 256*1024/512 ;
++#endif
+     stage2ImageNumber = 0;
+     
+     /* The location in memory where the software will be loaded */
+@@ -153,21 +172,30 @@
+         init_ddr(plla_set_config(0));
+     }
+ 
++#ifndef SDK_BUILD_NAND_BOOT
+     disk = 0;
+ 
+     /* reset sata core */
+     init_sata_hw();
++#else
++	nand_init(&nand);
++#endif
+ 
+     do {
+         keeplooping = 1;
++#ifndef SDK_BUILD_NAND_BOOT
+         putstr(debug_uart, "\r\nReading disk ");
+         putc_NS16550(debug_uart, (char) ('0' + (char)disk));
++#else
++        putstr(debug_uart, "\r\nReading NAND");
++#endif
+         putstr(debug_uart, ", Image ");
+         putc_NS16550(debug_uart, (char) ('0' + (char)stage2ImageNumber));
+ 
+         *header_length = 0xA1A2A3A4;
+         *header_crc    = 0xB1B2B3B4;
+         
++#ifndef SDK_BUILD_NAND_BOOT
+         /* fetch stage-2 (u-Boot) from SATA disk */
+         
+         putstr(debug_uart, "\r\n  Sector : ");
+@@ -177,28 +205,57 @@
+                                stage2_disk_sector[stage2ImageNumber],
+                                stage2_blocks,
+                                header_length );
++#else
++		/* fetch stage-2 (u-Boot) header from NAND flash */
++		bytes_read = nand_read(&nand,
++				stage2_nand_block[stage2ImageNumber] * nand.block_size,
++				8, (u8 *)header_length);
++		/* fetch stage-2 (u-Boot) from NAND flash */
++		bytes_read = nand_read(&nand,
++				stage2_nand_block[stage2ImageNumber] * nand.block_size,
++				(*header_length) + 8, (u8 *)header_length);
++#endif
+         
+         putstr(debug_uart, "\r\n  Hdr len: ");
+         puthex32(debug_uart, *header_length);
+         putstr(debug_uart, "\r\n  Hdr CRC: ");
+         puthex32(debug_uart, *header_crc);        
+         putstr(debug_uart, "\r\n");
+-                        
++
+         /* try the backup stage2 on this disk first (first time round, at least we know
+            it is working to some extent, go to next disk if this wraps round */
+         if (++stage2ImageNumber >= numStage2Images) {
+             stage2ImageNumber = 0;
++#ifndef SDK_BUILD_NAND_BOOT
+             if (++disk > 1) {
+                 disk = 0;
+             }
++#endif
+         }
+-        
++
++#ifndef SDK_BUILD_NAND_BOOT
+         if (blocks_read != stage2_blocks ) {
++#else
++		if (bytes_read != (*header_length) + 8) {
++#ifdef SDK_BUILD_DEBUG
++			unsigned int i, j = 0;
++			for (i = 0; i < bytes_read; i++) {
++				if (j++ % 16 == 0) {
++					putstr(debug_uart, "\r\n");
++				} else {
++					putstr(debug_uart, " ");
++				}
++				puthex8(debug_uart, *(((u8 *)stage2_ram_addr)+i));
++			}
++#endif
++#endif
+             putstr(debug_uart, " read failed");
+         } else if (*header_length == 0) {
+             putstr(debug_uart, " length 0");
++#ifndef SDK_BUILD_NAND_BOOT
+         } else if (*header_length > (stage2_blocks * 512) ) {
+             putstr(debug_uart, " too big ");
++#endif
+         } else if (*header_crc != crc32(0, (unsigned char*)stage2_ram_addr,*header_length)) {
+             putstr(debug_uart, " CRC fail");
+         } else {

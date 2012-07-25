@@ -1,0 +1,17 @@
+--- package/samba/samba.mk.ORIG	2011-09-29 22:42:28.000000000 -0600
++++ package/samba/samba.mk	2011-09-30 01:17:00.000000000 -0600
+@@ -75,7 +75,12 @@
+ samba-prealloc-dirclean:
+ 	@rm -rf $(SAMBA_PREALLOC_DIR)
+ 
+-ifeq ($(strip $(SDK_ROOTFS_APPS_SAMBA_PREALLOC)),y)
+-SDK_ROOTFS_PACKAGES += samba-prealloc
++#############################################################
++#
++## Toplevel Makefile options
++#
++##############################################################
++ifeq ($(strip $(BR2_PACKAGE_SAMBA)),y)
++TARGETS+=samba-prealloc
+ endif
+ 

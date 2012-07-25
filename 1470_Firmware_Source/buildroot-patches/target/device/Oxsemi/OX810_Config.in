@@ -1,0 +1,31 @@
+config BR2_TARGET_OX810
+        bool "Board support for the Oxsemi 810"
+        depends on BR2_arm
+        default n
+        help
+          Oxsemi 810 based systems
+
+if BR2_TARGET_OX810
+comment "Board Selection"
+
+choice
+        prompt "OX810 board"
+        depends on BR2_TARGET_OX810
+        default BR2_TARGET_OX810_DSE
+        help
+          Select the specific OX810 board you wish to use
+
+config BR2_TARGET_OX810_SE
+        bool "Oxsemi OX810 SDK SE development board"
+        depends on BR2_TARGET_OX810
+        help
+          Oxsemi OX810 SDK SE development board
+
+config BR2_TARGET_OX810_DSE
+        bool "Oxsemi OX810 SDK DSE development board"
+        depends on BR2_TARGET_OX810
+        help
+          Oxsemi OX810 SDK DSE development board
+
+endchoice
+endif

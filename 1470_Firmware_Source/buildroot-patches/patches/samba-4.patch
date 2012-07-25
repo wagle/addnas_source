@@ -1,0 +1,46 @@
+--- package/samba/samba.mk.ORIG3	2011-10-01 12:18:51.000000000 -0600
++++ package/samba/samba.mk	2011-10-01 12:30:11.000000000 -0600
+@@ -7,17 +7,19 @@
+ 
+ SAMBA_PREALLOC_ENVCONF:=$(SAMBA_PREALLOC_DIR)/source/include/config.h
+ 
+-samba-prealloc: $(ROOTFS_DIR)/usr/local/samba/sbin/smbd
++samba-prealloc: $(TARGET_DIR)/usr/local/samba/sbin/smbd
+ 
+-$(ROOTFS_DIR)/usr/local/samba/sbin/smbd: $(SAMBA_PREALLOC_DIR)/source/bin/smbd
+-	$(MAKE) DESTDIR=$(ROOTFS_DIR) -C $(SAMBA_PREALLOC_DIR)/source install
++$(TARGET_DIR)/usr/local/samba/sbin/smbd: $(SAMBA_PREALLOC_DIR)/source/bin/smbd
++	$(MAKE) DESTDIR=$(TARGET_DIR) -C $(SAMBA_PREALLOC_DIR)/source install
+ 	$(INSTALL) -m 0755 package/samba/S91smb $(TARGET_DIR)/etc/init.d
+-	@rm -rf $(addprefix $(ROOTFS_DIR)/usr/local/samba/,	\
++	@rm -rf $(addprefix $(TARGET_DIR)/usr/local/samba/,	\
+ 		man include swat sbin/swat)
+ 
+ $(SAMBA_PREALLOC_DIR)/source/bin/smbd: $(SAMBA_PREALLOC_DIR)/source/.configured
++	$(MAKE) -C $(SAMBA_PREALLOC_DIR)/source proto
+ 	$(MAKE) -C $(SAMBA_PREALLOC_DIR)/source
+ 
++
+ #$(TARGET_CONFIGURE_OPTS)
+ $(SAMBA_PREALLOC_DIR)/source/.configured: $(SAMBA_PREALLOC_DIR)/.patched
+ 	(cd $(SAMBA_PREALLOC_DIR)/source; rm -rf config.cache; \
+@@ -59,7 +61,7 @@
+ 	touch $@
+ 
+ $(SAMBA_PREALLOC_DIR)/.patched: $(SAMBA_PREALLOC_DIR)/.unpacked
+-	@toolchain/patch-kernel.sh $(@D) $(SAMBA_PREALLOC_DIR) samba-\*.patch
++	@toolchain/patch-kernel.sh $(@D) package/samba samba-\*.patch
+ 	@touch $@
+ 
+ $(SAMBA_PREALLOC_DIR)/.unpacked:
+@@ -68,8 +70,8 @@
+ 	@touch $@
+ 
+ samba-prealloc-clean:
+-	-$(MAKE) DESTDIR=$(ROOTFS_DIR) -C $(SAMBA_PREALLOC_DIR)/source uninstall
+-	rm -rf $(ROOTFS_DIR)/usr/local/samba
++	-$(MAKE) DESTDIR=$(TARGET_DIR) -C $(SAMBA_PREALLOC_DIR)/source uninstall
++	rm -rf $(TARGET_DIR)/usr/local/samba
+ 	-$(MAKE) -C $(SAMBA_PREALLOC_DIR)/source clean
+ 
+ samba-prealloc-dirclean:

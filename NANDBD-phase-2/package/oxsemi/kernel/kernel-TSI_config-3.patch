@@ -1,0 +1,11 @@
+--- linux-kernel/arch/arm/configs/ox7821_defconfig.ORIG	2011-12-16 03:35:09.000000000 -0700
++++ linux-kernel/arch/arm/configs/ox7821_defconfig	2011-12-16 03:35:16.000000000 -0700
+@@ -731,7 +731,7 @@
+ # CONFIG_SCSI_OSD_INITIATOR is not set
+ CONFIG_ATA=y
+ # CONFIG_ATA_NONSTANDARD is not set
+-# CONFIG_SATA_PMP is not set
++CONFIG_SATA_PMP=y
+ # CONFIG_SATA_AHCI is not set
+ # CONFIG_SATA_SIL24 is not set
+ CONFIG_SATA_OX820=y

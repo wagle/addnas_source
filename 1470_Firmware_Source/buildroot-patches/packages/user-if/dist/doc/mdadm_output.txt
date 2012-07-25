@@ -1,0 +1,52 @@
+EXAMPLE MDADM OUTPUT
+--------------------
+ls/sys/block/md...
+cat /proc/mdadm
+
+
+NORMAL RAID1
+------------
+
+Personalities : [linear] [raid1] 
+md1 : active raid1 sdb1[0] sda1[1]
+      7823552 blocks [2/2] [UU]
+      
+md2 : active raid1 sdb2[0] sda2[1]
+      104320 blocks [2/2] [UU]
+      
+md3 : active raid1 sdb3[0] sda3[1]
+      480439808 blocks [2/2] [UU]
+      
+unused devices: <none>
+
+
+ON FAILURE
+----------
+
+Personalities : [linear] [raid1] 
+md1 : active raid1 sdb1[2](F) sda1[1]
+      7823552 blocks [2/1] [_U]
+      
+md2 : active raid1 sdb2[2](F) sda2[1]
+      104320 blocks [2/1] [_U]
+      
+md3 : active raid1 sdb3[0] sda3[1]
+      480439808 blocks [2/2] [UU]
+      
+unused devices: <none>
+
+
+ON RESTART WITH NEW DISK
+------------------------
+
+Personalities : [linear] [raid1] 
+md1 : active raid1 sda1[1]
+      7823552 blocks [2/1] [_U]
+      
+md2 : active raid1 sdb2[0] sda2[1]
+      104320 blocks [2/2] [UU]
+      
+md3 : active raid1 sda3[1]
+      480439808 blocks [2/1] [_U]
+      
+

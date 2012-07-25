@@ -1,0 +1,29 @@
+diff -urN package/procps.orig/procps-unknown-hz.patch package/procps/procps-unknown-hz.patch
+--- package/procps.orig/procps-unknown-hz.patch	1970-01-01 01:00:00.000000000 +0100
++++ package/procps/procps-unknown-hz.patch	2008-12-05 15:58:12.000000000 +0000
+@@ -0,0 +1,12 @@
++diff -urN procps-3.2.5.orig/proc/sysinfo.c procps-3.2.5/proc/sysinfo.c
++--- procps-3.2.5.orig/proc/sysinfo.c	2004-10-01 05:37:18.000000000 +0100
+++++ procps-3.2.5/proc/sysinfo.c	2008-12-05 15:57:16.000000000 +0000
++@@ -166,7 +166,7 @@
++     /* If 32-bit or big-endian (not Alpha or ia64), assume HZ is 100. */
++     Hertz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
++ #endif
++-    fprintf(stderr, "Unknown HZ value! (%d) Assume %Ld.\n", h, Hertz);
+++//    fprintf(stderr, "Unknown HZ value! (%d) Assume %Ld.\n", h, Hertz);
++   }
++ }
++ 
+--- package/procps.orig/procps-1.patch	1970-01-01 01:00:00.000000000 +0100
++++ package/procps/procps-1.patch	2009-09-22 14:07:48.000000000 +0100
+@@ -0,0 +1,10 @@
++--- procps-3.2.5-orig/ps/common.h	2009-09-22 14:05:42.000000000 +0100
+++++ procps-3.2.5/ps/common.h	2009-09-22 14:06:06.000000000 +0100
++@@ -14,7 +14,6 @@
++ 
++ #include "../proc/procps.h"
++ #include "../proc/readproc.h"
++-#include <asm/page.h>  /* looks safe for glibc, we need PAGE_SIZE */
++ 
++ #ifndef PAGE_SIZE
++ #warning PAGE_SIZE not defined, using sysconf() to determine correct value

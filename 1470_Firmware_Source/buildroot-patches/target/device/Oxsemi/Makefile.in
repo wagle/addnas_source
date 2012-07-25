@@ -1,0 +1,28 @@
+ifeq ($(strip $(BR2_TARGET_OXSEMI)),y)
+
+OXSEMI_PATH:=$(strip  $(subst ",, $(BR2_OXSEMI_PATH)))
+
+OXSEMI_TARGET:=$(OXSEMI_PATH)/root
+BASE_TARGET_SKELETON:=$(OXSEMI_TARGET)/target_skeleton
+TARGET_DEVICE_TABLE:=$(OXSEMI_TARGET)/device_table.txt
+
+# Add/update from board specific makefiles
+STRIPPED_BOARD_NAME:=$(strip  $(subst ",, $(BR2_BOARD_NAME)))
+include target/device/Oxsemi/$(STRIPPED_BOARD_NAME)/Makefile.in
+
+oxsemi_status:
+	@echo "***************************************************************"
+	@echo BR2_BOARD_NAME = $(BR2_BOARD_NAME)
+	@echo BR2_BOARD_PATH = $(BR2_BOARD_PATH)
+	@echo BASE_TARGET_SKELETON = $(BASE_TARGET_SKELETON)
+	@echo TARGET_SKELETON = $(TARGET_SKELETON)
+	@echo TARGET_DEVICE_TABLE = $(TARGET_DEVICE_TABLE)
+	@echo BR2_DL_DIR = $(BR2_DL_DIR)
+	@echo PROJECT_BUILD_DIR = $(PROJECT_BUILD_DIR)
+	@echo BR2_UCLIBC_CONFIG = $(BR2_UCLIBC_CONFIG)
+	@echo BR2_PACKAGE_BUSYBOX_CONFIG = $(BR2_PACKAGE_BUSYBOX_CONFIG)
+	@echo BR2_PACKAGE_LINUX_KCONFIG = $(BR2_PACKAGE_LINUX_KCONFIG)
+	@echo "*****************************************************************"
+	@echo TARGETS = $(TARGETS)
+
+endif

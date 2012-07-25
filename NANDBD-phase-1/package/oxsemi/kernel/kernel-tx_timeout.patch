@@ -1,0 +1,12 @@
+Index: linux-kernel/drivers/net/gmac/gmac-napi.c
+===================================================================
+--- linux-kernel/drivers/net/gmac/gmac-napi.c	(revision 4679)
++++ linux-kernel/drivers/net/gmac/gmac-napi.c	(revision 4680)
+@@ -4008,6 +4008,7 @@
+ #if defined(CONFIG_ARCH_OX820)
+ 	reg_contents = unit ? readl(SYS_CTRL_GMACB_CTRL) : readl(SYS_CTRL_GMACA_CTRL);
+ 	reg_contents |= ((1UL << SYS_CTRL_GMAC_CKEN_GTX) |
++					 (1UL << SYS_CTRL_GMAC_SIMPLE_MUX) |
+ 					 (1UL << SYS_CTRL_GMAC_AUTO_TX_SOURCE) |
+ 					 (1UL << SYS_CTRL_GMAC_CKEN_TX_OUT) |
+ 					 (1UL << SYS_CTRL_GMAC_CKEN_TXN_OUT) |

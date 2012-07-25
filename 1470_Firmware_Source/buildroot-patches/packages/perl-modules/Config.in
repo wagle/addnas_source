@@ -1,0 +1,8 @@
+config BR2_PACKAGE_PERL_MODULES
+	bool "Natively compiled pre-built perl modules"
+    default y
+    depends on BR2_PACKAGE_PERL
+	help
+		Pre-compiled binary perl modules installation containing the perl modules needed for the user interface.
+	
+

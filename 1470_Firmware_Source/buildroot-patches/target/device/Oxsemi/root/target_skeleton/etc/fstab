@@ -1,0 +1,7 @@
+# /etc/fstab: static file system information.
+#
+# <file system>	<mount pt>		<type>	<options>			<dump> 	<pass>
+ubi0:rootfs	/			ubifs	rw,noauto,noatime		0	1
+proc		/proc			proc	defaults			0 	0
+devpts		/dev/pts		devpts	defaults,gid=5,mode=620		0	0
+sys		/sys			sysfs	defaults			0	0
