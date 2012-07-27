@@ -16,3 +16,5 @@ cd ../1470_Firmware_Source
 cp -a ../NANDBD-phase-2/build_arm/linux-kernel .
 time ./build.sh 7821TSI
 ```
+
+This takes a total of about 4-5 hours on my virtualbox VM on my 2009 era macmini.
