@@ -1,0 +1,25 @@
+--- linux-kernel/arch/arm/configs/ox7821_defconfig.ORIG	2012-12-23 01:48:30.394162949 -0800
++++ linux-kernel/arch/arm/configs/ox7821_defconfig	2013-01-23 10:37:42.395776440 -0800
+@@ -1216,10 +1216,12 @@
+ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+ # CONFIG_EXT3_FS_XATTR is not set
++CONFIG_EXT3_FS_POSIX_ACL=y
++
+ CONFIG_EXT4_FS=y
+ # CONFIG_EXT4DEV_COMPAT is not set
+ CONFIG_EXT4_FS_XATTR=y
+-# CONFIG_EXT4_FS_POSIX_ACL is not set
++CONFIG_EXT4_FS_POSIX_ACL=y
+ # CONFIG_EXT4_FS_SECURITY is not set
+ CONFIG_JBD=y
+ CONFIG_JBD2=y
+@@ -1229,7 +1231,7 @@
+ CONFIG_FS_POSIX_ACL=y
+ CONFIG_XFS_FS=y
+ # CONFIG_XFS_QUOTA is not set
+-# CONFIG_XFS_POSIX_ACL is not set
++CONFIG_XFS_POSIX_ACL=y
+ # CONFIG_XFS_RT is not set
+ # CONFIG_XFS_DEBUG is not set
+ # CONFIG_GFS2_FS is not set
