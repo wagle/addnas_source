@@ -314,6 +314,7 @@ BR2_PACKAGE_PCRE=y
 #
 # Other stuff
 #
+BR2_PACKAGE_ACL=y
 # BR2_PACKAGE_AT is not set
 # BR2_PACKAGE_BEECRYPT is not set
 # BR2_PACKAGE_BERKELEYDB is not set

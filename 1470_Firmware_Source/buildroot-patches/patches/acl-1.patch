@@ -1,0 +1,127 @@
+diff -urN package/acl.ORIG/acl.mk package/acl/acl.mk
+--- package/acl.ORIG/acl.mk	1969-12-31 16:00:00.000000000 -0800
++++ package/acl/acl.mk	2013-01-23 14:05:29.230352636 -0800
+@@ -0,0 +1,73 @@
++#############################################################
++#
++# acl
++#
++#############################################################
++
++ACL_VERSION = 2.2.51
++ACL_SOURCE = acl-$(ACL_VERSION).src.tar.gz
++ACL_SITE = http://download.savannah.gnu.org/releases/acl
++ACL_CONF_OPT = --enable-gettext=no
++
++ACL_DIR:=$(BUILD_DIR)/acl-$(ACL_VERSION)
++ACL_CAT:=$(ZCAT)
++ACL_BINARY:=chacl
++ACL_TARGET_BINARY:=usr/bin/chacl
++
++$(DL_DIR)/$(ACL_SOURCE):
++	 $(WGET) -P $(DL_DIR) $(ACL_SITE)/$(ACL_SOURCE)
++
++$(DL_DIR)/$(ACL_MOD_VROOT_SOURCE):
++	 $(WGET) -P $(DL_DIR) $(ACL_MOD_VROOT_SITE)/$(ACL_MOD_VROOT_SOURCE)
++
++acl-source: $(DL_DIR)/$(ACL_SOURCE) $(DL_DIR)/$(ACL_MOD_VROOT_SOURCE)
++
++$(ACL_DIR)/.unpacked: $(DL_DIR)/$(ACL_SOURCE)
++	$(ACL_CAT) $(DL_DIR)/$(ACL_SOURCE) | tar -C $(BUILD_DIR) $(TAR_OPTIONS) -
++	$(CONFIG_UPDATE) $(ACL_DIR)
++	toolchain/patch-kernel.sh $(ACL_DIR) package/acl/ acl-$(ACL_VERSION)\*.patch;
++	touch $@
++
++$(ACL_DIR)/.configured: $(ACL_DIR)/.unpacked
++	(cd $(ACL_DIR); rm -rf config.cache; \
++		$(TARGET_CONFIGURE_OPTS) \
++		$(TARGET_CONFIGURE_ARGS) \
++		./configure \
++		--target=$(GNU_TARGET_NAME) \
++		--host=$(GNU_TARGET_NAME) \
++		--build=$(GNU_HOST_NAME) \
++		--prefix=/usr \
++		$(ACL_CONF_OPT) \
++	)
++	touch $@
++
++$(ACL_DIR)/.built: $(ACL_DIR)/.configured
++	$(MAKE) CC="$(HOSTCC)" CFLAGS="" LDFLAGS="" \
++		-C $(ACL_DIR)/lib/libcap _makenames
++	$(MAKE) -C $(ACL_DIR)
++	touch $@
++
++$(TARGET_DIR)/$(ACL_TARGET_BINARY): $(ACL_DIR)/$(ACL_BINARY)
++	cp -dpf $(ACL_DIR)/$(ACL_BINARY) \
++		$(TARGET_DIR)/$(ACL_TARGET_BINARY)
++	$(INSTALL) -m 0755 package/acl/chacl/chacl $(TARGET_DIR)/usr/bin/chacl
++	$(INSTALL) -m 0755 package/acl/chacl/getfacl $(TARGET_DIR)/usr/bin/getfacl
++	$(INSTALL) -m 0755 package/acl/chacl/setfacl $(TARGET_DIR)/usr/bin/setfacl
++
++acl: uclibc $(TARGET_DIR)/$(ACL_TARGET_BINARY)
++
++acl-clean:
++	rm -f $(TARGET_DIR)/$(ACL_TARGET_BINARY)
++	-$(MAKE) -C $(ACL_DIR) clean
++
++acl-dirclean:
++	rm -rf $(ACL_DIR)
++
++#############################################################
++#
++# Toplevel Makefile options
++#
++#############################################################
++ifeq ($(strip $(BR2_PACKAGE_ACL)),y)
++TARGETS+=acl
++endif
+diff -urN package/acl.ORIG/acl.mk.ORIG package/acl/acl.mk.ORIG
+--- package/acl.ORIG/acl.mk.ORIG	1969-12-31 16:00:00.000000000 -0800
++++ package/acl/acl.mk.ORIG	2012-05-30 14:23:07.000000000 -0700
+@@ -0,0 +1,28 @@
++#############################################################
++#
++# acl
++#
++#############################################################
++
++ACL_VERSION = 2.2.51
++ACL_SOURCE = acl-$(ACL_VERSION).src.tar.gz
++ACL_SITE = http://download.savannah.gnu.org/releases/acl
++ACL_INSTALL_STAGING = YES
++ACL_DEPENDENCIES = attr
++ACL_CONF_OPT = --enable-gettext=no
++
++# While the configuration system uses autoconf, the Makefiles are
++# hand-written and do not use automake. Therefore, we have to hack
++# around their deficiencies by passing installation paths.
++ACL_INSTALL_STAGING_OPT = 			\
++	prefix=$(STAGING_DIR)/usr 		\
++	exec_prefix=$(STAGING_DIR)/usr 		\
++	PKG_DEVLIB_DIR=$(STAGING_DIR)/usr/lib	\
++	install-dev install-lib
++
++ACL_INSTALL_TARGET_OPT = 			\
++	prefix=$(TARGET_DIR)/usr 		\
++	exec_prefix=$(TARGET_DIR)/usr 		\
++	install install-lib
++
++$(eval $(call AUTOTARGETS))
+diff -urN package/acl.ORIG/Config.in package/acl/Config.in
+--- package/acl.ORIG/Config.in	1969-12-31 16:00:00.000000000 -0800
++++ package/acl/Config.in	2012-05-30 14:23:07.000000000 -0700
+@@ -0,0 +1,14 @@
++config BR2_PACKAGE_ACL
++	bool "acl"
++	select BR2_PACKAGE_ATTR
++	depends on BR2_LARGEFILE
++	help
++	  POSIX Access Control Lists, which are used to define more
++	  fine-grained discretionary access rights for files and
++	  directories.
++	  This package also provides libacl.
++
++	  http://savannah.nongnu.org/projects/acl
++
++comment "acl requires a toolchain with LARGEFILE support"
++	depends on !BR2_LARGEFILE
