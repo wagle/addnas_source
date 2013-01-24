@@ -1,0 +1,10 @@
+--- package/Config.in.ORIG	2013-01-23 14:16:41.825449244 -0800
++++ package/Config.in	2013-01-23 18:12:51.017376154 -0800
+@@ -59,6 +59,7 @@
+ source "package/pcre/Config.in"
+ 
+ comment "Other stuff"
++source "package/acl/Config.in"
+ source "package/at/Config.in"
+ source "package/beecrypt/Config.in"
+ source "package/berkeleydb/Config.in"
