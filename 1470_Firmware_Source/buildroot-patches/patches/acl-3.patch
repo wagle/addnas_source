@@ -1,0 +1,51 @@
+diff -urN package/acl.ORIG/acl.mk package/acl/acl.mk
+--- package/acl.ORIG/acl.mk	2013-01-23 18:26:31.555396431 -0800
++++ package/acl/acl.mk	2013-01-28 08:45:29.799357494 -0800
+@@ -42,14 +42,10 @@
+ 	touch $@
+ 
+ $(ACL_DIR)/.built: $(ACL_DIR)/.configured
+-	$(MAKE) CC="$(HOSTCC)" CFLAGS="" LDFLAGS="" \
+-		-C $(ACL_DIR)/lib/libcap _makenames
+ 	$(MAKE) -C $(ACL_DIR)
+ 	touch $@
+ 
+-$(TARGET_DIR)/$(ACL_TARGET_BINARY): $(ACL_DIR)/$(ACL_BINARY)
+-	cp -dpf $(ACL_DIR)/$(ACL_BINARY) \
+-		$(TARGET_DIR)/$(ACL_TARGET_BINARY)
++$(TARGET_DIR)/$(ACL_TARGET_BINARY): $(ACL_DIR)/.built
+ 	$(INSTALL) -m 0755 package/acl/chacl/chacl $(TARGET_DIR)/usr/bin/chacl
+ 	$(INSTALL) -m 0755 package/acl/chacl/getfacl $(TARGET_DIR)/usr/bin/getfacl
+ 	$(INSTALL) -m 0755 package/acl/chacl/setfacl $(TARGET_DIR)/usr/bin/setfacl
+diff -urN package/acl.ORIG/acl.mk.ORIG package/acl/acl.mk.ORIG
+--- package/acl.ORIG/acl.mk.ORIG	2013-01-23 18:26:31.557396458 -0800
++++ package/acl/acl.mk.ORIG	1969-12-31 16:00:00.000000000 -0800
+@@ -1,28 +0,0 @@
+-#############################################################
+-#
+-# acl
+-#
+-#############################################################
+-
+-ACL_VERSION = 2.2.51
+-ACL_SOURCE = acl-$(ACL_VERSION).src.tar.gz
+-ACL_SITE = http://download.savannah.gnu.org/releases/acl
+-ACL_INSTALL_STAGING = YES
+-ACL_DEPENDENCIES = attr
+-ACL_CONF_OPT = --enable-gettext=no
+-
+-# While the configuration system uses autoconf, the Makefiles are
+-# hand-written and do not use automake. Therefore, we have to hack
+-# around their deficiencies by passing installation paths.
+-ACL_INSTALL_STAGING_OPT = 			\
+-	prefix=$(STAGING_DIR)/usr 		\
+-	exec_prefix=$(STAGING_DIR)/usr 		\
+-	PKG_DEVLIB_DIR=$(STAGING_DIR)/usr/lib	\
+-	install-dev install-lib
+-
+-ACL_INSTALL_TARGET_OPT = 			\
+-	prefix=$(TARGET_DIR)/usr 		\
+-	exec_prefix=$(TARGET_DIR)/usr 		\
+-	install install-lib
+-
+-$(eval $(call AUTOTARGETS))
