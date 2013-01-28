@@ -1,0 +1,20 @@
+diff -urN package/attr.ORIG/attr.mk package/attr/attr.mk
+--- package/attr.ORIG/attr.mk	2013-01-28 13:08:17.151383150 -0800
++++ package/attr/attr.mk	2013-01-28 14:53:24.304355351 -0800
+@@ -11,6 +11,7 @@
+ 
+ ATTR_DIR:=$(BUILD_DIR)/attr-$(ATTR_VERSION)
+ ATTR_CAT:=$(ZCAT)
++ATTR_STAGING_LIBRARY:=usr/libexec/libattr.so
+ ATTR_TARGET_LIBRARY:=usr/lib/libattr.so
+ 
+ $(DL_DIR)/$(ATTR_SOURCE):
+@@ -49,7 +50,7 @@
+ $(TARGET_DIR)/$(ATTR_TARGET_LIBRARY): $(ATTR_DIR)/.built
+ 	### WAGLE ### I think all you have to do here is install the dynamic lib on the target
+ 	$(MAKE) CC=$(TARGET_CC) INSTALL_PREFIX=$(STAGING_DIR)/usr -C $(ATTR_DIR) install-dev
+-	$(INSTALL) -m 0755 $(STAGING_DIR)/$(ATTR_TARGET_LIBRARY) $(TARGET_DIR)/$(ATTR_TARGET_LIBRARY)
++	$(INSTALL) -m 0755 $(STAGING_DIR)/$(ATTR_STAGING_LIBRARY) $(TARGET_DIR)/$(ATTR_TARGET_LIBRARY)
+ 
+ attr: uclibc $(TARGET_DIR)/$(ATTR_TARGET_LIBRARY)
+ 
