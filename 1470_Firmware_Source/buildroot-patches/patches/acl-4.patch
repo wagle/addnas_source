@@ -1,0 +1,28 @@
+diff -urN package/acl.ORIG/acl.mk package/acl/acl.mk
+--- package/acl.ORIG/acl.mk	2013-01-28 12:57:07.844357367 -0800
++++ package/acl/acl.mk	2013-01-28 12:51:37.759356064 -0800
+@@ -11,7 +11,6 @@
+ 
+ ACL_DIR:=$(BUILD_DIR)/acl-$(ACL_VERSION)
+ ACL_CAT:=$(ZCAT)
+-ACL_BINARY:=chacl
+ ACL_TARGET_BINARY:=usr/bin/chacl
+ 
+ $(DL_DIR)/$(ACL_SOURCE):
+@@ -46,11 +45,12 @@
+ 	touch $@
+ 
+ $(TARGET_DIR)/$(ACL_TARGET_BINARY): $(ACL_DIR)/.built
+-	$(INSTALL) -m 0755 package/acl/chacl/chacl $(TARGET_DIR)/usr/bin/chacl
+-	$(INSTALL) -m 0755 package/acl/chacl/getfacl $(TARGET_DIR)/usr/bin/getfacl
+-	$(INSTALL) -m 0755 package/acl/chacl/setfacl $(TARGET_DIR)/usr/bin/setfacl
++	$(MAKE) CC=$(TARGET_CC) INSTALL_PREFIX=$(STAGING_DIR)/usr -C $(ATTR_DIR) install-dev
++	$(INSTALL) -m 0755 $(STAGING_DIR)/usr/bin/chacl $(TARGET_DIR)/usr/bin/
++	$(INSTALL) -m 0755 $(STAGING_DIR)/usr/bin/setfacl $(TARGET_DIR)/usr/bin/
++	$(INSTALL) -m 0755 $(STAGING_DIR)/usr/bin/getfacl $(TARGET_DIR)/usr/bin/
+ 
+-acl: uclibc $(TARGET_DIR)/$(ACL_TARGET_BINARY)
++acl: uclibc attr $(TARGET_DIR)/$(ACL_TARGET_BINARY)
+ 
+ acl-clean:
+ 	rm -f $(TARGET_DIR)/$(ACL_TARGET_BINARY)
