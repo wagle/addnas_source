@@ -1,0 +1,90 @@
+diff -urN package/attr.ORIG/attr.mk package/attr/attr.mk
+--- package/attr.ORIG/attr.mk	1969-12-31 16:00:00.000000000 -0800
++++ package/attr/attr.mk	2013-01-28 12:33:19.948364905 -0800
+@@ -0,0 +1,71 @@
++#############################################################
++#
++# attr
++#
++#############################################################
++
++ATTR_VERSION = 2.4.46
++ATTR_SOURCE = attr-$(ATTR_VERSION).src.tar.gz
++ATTR_SITE = http://download.savannah.gnu.org/releases/attr
++ATTR_CONF_OPT = --enable-gettext=no
++
++ATTR_DIR:=$(BUILD_DIR)/attr-$(ATTR_VERSION)
++ATTR_CAT:=$(ZCAT)
++ATTR_TARGET_LIBRARY:=usr/lib/libattr.so
++
++$(DL_DIR)/$(ATTR_SOURCE):
++	 $(WGET) -P $(DL_DIR) $(ATTR_SITE)/$(ATTR_SOURCE)
++
++$(DL_DIR)/$(ATTR_MOD_VROOT_SOURCE):
++	 $(WGET) -P $(DL_DIR) $(ATTR_MOD_VROOT_SITE)/$(ATTR_MOD_VROOT_SOURCE)
++
++attr-source: $(DL_DIR)/$(ATTR_SOURCE) $(DL_DIR)/$(ATTR_MOD_VROOT_SOURCE)
++
++attr-unpack: $(ATTR_DIR)/.unpacked
++
++$(ATTR_DIR)/.unpacked: $(DL_DIR)/$(ATTR_SOURCE)
++	$(ATTR_CAT) $(DL_DIR)/$(ATTR_SOURCE) | tar -C $(BUILD_DIR) $(TAR_OPTIONS) -
++	$(CONFIG_UPDATE) $(ATTR_DIR)
++	toolchain/patch-kernel.sh $(ATTR_DIR) package/attr/ attr-$(ATTR_VERSION)\*.patch;
++	touch $@
++
++$(ATTR_DIR)/.configured: $(ATTR_DIR)/.unpacked
++	(cd $(ATTR_DIR); rm -rf config.cache; \
++		$(TARGET_CONFIGURE_OPTS) \
++		$(TARGET_CONFIGURE_ARGS) \
++		./configure \
++		--target=$(GNU_TARGET_NAME) \
++		--host=$(GNU_TARGET_NAME) \
++		--build=$(GNU_HOST_NAME) \
++		--prefix=/usr \
++		$(ATTR_CONF_OPT) \
++	)
++	touch $@
++
++$(ATTR_DIR)/.built: $(ATTR_DIR)/.configured
++	$(MAKE) -C $(ATTR_DIR)
++	touch $@
++
++$(TARGET_DIR)/$(ATTR_TARGET_LIBRARY): $(ATTR_DIR)/.built
++	### WAGLE ### I think all you have to do here is install the dynamic lib on the target
++	$(MAKE) CC=$(TARGET_CC) INSTALL_PREFIX=$(STAGING_DIR)/usr -C $(ATTR_DIR) install-dev
++	$(INSTALL) -m 0755 $(STAGING_DIR)/$(ATTR_TARGET_LIBRARY) $(TARGET_DIR)/$(ATTR_TARGET_LIBRARY)
++
++attr: uclibc $(TARGET_DIR)/$(ATTR_TARGET_LIBRARY)
++
++attr-clean:
++	### WAGLE ### is this ever called?  cleaning the STAGING dir seems tedious
++	rm -f $(TARGET_DIR)/$(ATTR_TARGET_LIBRARY)
++	-$(MAKE) -C $(ATTR_DIR) clean
++
++attr-dirclean:
++	rm -rf $(ATTR_DIR)
++
++#############################################################
++#
++# Toplevel Makefile options
++#
++#############################################################
++ifeq ($(strip $(BR2_PACKAGE_ATTR)),y)
++TARGETS+=attr
++endif
+diff -urN package/attr.ORIG/Config.in package/attr/Config.in
+--- package/attr.ORIG/Config.in	1969-12-31 16:00:00.000000000 -0800
++++ package/attr/Config.in	2012-05-30 14:23:07.000000000 -0700
+@@ -0,0 +1,11 @@
++config BR2_PACKAGE_ATTR
++	bool "attr"
++	depends on BR2_LARGEFILE
++	help
++	  Commands for Manipulating Filesystem Extended Attributes.
++	  This package also provides libattr.
++
++	  http://savannah.nongnu.org/projects/attr
++
++comment "attr requires a toolchain with LARGEFILE support"
++	depends on !BR2_LARGEFILE
