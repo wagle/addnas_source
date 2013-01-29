@@ -1,0 +1,11 @@
+--- package/attr/attr.mk.ORIG	2013-01-28 16:26:17.734386206 -0800
++++ package/attr/attr.mk	2013-01-28 18:32:01.201357171 -0800
+@@ -11,7 +11,7 @@
+ 
+ ATTR_DIR:=$(BUILD_DIR)/attr-$(ATTR_VERSION)
+ ATTR_CAT:=$(ZCAT)
+-ATTR_STAGING_LIBRARY:=usr/libexec/libattr.so
++ATTR_STAGING_LIBRARY:=usr/lib/libattr.so
+ ATTR_TARGET_LIBRARY:=usr/lib/libattr.so
+ 
+ $(DL_DIR)/$(ATTR_SOURCE):
