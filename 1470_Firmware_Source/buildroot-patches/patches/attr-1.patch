@@ -1,0 +1,11 @@
+--- package/Config.in.ORIG	2013-01-28 13:08:17.105404561 -0800
++++ package/Config.in	2013-01-28 16:03:09.928355094 -0800
+@@ -58,6 +58,8 @@
+ source "package/valgrind/Config.in"
+ source "package/pcre/Config.in"
+ 
++source "package/attr/Config.in"
++
+ comment "Other stuff"
+ source "package/acl/Config.in"
+ source "package/at/Config.in"
