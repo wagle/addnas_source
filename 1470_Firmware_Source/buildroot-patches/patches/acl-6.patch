@@ -1,0 +1,12 @@
+diff -urN package/acl.ORIG/acl.mk package/acl/acl.mk
+--- package/acl.ORIG/acl.mk	2013-01-28 18:44:48.691384941 -0800
++++ package/acl/acl.mk	2013-01-29 19:02:08.634358304 -0800
+@@ -45,7 +45,7 @@
+ 	touch $@
+ 
+ $(TARGET_DIR)/$(ACL_TARGET_BINARY): $(ACL_DIR)/.built
+-	$(MAKE) CC=$(TARGET_CC) prefix=$(STAGING_DIR)/usr -C $(ATTR_DIR) install-dev
++	$(MAKE) CC=$(TARGET_CC) prefix=$(STAGING_DIR)/usr -C $(ATTR_DIR) install-lib install-dev
+ 	$(INSTALL) -m 0755 $(STAGING_DIR)/usr/bin/chacl $(TARGET_DIR)/usr/bin/
+ 	$(INSTALL) -m 0755 $(STAGING_DIR)/usr/bin/setfacl $(TARGET_DIR)/usr/bin/
+ 	$(INSTALL) -m 0755 $(STAGING_DIR)/usr/bin/getfacl $(TARGET_DIR)/usr/bin/
