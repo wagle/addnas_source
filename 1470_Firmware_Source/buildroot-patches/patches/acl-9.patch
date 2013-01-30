@@ -1,0 +1,11 @@
+diff -urN package/acl.ORIG/acl.mk package/acl/acl.mk
+--- package/acl.ORIG/acl.mk	2013-01-29 21:47:49.311414325 -0800
++++ package/acl/acl.mk	2013-01-30 07:04:59.749426038 -0800
+@@ -49,6 +49,7 @@
+ 	$(INSTALL) -m 0755 $(STAGING_DIR)/usr/bin/chacl $(TARGET_DIR)/usr/bin/
+ 	$(INSTALL) -m 0755 $(STAGING_DIR)/usr/bin/setfacl $(TARGET_DIR)/usr/bin/
+ 	$(INSTALL) -m 0755 $(STAGING_DIR)/usr/bin/getfacl $(TARGET_DIR)/usr/bin/
++	$(INSTALL) -m 0755 $(STAGING_DIR)/usr/lib/libacl.so $(TARGET_DIR)/usr/lib
+ 
+ acl: uclibc attr $(TARGET_DIR)/$(ACL_TARGET_BINARY)
+ 
