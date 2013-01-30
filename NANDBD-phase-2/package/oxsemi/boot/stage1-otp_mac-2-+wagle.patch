@@ -1,0 +1,47 @@
+--- stage1/src/stage1.c.ORIG	2013-01-30 06:47:56.364402678 -0800
++++ stage1/src/stage1.c	2013-01-30 15:05:17.546360871 -0800
+@@ -419,26 +419,32 @@
+ {
+         int i, j;
+         int all_blank = 1, match = 0;
+-        unsigned char b[3];
++	unsigned char actual[6], wagle[6], addonics[3];
+ 
+-	b[0] = 0x00;
+-        b[1] = 0x50;
+-        b[2] = 0xC8;
++	addonics[0] = 0x00; addonics[1] = 0x50; addonics[2] = 0xC8;
++	wagle[0]    = 0x00; wagle[1]    = 0x30; wagle[2]    = 0xe0;
++	wagle[3]    = 0xff; wagle[4]    = 0xff; wagle[5]    = 0xf0;
+ 
+         for (i = 0; i < OTP_MAC_CNT; i++) {
+-                int blank_once = 1, match_once = 1;
++                int blank_once, addonics_once, wagle_once;
+                 putstr(debug_uart, "OTPMAC[");
+                 puthex8(debug_uart, i);
+                 putstr(debug_uart, "]=");
+                 for (j = 0; j < 6; j++) {
+-                        unsigned char a = read_otp_byte(OTP_MAC0-6*i+j);
+-                        puthex8(debug_uart, a);
+-                        blank_once = blank_once && (a == 0);
+-			match_once = match_once && ((j >= 3) || (b[j] == a));
++                        actual[j] = read_otp_byte(OTP_MAC0-6*i+j);
++                        puthex8(debug_uart, actual[j]);
++		}
++		putstr(debug_uart, "\n");
++		blank_once = 1, addonics_once = 1, wagle_once = 1;
++		for (j = 0; j < 6; j++) {
++                        blank_once &&= actual[j] == 0x00;
++			wagle_once &&= actual[j] == wagle[j];
++		}
++		for (j = 0; j < 3; j++) {
++			addonics_once &&= actual[j] == addonics[j];
+                 }
+-                putstr(debug_uart, "\n");
+-                all_blank = all_blank && blank_once;
+-                match = blank_once ? match : match_once;
++                all_blank &&= blank_once;
++                match = blank_once ? match : (addonics_once || wagle_once);
+         }
+         return (match || all_blank);
+ }
