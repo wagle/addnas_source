@@ -1,0 +1,12 @@
+diff -urN package/attr.ORIG/attr.mk package/attr/attr.mk
+--- package/attr.ORIG/attr.mk	2013-01-28 18:44:48.765440499 -0800
++++ package/attr/attr.mk	2013-01-29 18:55:22.688407357 -0800
+@@ -49,7 +49,7 @@
+ 
+ $(TARGET_DIR)/$(ATTR_TARGET_LIBRARY): $(ATTR_DIR)/.built
+ 	### WAGLE ### I think all you have to do here is install the dynamic lib on the target
+-	$(MAKE) CC=$(TARGET_CC) prefix=$(STAGING_DIR)/usr -C $(ATTR_DIR) install-dev
++	$(MAKE) CC=$(TARGET_CC) prefix=$(STAGING_DIR)/usr -C $(ATTR_DIR) install-lib install-dev
+ 	$(INSTALL) -m 0755 $(STAGING_DIR)/$(ATTR_STAGING_LIBRARY) $(TARGET_DIR)/$(ATTR_TARGET_LIBRARY)
+ 
+ attr: uclibc $(TARGET_DIR)/$(ATTR_TARGET_LIBRARY)
