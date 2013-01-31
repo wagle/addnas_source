@@ -31,16 +31,16 @@
 +		putstr(debug_uart, "\n");
 +		blank_once = 1, addonics_once = 1, wagle_once = 1;
 +		for (j = 0; j < 6; j++) {
-+                        blank_once &&= actual[j] == 0x00;
-+			wagle_once &&= actual[j] == wagle[j];
++                        blank_once = blank_once && actual[j] == 0x00;
++			wagle_once = wagle_once && actual[j] == wagle[j];
 +		}
 +		for (j = 0; j < 3; j++) {
-+			addonics_once &&= actual[j] == addonics[j];
++			addonics_once = addonics_once && actual[j] == addonics[j];
                  }
 -                putstr(debug_uart, "\n");
 -                all_blank = all_blank && blank_once;
 -                match = blank_once ? match : match_once;
-+                all_blank &&= blank_once;
++                all_blank = all_blank && blank_once;
 +                match = blank_once ? match : (addonics_once || wagle_once);
          }
          return (match || all_blank);
