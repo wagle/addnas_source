@@ -1,0 +1,12 @@
+diff -urN package/proftpd.ORIG/proftpd.mk package/proftpd/proftpd.mk
+--- package/proftpd.ORIG/proftpd.mk	2013-02-01 06:52:03.183384129 -0800
++++ package/proftpd/proftpd.mk	2013-02-06 08:26:04.009358297 -0800
+@@ -59,7 +59,7 @@
+ 		$(DISABLE_LARGEFILE) \
+ 		$(ENABLE_IPV6) \
+ 		--with-gnu-ld \
+-		--with-modules=mod_vroot \
++		--enable-vroot --with-modules=mod_vroot \
+ 		--enable-facl --with-modules=mod_facl \
+ 	)
+ 	touch $@
