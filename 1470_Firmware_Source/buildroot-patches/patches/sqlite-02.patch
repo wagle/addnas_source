@@ -1,6 +1,21 @@
+diff -urN package/sqlite.ORIG/sqlite-001.patch package/sqlite/sqlite-001.patch
+--- package/sqlite.ORIG/sqlite-001.patch	1969-12-31 16:00:00.000000000 -0800
++++ package/sqlite/sqlite-001.patch	2013-02-12 15:13:41.631623273 -0800
+@@ -0,0 +1,11 @@
++--- sqlite-autoconf-3071502/sqlite3.c.ORIG	2013-01-09 05:51:56.000000000 -0800
+++++ sqlite-autoconf-3071502/sqlite3.c	2013-02-12 15:03:19.140601769 -0800
++@@ -22718,7 +22718,7 @@
++ */
++ #if !defined(HAVE_POSIX_FALLOCATE) \
++       && (_XOPEN_SOURCE >= 600 || _POSIX_C_SOURCE >= 200112L)
++-# define HAVE_POSIX_FALLOCATE 1
+++/* ###WAGLE### # define HAVE_POSIX_FALLOCATE 1 */
++ #endif
++ 
++ /*
 diff -urN package/sqlite.ORIG/sqlite.mk package/sqlite/sqlite.mk
 --- package/sqlite.ORIG/sqlite.mk	2013-02-12 11:16:51.608682577 -0800
-+++ package/sqlite/sqlite.mk	2013-02-12 14:29:14.064684726 -0800
++++ package/sqlite/sqlite.mk	2013-02-12 15:09:00.591658243 -0800
 @@ -12,7 +12,7 @@
  SQLITE_VERSION:=3071502
  SQLITE_SOURCE:=sqlite-autoconf-$(SQLITE_VERSION).tar.gz
@@ -10,3 +25,11 @@ diff -urN package/sqlite.ORIG/sqlite.mk package/sqlite/sqlite.mk
  SQLITE_CAT:=$(ZCAT)
  
  $(DL_DIR)/$(SQLITE_SOURCE):
+@@ -20,6 +20,7 @@
+ 
+ $(SQLITE_DIR)/.unpacked: $(DL_DIR)/$(SQLITE_SOURCE)
+ 	$(SQLITE_CAT) $(DL_DIR)/$(SQLITE_SOURCE) | tar -C $(BUILD_DIR) $(TAR_OPTIONS) -
++	toolchain/patch-kernel.sh $(SQLITE_DIR) package/sqlite/ sqlite-\*.patch;
+ 	touch $(SQLITE_DIR)/.unpacked
+ 
+ $(SQLITE_DIR)/.configured: $(SQLITE_DIR)/.unpacked
