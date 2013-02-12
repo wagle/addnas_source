@@ -1,0 +1,31 @@
+diff -urN package/sqlite.ORIG/sqlite.mk package/sqlite/sqlite.mk
+--- package/sqlite.ORIG/sqlite.mk	2008-06-20 00:15:33.000000000 -0700
++++ package/sqlite/sqlite.mk	2013-02-11 16:10:14.971355963 -0800
+@@ -4,8 +4,13 @@
+ #
+ #############################################################
+ 
+-SQLITE_VERSION:=3.5.9
+-SQLITE_SOURCE:=sqlite-$(SQLITE_VERSION).tar.gz
++# http://www.sqlite.org/sqlite-autoconf-3071502.tar.gz
++#  --enable-readline           use readline in shell tool   [default=yes]
++#  --enable-threadsafe         build a thread-safe library  [default=yes]
++#  --enable-dynamic-extensions support loadable extensions  [default=yes]
++
++SQLITE_VERSION:=3071502
++SQLITE_SOURCE:=sqlite-autoconf-$(SQLITE_VERSION).tar.gz
+ SQLITE_SITE:=http://www.sqlite.org
+ SQLITE_DIR:=$(BUILD_DIR)/sqlite-$(SQLITE_VERSION)
+ SQLITE_CAT:=$(ZCAT)
+@@ -35,10 +40,8 @@
+ 		--localstatedir=/var \
+ 		--enable-shared \
+ 		--enable-static \
+-		--disable-tcl \
+-		--enable-tempstore \
++		--disable-readline \
+ 		--enable-threadsafe \
+-		--enable-releasemode \
+ 	)
+ 	touch $(SQLITE_DIR)/.configured
+ 
