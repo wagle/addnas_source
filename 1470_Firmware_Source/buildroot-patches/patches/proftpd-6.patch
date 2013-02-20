@@ -1,12 +1,12 @@
 diff -urN package/proftpd.ORIG/proftpd.mk package/proftpd/proftpd.mk
---- package/proftpd.ORIG/proftpd.mk	2013-02-12 00:28:52.652377630 -0800
-+++ package/proftpd/proftpd.mk	2013-02-12 00:31:26.670416286 -0800
-@@ -77,7 +77,7 @@
- 	$(INSTALL) -m 0755 package/proftpd/S50proftpd $(TARGET_DIR)/etc/init.d
- 	$(INSTALL) -m 0755 $(PROFTPD_DIR)/ftpwho $(TARGET_DIR)/usr/sbin  ###WAGLE###
+--- package/proftpd.ORIG/proftpd.mk	2013-02-12 15:40:13.461632529 -0800
++++ package/proftpd/proftpd.mk	2013-02-19 23:00:58.969514367 -0800
+@@ -59,7 +59,7 @@
+ 		$(DISABLE_LARGEFILE) \
+ 		$(ENABLE_IPV6) \
+ 		--with-gnu-ld \
+-		--with-modules=mod_sql:mod_sql_sqlite:mod_vroot \
++		--with-modules=mod_sql:mod_sql_sqlite:mod_dbacl:mod_vroot \
+ 	)
+ 	touch $@
  
--proftpd: uclibc $(TARGET_DIR)/$(PROFTPD_TARGET_BINARY)
-+proftpd: uclibc sqlite $(TARGET_DIR)/$(PROFTPD_TARGET_BINARY)
- 
- proftpd-clean:
- 	rm -f $(TARGET_DIR)/$(PROFTPD_TARGET_BINARY)
