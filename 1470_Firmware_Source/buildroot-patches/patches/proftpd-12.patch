@@ -1,0 +1,11 @@
+--- package/proftpd/proftpd.mk.ORIG	2013-03-01 12:09:19.900172377 -0800
++++ package/proftpd/proftpd.mk	2013-03-04 19:11:41.918145559 -0800
+@@ -69,7 +69,7 @@
+ 		$(DISABLE_LARGEFILE) \
+ 		$(ENABLE_IPV6) \
+ 		--with-gnu-ld \
+-		--with-modules=mod_sql:mod_sql_sqlite:mod_dbacl:mod_vroot \
++		--with-modules=mod_sql:mod_sql_sqlite:mod_dbacl:mod_vroot:mod_ifsession \
+ 	)
+ 	touch $@
+ 
