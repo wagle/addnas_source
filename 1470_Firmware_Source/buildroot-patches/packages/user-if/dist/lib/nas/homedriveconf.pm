@@ -28,8 +28,7 @@ sub main($$$) {
 		$hdpath = $pathtouse;
 
 	        my ($usersSorted, $errormesg ) = Service::Shares->getSortedlUsers();
-        	if ( $errormesg )
-        	{
+        	if ($errormesg) {
            		$self->fatalError( $config, $errormesg );
            		return;
         	} else {
@@ -42,12 +41,10 @@ sub main($$$) {
                         $self->fatalError($config, 'f00013');
                         return;
                 }
-
-
 	}
 	my $hdconfigured;
 	my $hdpathexists;
-	#First lets find out if the path has been configured and is valid
+	# First lets find out if the path has been configured and is valid
 	if ($hdpath =~ /$sharesHome\/external\/.+$/) {
 		$hdconfigured = 1;
 	}
