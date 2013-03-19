@@ -15,7 +15,7 @@ HOMED="$3"
 . /usr/www/nbin/commonfuncs
 
 if [ $UNAME = "www-data" ] ; then
-	$SMB_HOME/bin/pdbedit -a -u "$UNAME" -c "[N ]"  -s ${SMB_CONF}  -t  <<EOF
+$SMB_HOME/bin/pdbedit -a -u "$UNAME" -c "[N ]"  -s ${SMB_CONF}  -t  <<EOF
 ${PWORD}
 ${PWORD}
 EOF
@@ -29,6 +29,8 @@ fi
 
 adduser -D -H "$UNAME"
 nas_passwd.sh "$UNAME" "$PWORD"
+addgroup "$UNAME" www-data  ### give access to shares
+mkdir -p /top/"$UNAME"      ### initial dir for proftpd magic
 
 if [ -n "$HOMED" ] ; then
 	chown -R "$UNAME" "$HOMED"
