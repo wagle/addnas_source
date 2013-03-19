@@ -11,7 +11,7 @@ use nasCommon;
 
 sub main($$$) {
 	my ($self, $cgi, $config) = @_;
-	my $frm={};
+	my $frm = {};
 	my $hdpath = $config->val('general','userhomebase');
 
 	if ($cgi->param('dofunc') eq "setdrive") {
@@ -49,10 +49,10 @@ sub main($$$) {
 	my $hdpathexists;
 	#First lets find out if the path has been configured and is valid
 	if ($hdpath =~ /$sharesHome\/external\/.+$/) {
-		$hdconfigured=1;
+		$hdconfigured = 1;
 	}
 	if (-d $hdpath) {
-		$hdpathexists=1;
+		$hdpathexists = 1;
 	}
 	my @vols = ();
 	unless (listExternals(\@vols)) {
@@ -61,16 +61,16 @@ sub main($$$) {
 	}
 
 	if ($hdpathexists && $hdconfigured) {
-		$frm->{hdconfigstatus}="Home directories are configured, no changes are needed at this time.<BR>($hdpath)";
+		$frm->{hdconfigstatus} = "Home directories are configured, no changes are needed at this time.<BR>($hdpath)";
 	} elsif ($hdconfigured && (!($hdpathexists))) {
-		$frm->{hdconfigstatus}="Home directories are configured, but drive has been removed, please select a new drive or connect the original. <BR>($hdpath)";
-		$frm->{showdriveselector}="1";
+		$frm->{hdconfigstatus} = "Home directories are configured, but drive has been removed, please select a new drive or connect the original. <BR>($hdpath)";
+		$frm->{showdriveselector} = "1";
 	} else {
-		$frm->{hdconfigstatus}="Home directories are not configured and running<BR>($hdpath)";
-		$frm->{showdriveselector}="1";
+		$frm->{hdconfigstatus} = "Home directories are not configured and running<BR>($hdpath)";
+		$frm->{showdriveselector} = "1";
 	}
 
-	$frm->{showdriveselector}="1";   ### WAGLE do always
+	$frm->{showdriveselector} = "1";   ### WAGLE do always
 
 	$self->outputTemplate('homedriveconf.tpl', {tabon => 'gensetup', frm => $frm, extvols => \@vols,});
 }
