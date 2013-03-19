@@ -16,5 +16,6 @@ then
 	$SMB_HOME/bin/pdbedit -x "$UNAME" -s ${SMB_CONF}
 	deluser "$UNAME"
 	rm /home/"$UNAME"
+	rmdir /top/"$UNAME"  ### should always be empty
 fi
 exit 0
