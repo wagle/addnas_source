@@ -2,7 +2,7 @@
 package nas::homedriveconf;
 
 use Exporter;
-@ISA=qw(nasCore);
+@ISA = qw(nasCore);
 
 use Service::Shares;
 use strict;
@@ -22,7 +22,7 @@ sub main($$$) {
 		} else {
 			$config->newval('general','userhomebase',$pathtouse);
 		}
-		$frm->{hdconfigstatus2}="User home directory base changed.";	
+		$frm->{hdconfigstatus2} = "User home directory base changed.";	
 		sudo("$nbin/mkdir.sh $pathtouse");
 		sudo("$nbin/chown.sh www-data $pathtouse");
 		$hdpath = $pathtouse;
