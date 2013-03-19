@@ -7,14 +7,14 @@
 #	Does NOT create a home dir for the user
 #
 
-UNAME=$1
+UNAME="$1"
 
 . /usr/www/nbin/commonfuncs
 
 if [ -n "$UNAME" ]
 then
-	$SMB_HOME/bin/pdbedit -x ${UNAME} -s ${SMB_CONF}
-	deluser ${UNAME}
-	rm /home/$UNAME
+	$SMB_HOME/bin/pdbedit -x "$UNAME" -s ${SMB_CONF}
+	deluser "$UNAME"
+	rm /home/"$UNAME"
 fi
 exit 0
