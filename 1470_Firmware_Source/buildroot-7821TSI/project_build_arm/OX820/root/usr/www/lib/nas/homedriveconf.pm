@@ -1,4 +1,3 @@
-
 package nas::homedriveconf;
 
 use Exporter;
