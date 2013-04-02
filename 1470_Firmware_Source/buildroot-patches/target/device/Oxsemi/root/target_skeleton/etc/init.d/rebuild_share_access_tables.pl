@@ -166,11 +166,11 @@ EOF
 EOF
   if (scalar(keys %noUsers)) {
     $aliases .= <<EOF;
-	<Directory>
+	<Directory />
 EOF
     foreach my $user (keys %noUsers) {
       $aliases .= <<EOF;
-	  HideFiles /$share user $user
+	  HideFiles $share user $user
 EOF
     }
     $aliases .= <<EOF;
