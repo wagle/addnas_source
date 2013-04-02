@@ -4,11 +4,11 @@
 #
 LOGS=/var/log
 NMBD_LOG=$LOGS/log.nmbd
-REANNOTATE="su www-data -c /etc/init.d/reannotate_samba_shares.pl"
+REBUILD="su www-data -c /etc/init.d/rebuild_share_access_tables.pl"
 
 start() {
 	echo "Starting Samba"
-	$REANNOTATE
+	$REBUILD
 	if [ -f $NMBD_LOG ];
 	then
 		mv $NMBD_LOG ${NMBD_LOG}.old
@@ -27,7 +27,7 @@ restart() {
 	start
 }
 reconfig() {
-        $REANNOTATE
+        $REBUILD
         killall -HUP smbd
 }
 
