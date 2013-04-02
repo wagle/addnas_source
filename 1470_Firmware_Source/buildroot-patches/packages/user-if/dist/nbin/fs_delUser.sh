@@ -17,6 +17,5 @@ then
 	deluser "$UNAME"
 	rm /home/"$UNAME"
 	rmdir /top/"$UNAME"  ### should always be empty
-	sql-ftpacl-delete-user "$UNAME"
 fi
 exit 0

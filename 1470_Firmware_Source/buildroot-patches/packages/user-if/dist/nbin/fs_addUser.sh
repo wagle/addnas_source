@@ -31,7 +31,6 @@ adduser -D -H "$UNAME"
 nas_passwd.sh "$UNAME" "$PWORD"
 addgroup "$UNAME" www-data  ### give access to shares
 mkdir -p /top/"$UNAME"      ### initial dir for proftpd magic
-sql-ftpacl-add-user "$UNAME"  ### tell proftpd to give permission to /top/%u
 
 if [ -n "$HOMED" ] ; then
 	chown -R "$UNAME" "$HOMED"
