@@ -185,8 +185,8 @@ chmod 755 ${removal_script}
 echo "$0: $1 -- max_sectors set to 1024" > /dev/console
 echo 1024 > /sys/block/$1/device/max_sectors
 
-echo "$0: $1 -- doing rebuild_share_access_tables.pl" > /dev/console
-su www-data -c /etc/init.d/rebuild_share_access_tables.pl
+echo "$0: $1 -- doing reannotate_samba_shares.pl" > /dev/console
+su www-data -c /etc/init.d/reannotate_samba_shares.pl
 
 echo "$0: $1 -- doing reEnableExternalShares.pl" > /dev/console
 su -c "/usr/local/bin/perl -I /usr/www/lib /usr/www/lib/reEnableExternalShares.pl" www-data
