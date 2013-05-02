@@ -4,21 +4,23 @@ package nasFTP;
 @EXPORT = qw(doConsole ftpMakeSchema ftpInsertUser ftpDeleteUser ftpUpsertUserToFULL ftpUpsertUserToREAD ftpUpsertUserToNONE);
 
 use Exporter;
-use IPC2::Filter qw(filter);
+use IPC::Filter qw(filter);
+use nasCommon qw(sudo $nbin);
 
 my $SQL = '/usr/bin/sqlite3';
 my $DBASE = '/var/oxsemi/proftpd.sqlite3';
 
 sub doConsole {
   my $msg = shift;
-  my ($output, $exitcode) = filter($msg, "tee /dev/console");
-  return ($output, $exitcode);
+  my ($stdout, $stderr, $exitcode) = filter($msg, "tee /dev/console");
+  return ($stdout, $exitcode);
 }
 
 sub doQuery {
   my $query = shift;
-  my ($output, $exitcode) = filter($query, "$SQL $DBASE");
-  return ($output, $exitcode);
+  my ($stdout, $stderr, $exitcode) = filter($query, "$SQL $DBASE");
+  system("touch '/tmp/baz" . $exitcode . "_" . $stderr . "'");
+  return ($stdout, $exitcode);
 }
 
 sub ftpMakeSchema {
@@ -128,8 +130,8 @@ EOF
 }
 
 sub dumpQuery {
-  my ($output, $exitcode) = @_;
-  return "output=$output, exitcode=$exitcode";
+  my ($stdout, $exitcode) = @_;
+  return "stdout=$stdout, exitcode=$exitcode";
 }
 
 # my @mpnt = (1,2,3);
