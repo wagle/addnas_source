@@ -122,13 +122,27 @@ sub stage1($$$) {
 #      $self->fatalError($config, 'f00017');
 #      return;
 #    }
+
   unless (sudo("$nbin/reconfigSamba.sh")) {
     $self->fatalError($config, 'f00034');
     return;
   }
 
-  print $cgi->redirect('/auth/fs_userman.pl');
+  unless (system("$nbin/ftpacl.pl del $username") {
+    $self->fatalError($config, 'f00037');
+    return;
+  }
 
+  unless (system("$nbin/ftpacl.pl rebuild)) {
+    $self->fatalError($config, 'f00038');
+    return;
+  }
+  unless (sudo("$nbin/rereadFTPconfig.sh")) {
+    $self->fatalError($config, 'f00038');
+    return;
+  }
+
+  print $cgi->redirect('/auth/fs_userman.pl');
 }
 
 1;

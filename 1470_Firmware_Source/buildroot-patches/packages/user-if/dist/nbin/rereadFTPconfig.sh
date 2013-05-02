@@ -9,7 +9,7 @@
 
 . /usr/www/nbin/commonfuncs
 
-/etc/init.d/proftpd.sh restart
+/etc/init.d/proftpd.sh reread_config
 
 # chgrp www-data /var/private/smbpasswd
 # chmod 0640 /var/private/smbpasswd

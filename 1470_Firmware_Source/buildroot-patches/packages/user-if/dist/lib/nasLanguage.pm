@@ -556,6 +556,8 @@ WARNING:
 		f00034 => 'Failed to open disk for reading existing folders.  Disk trouble?',
 		f00035 => 'A folder of the same name, but containing lower case letters already exists on that partition.',
 		f00036 => 'That share name is reserved for system use.  Try another.',
+		f00037 => 'Couldn\'t delete user from FTP access database.',
+		f00038 => 'Couldn\'t add user to FTP access database.',
 		eTooManyUsers => 'There are too many users. Please logout or wait.',
 		eWaitTime1 => 'Please try again in ',
 		eWaitTime2 => ' seconds.',

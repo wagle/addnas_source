@@ -136,9 +136,9 @@ if (@ARGV == 1 && $ARGV[0] eq "init") {
   ftpDeleteUser($ARGV[1]);
 } elsif (@ARGV == 4 && $ARGV[0] eq "full") {
   ftpUpsertUserToFULL($ARGV[1], $ARGV[2], $ARGV[3]);
-} elsif (@ARGV == 4 && $ARGV[0] eq "full") {
+} elsif (@ARGV == 4 && $ARGV[0] eq "read") {
   ftpUpsertUserToREAD($ARGV[1], $ARGV[2], $ARGV[3]);
-} elsif (@ARGV == 4 && $ARGV[0] eq "full") {
+} elsif (@ARGV == 4 && $ARGV[0] eq "none") {
   ftpUpsertUserToNONE($ARGV[1] ,$ARGV[2], $ARGV[3]);
 } else {
   open(my $con, "> /dev/console");

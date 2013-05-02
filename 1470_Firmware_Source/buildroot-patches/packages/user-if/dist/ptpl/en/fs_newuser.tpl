@@ -1,4 +1,3 @@
-
 <p class="PageTitle">[% lang.m10001 %]</p>
 <form action="/auth/fs_newuser.pl" method="post">
 <table>
@@ -19,21 +18,29 @@
 <br />
 [% lang.m10004 %]
 <br />
-<table border="0" width="100%">
+<table border="1" width="100%">
 <tr>
-  <th align="left">[% lang.m10005 %]</th>
+  <th align="left" rowspan="2">[% lang.m10005 %]</th>
+  <th colspan="3">SMB</th>
+  <th colspan="3">FTP</th>
+</tr>
+<tr>
+  <th width="50px" align="left">[% lang.m10006 %]</th>
+  <th width="50px" align="left">[% lang.m10007 %]</th>
+  <th width="50px" align="left">[% lang.m10008 %]</th>
   <th width="50px" align="left">[% lang.m10006 %]</th>
   <th width="50px" align="left">[% lang.m10007 %]</th>
   <th width="50px" align="left">[% lang.m10008 %]</th>
 </tr>
 [% FOREACH sh IN shares %]
 <tr>
-  <td>[% sh.name %]</td>
-  <td><input type="radio" name="sh_[% sh.id %]_perms"  value="f"></td>
-  <td><input type="radio" name="sh_[% sh.id %]_perms"  value="r"></td>
-  <td><input type="radio" name="sh_[% sh.id %]_perms"  value="n" CHECKED>
-      <input type="hidden" name="sh_[% sh.id %]_name"  value="[% sh.name %]">
-  </td>
+  <td>[% sh.name %]<input type="hidden" name="sh_[% sh.id %]_name" id="sh_[% sh.id %]_name"  value="[% sh.name %]"></td>
+  <td><input type="radio" name="sx_[% sh.id %]_smbperm"  value="f"></td>
+  <td><input type="radio" name="sx_[% sh.id %]_smbperm"  value="r"></td>
+  <td><input type="radio" name="sx_[% sh.id %]_smbperm"  value="n" CHECKED></td>
+  <td><input type="radio" name="sy_[% sh.id %]_ftpperm"    value="a1"></td>
+  <td><input type="radio" name="sy_[% sh.id %]_ftpperm"    value="b1"></td>
+  <td><input type="radio" name="sy_[% sh.id %]_ftpperm"    value="c1" CHECKED></td>
 </tr>
 [% END %]
 </table>

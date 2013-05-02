@@ -12,6 +12,7 @@ use Exporter;
 use strict;
 
 use nasCommon;
+# use nasFTP;
 
 sub main($$$) {
   my ($self, $cgi, $config) = @_;
@@ -86,6 +87,12 @@ sub stage1($$$) {
       return;
     }
   }
+
+  unless (system("$nbin/ftpacl.pl add $username") {
+    $self->fatalError($config, 'f00014');
+    return;
+  }
+
   #
   # Set the permissions on the shares
   #
@@ -101,41 +108,62 @@ sub stage1($$$) {
       if ($p =~ /sh_(\d+)_name/) {
 	my $id = $1;
 	my $name = $cgi->param("sh_${id}_name");
-	my $perm = $cgi->param("sh_${id}_perms");
-	
+	my $smbperm = $cgi->param("sx_${id}_smbperm");
+	my $ftpperm = $cgi->param("sy_${id}_ftpperm");
+
 	# Is this share publically accessible?
 	my $public = $smbConf->val($name, 'guest ok') =~ /Yes/i;
 	# Determine public level of accessibility (irrelevant unless $public is true btw)
 	my $pubFull = $smbConf->val($name, 'write list') =~ /.*www-data.*/;
 
-	my $all = $smbConf->val($name, 'valid users');
-	my $full = $smbConf->val($name, 'write list');
-	my $ro = $smbConf->val($name, 'read list');
+	my $smb_all = $smbConf->val($name, 'valid users');
+	my $smb_full = $smbConf->val($name, 'write list');
+	my $smb_ro = $smbConf->val($name, 'read list');
 	
 	if ($public) {
 	  # As this share is publically accessible, we have to give the user the maximum access
 	  # of either public level or the one requested at user create (this process).
-	  $all .= " $username";
-	  if ($perm eq 'f') {
-	    $full .= " $username";
+	  $smb_all .= " $username";
+	  if ($smbperm eq 'f') {
+	    $smb_full .= " $username";
 	  } else {
 	    # Not f
 	    if ($pubFull) {
-	      $full .= " $username";
+	      $smb_full .= " $username";
 	    } else {
-	      $ro .= " $username";
+	      $smb_ro .= " $username";
 	    }
 	  }
 	} else {
 	  # Not public
-	  $all .= " $username" if ($perm ne 'n');
-	  $full .= " $username" if ($perm eq 'f');
-	  $ro .= " $username" if ($perm eq 'r');
+	  $smb_all .= " $username" if ($smbperm ne 'n');
+	  $smb_full .= " $username" if ($smbperm eq 'f');
+	  $smb_ro .= " $username" if ($smbperm eq 'r');
 	}
 	# Write back users perms
-	$smbConf->newval($name, 'valid users', $all);
-	$smbConf->newval($name, 'write list', $full);
-	$smbConf->newval($name, 'read list', $ro);
+	$smbConf->newval($name, 'valid users', $smb_all);
+	$smbConf->newval($name, 'write list', $smb_full);
+	$smbConf->newval($name, 'read list', $smb_ro);
+
+	my $mpnt = $smbConf->val($name,'path');
+	$mpnt =~ s,/$name$,,;
+
+	if ($ftpperm eq 'a') {
+	  # doConsole("ftp perm a");
+	  # ftpUpsertUserToFULL($username, $mpnt, $name);
+	  system("$nbin/ftpacl.pl full $username $mpnt $name");
+	} elsif ($ftpperm eq 'b') {
+	  # doConsole("ftp perm b");
+	  # ftpUpsertUserToREAD($username, $mpnt, $name);
+	  system("$nbin/ftpacl.pl read $username $mpnt $name");
+	} elsif ($ftpperm eq 'c') {
+	  # doConsole("ftp perm c");
+	  # ftpUpsertUserToNONE($username, $mpnt, $name);
+	  system("$nbin/ftpacl.pl none $username $mpnt $name");
+	} else {
+	  $self->fatalError($config, 'f00013');
+	  return;
+	}
       }
     }
     # Write back the ini file
@@ -145,6 +173,14 @@ sub stage1($$$) {
     }
     unless (sudo("$nbin/reconfigSamba.sh")) {
       $self->fatalError($config, 'f00034');
+      return;
+    }
+    unless (system("$nbin/ftpacl.pl rebuild)) {
+      $self->fatalError($config, 'f00038');
+      return;
+    }
+    unless (sudo("$nbin/rereadFTPconfig.sh")) {
+      $self->fatalError($config, 'f00038');
       return;
     }
   } # end if smbConf

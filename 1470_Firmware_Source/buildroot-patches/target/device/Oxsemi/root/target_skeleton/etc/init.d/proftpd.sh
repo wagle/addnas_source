@@ -17,6 +17,11 @@ restart() {
 	start
 }
 
+reread_config() {
+###	kill -TERM `cat /usr/local/var/proftpd.pid`  # right way
+  	killall -TERM proftpd
+}
+
 case "$1" in
 	start)
 		start
@@ -28,6 +33,9 @@ case "$1" in
 		restart
 		;;
 	cleanup)
+		;;
+	reread_config)
+		reread_config
 		;;
 	get_port)
 		grep "^Port" /etc/proftpd.conf | sed -r "s/^Port[ \t]+([0123456789]+)$/\1/"
