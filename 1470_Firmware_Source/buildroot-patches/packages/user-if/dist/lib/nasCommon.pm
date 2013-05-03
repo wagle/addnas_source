@@ -1,7 +1,7 @@
 package nasCommon;
 
 @ISA=qw(Exporter);
-@EXPORT = qw(logger debug checkForFilenameCaseBraindamage listExternals getMessage getPasswordError getUsernameError validateDeviceName validateSharename validateWorkgroup isValidEmail copyFormVars mapUidToName mapNameToUid $shareGuest $sharesHome sudo $nbin VALID INVALID SUCCESS FAILURE);
+@EXPORT = qw(logger debug checkForFilenameCaseBraindamage listExternals getMessage getPasswordError getUsernameError validateDeviceName validateSharename validateWorkgroup isValidEmail copyFormVars mapUidToName mapNameToUid $shareGuest $sharesHome sudo ludo $nbin VALID INVALID SUCCESS FAILURE);
 
 use constant VALID => 1;
 use constant INVALID => 0;
@@ -181,6 +181,16 @@ sub sudo($) {
 	}
 
 #  return SUCCESS;	# bruce - removed constant success...
+}
+
+sub ludo($) {
+	my ($cmd) = @_;
+	my $rc = system($cmd);
+	if ( $rc && ($rc != 256) ) {
+		return FAILURE;
+	} else {
+		return SUCCESS;
+	}
 }
 
 # Copies variables from one hash to another in effect.

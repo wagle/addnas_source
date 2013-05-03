@@ -38,9 +38,9 @@
   <td><input type="radio" name="sx_[% sh.id %]_smbperm"  value="f"></td>
   <td><input type="radio" name="sx_[% sh.id %]_smbperm"  value="r"></td>
   <td><input type="radio" name="sx_[% sh.id %]_smbperm"  value="n" CHECKED></td>
-  <td><input type="radio" name="sy_[% sh.id %]_ftpperm"    value="a1"></td>
-  <td><input type="radio" name="sy_[% sh.id %]_ftpperm"    value="b1"></td>
-  <td><input type="radio" name="sy_[% sh.id %]_ftpperm"    value="c1" CHECKED></td>
+  <td><input type="radio" name="sy_[% sh.id %]_ftpperm"    value="f"></td>
+  <td><input type="radio" name="sy_[% sh.id %]_ftpperm"    value="r"></td>
+  <td><input type="radio" name="sy_[% sh.id %]_ftpperm"    value="n" CHECKED></td>
 </tr>
 [% END %]
 </table>

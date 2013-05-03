@@ -88,8 +88,8 @@ sub stage1($$$) {
     }
   }
 
-  unless (system("$nbin/ftpacl.pl add $username")) {
-    $self->fatalError($config, 'f00014');
+  unless (ludo("$nbin/ftpacl.pl add $username")) {
+    $self->fatalError($config, 'f00038');
     return;
   }
 
@@ -148,20 +148,20 @@ sub stage1($$$) {
 	my $mpnt = $smbConf->val($name,'path');
 	$mpnt =~ s,/$name$,,;
 
-	if ($ftpperm eq 'a') {
-	  # doConsole("ftp perm a");
+	if ($ftpperm eq 'f') {
+	  # doConsole("ftp perm f");
 	  # ftpUpsertUserToFULL($username, $mpnt, $name);
-	  system("$nbin/ftpacl.pl full $username $mpnt $name");
-	} elsif ($ftpperm eq 'b') {
-	  # doConsole("ftp perm b");
+	  ludo("$nbin/ftpacl.pl full $username $mpnt $name");
+	} elsif ($ftpperm eq 'r') {
+	  # doConsole("ftp perm r");
 	  # ftpUpsertUserToREAD($username, $mpnt, $name);
-	  system("$nbin/ftpacl.pl read $username $mpnt $name");
-	} elsif ($ftpperm eq 'c') {
-	  # doConsole("ftp perm c");
+	  ludo("$nbin/ftpacl.pl read $username $mpnt $name");
+	} elsif ($ftpperm eq 'n') {
+	  # doConsole("ftp perm n");
 	  # ftpUpsertUserToNONE($username, $mpnt, $name);
-	  system("$nbin/ftpacl.pl none $username $mpnt $name");
+	  ludo("$nbin/ftpacl.pl none $username $mpnt $name");
 	} else {
-	  $self->fatalError($config, 'f00013');
+	  $self->fatalError($config, 'f00041');
 	  return;
 	}
       }
@@ -175,12 +175,12 @@ sub stage1($$$) {
       $self->fatalError($config, 'f00034');
       return;
     }
-    unless (system("$nbin/ftpacl.pl rebuild")) {
-      $self->fatalError($config, 'f00038');
+    unless (ludo("$nbin/ftpacl.pl rebuild")) {
+      $self->fatalError($config, 'f00039');
       return;
     }
     unless (sudo("$nbin/rereadFTPconfig.sh")) {
-      $self->fatalError($config, 'f00038');
+      $self->fatalError($config, 'f00040');
       return;
     }
   } # end if smbConf

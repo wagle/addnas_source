@@ -128,17 +128,17 @@ sub stage1($$$) {
     return;
   }
 
-  unless (system("$nbin/ftpacl.pl del $username") {
+  unless (ludo("$nbin/ftpacl.pl del $username")) {
     $self->fatalError($config, 'f00037');
     return;
   }
 
-  unless (system("$nbin/ftpacl.pl rebuild)) {
-    $self->fatalError($config, 'f00038');
+  unless (ludo("$nbin/ftpacl.pl rebuild")) {
+    $self->fatalError($config, 'f00039');
     return;
   }
   unless (sudo("$nbin/rereadFTPconfig.sh")) {
-    $self->fatalError($config, 'f00038');
+    $self->fatalError($config, 'f00040');
     return;
   }
 

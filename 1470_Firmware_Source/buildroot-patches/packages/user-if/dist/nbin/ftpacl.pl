@@ -1,8 +1,6 @@
 #!/usr/local/bin/perl -I/usr/www/lib
 # above doesn't work with env
 
-package wagle::reannotate_samba_shares;
-
 use strict;
 use warnings;
 
@@ -14,18 +12,19 @@ use IPC::Filter qw(filter);
 
 my $SQL = '/usr/bin/sqlite3';
 my $DBASE = '/var/oxsemi/proftpd.sqlite3';
-
+my $ALIASES = '/var/oxsemi/proftpd.aliases';
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 # sub dumpQuery {
 #   my ($output, $exitcode) = @_;
 #   return "output=$output, exitcode=$exitcode";
 # }
-
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 # sub doConsole {
 #   my $msg = shift;
 #   my ($output, $exitcode) = filter($msg, "tee /dev/console");
 #   return ($output, $exitcode);
 # }
-
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub doQuery {
   my $query = shift;
   my ($output, $errout, $exitcode) = filter($query, "$SQL $DBASE");
@@ -33,11 +32,13 @@ sub doQuery {
   print $con "query:\n", $query;
   print $con "output:\n", $output;
   print $con "errout:\n", $errout;
-  print $con "exitcode:\n", $exitcode;
+  print $con "exitcode:\n", $exitcode, "\n";
   close $con;
-  return ($output, $errout, $exitcode);
+  exit 1 if $exitcode != 0;
+  chomp($output);
+  return (split(/\n/,$output));
 }
-
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpMakeSchema () {
   my $query = <<EOF;
  	BEGIN TRANSACTION;
@@ -64,7 +65,7 @@ sub ftpMakeSchema () {
 EOF
   return doQuery($query);
 }
-
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpInsertUser ($) {
   my ($user) = @_;
   my $query = <<EOF;
@@ -77,7 +78,7 @@ sub ftpInsertUser ($) {
 EOF
   return doQuery($query);
 }
-
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpDeleteUser ($) {
   my ($user) = @_;
   my $query = <<EOF;
@@ -85,7 +86,7 @@ sub ftpDeleteUser ($) {
 EOF
   return doQuery($query);
 }
-
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpUpsertUserToFULL ($$$) {
   my ($user, $mpnt, $share) = @_;
   my $query .= <<EOF;
@@ -99,7 +100,7 @@ sub ftpUpsertUserToFULL ($$$) {
 EOF
   return doQuery($query);
 }
-
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpUpsertUserToREAD ($$$) {
   my ($user, $mpnt, $share) = @_;
   my $query .= <<EOF;
@@ -113,7 +114,7 @@ sub ftpUpsertUserToREAD ($$$) {
 EOF
   return doQuery($query);
 }
-
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpUpsertUserToNONE ($$$) {
   my ($user, $mpnt, $share) = @_;
   my $query .= <<EOF;
@@ -127,7 +128,77 @@ sub ftpUpsertUserToNONE ($$$) {
 EOF
   return doQuery($query);
 }
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub FTPACL_SHARE_QUERY() {
+  my $query = <<EOF;
+    select distinct mpnt,path from ftpacl where mpnt is not NULL;
+EOF
+  return $query;
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub FTPACL_HIDDEN_SHARE_QUERY() {
+  my $query = <<EOF;
+      select distinct mpnt,path,user from ftpacl where mpnt is not NULL and hidden = "yes";
+EOF
+  return $query;
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub ALIASES_TOP_TEMPLATE($$) {
+  my ($mpnt, $share) = @_;
+  my $template .= <<EOF;
+VRootAlias $mpnt/$share /$share
+EOF
+  return $template;
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub ALIASES_HEAD_TEMPLATE() {
+  my $template .= <<EOF;
+<Directory />
+EOF
+  return $template;
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub ALIASES_BODY_TEMPLATE($$) {
+  my ($share, $user) = @_;
+  my $template = <<EOF;
+  HideFiles $share user $user
+EOF
+  return $template;
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub ALIASES_TAIL_TEMPLATE() {
+  my $template .= <<EOF;
+  <Limit ALL>
+    IgnoreHidden on
+  </Limit>
+</Directory>
+EOF
+  return $template;
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub ftpRebuildConfig () {
+  my $aliases = "";
+  foreach (doQuery(FTPACL_SHARE_QUERY())) {
+    my ($mpnt, $share) = split(/\|/);
+    $share =~ s,^/,,;  # strip leading "/"
+    $aliases .= ALIASES_TOP_TEMPLATE($mpnt, $share);
+  }
+  my @output = doQuery(FTPACL_HIDDEN_SHARE_QUERY());
+  if (scalar @output != 0) {
+    $aliases .= ALIASES_HEAD_TEMPLATE();
+    foreach (@output) {
+      my ($mpnt, $share, $user) = split(/\|/);
+      $aliases .= ALIASES_BODY_TEMPLATE($share, $user);
+    }
+    $aliases .= ALIASES_TAIL_TEMPLATE();
+  }
+  open(my $file, "> $ALIASES");
+  print $file $aliases;
+  close $file;
+}
 
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 if (@ARGV == 1 && $ARGV[0] eq "init") {
   ftpMakeSchema();
 } elsif (@ARGV == 2 && $ARGV[0] eq "add") {
@@ -140,6 +211,8 @@ if (@ARGV == 1 && $ARGV[0] eq "init") {
   ftpUpsertUserToREAD($ARGV[1], $ARGV[2], $ARGV[3]);
 } elsif (@ARGV == 4 && $ARGV[0] eq "none") {
   ftpUpsertUserToNONE($ARGV[1] ,$ARGV[2], $ARGV[3]);
+} elsif (@ARGV == 1 && $ARGV[0] eq "rebuild") {
+  ftpRebuildConfig();
 } else {
   open(my $con, "> /dev/console");
   print $con "usage:\n";
@@ -158,5 +231,4 @@ if (@ARGV == 1 && $ARGV[0] eq "init") {
   exit 1;
 }
 exit 0;
-
-1;
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
