@@ -88,7 +88,7 @@ sub stage1($$$) {
     }
   }
 
-  unless (system("$nbin/ftpacl.pl add $username") {
+  unless (system("$nbin/ftpacl.pl add $username")) {
     $self->fatalError($config, 'f00014');
     return;
   }
@@ -175,7 +175,7 @@ sub stage1($$$) {
       $self->fatalError($config, 'f00034');
       return;
     }
-    unless (system("$nbin/ftpacl.pl rebuild)) {
+    unless (system("$nbin/ftpacl.pl rebuild")) {
       $self->fatalError($config, 'f00038');
       return;
     }
