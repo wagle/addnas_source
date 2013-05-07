@@ -13,22 +13,29 @@
 document.getElementById( [% IF focusOn %] "[% focusOn %]" [% ELSE %] "pword1" [% END %] ).focus();
 </script>
 [% ELSE %]
-<table width="90%">
-<tr> <th align="left">    </th> </tr>
-<tr> <th align="left">    </th></tr>
-<tr> <th align="left">[% lang.m14017 %]</th></tr>
+<table border="1" width="100%">
 <tr>
-  <th align="left">[% lang.m14007 %]</th>
-  <th align="left">[% lang.m14008 %]</th>
-  <th align="left">[% lang.m14009 %]</th>
-  <th align="left">[% lang.m14010 %]</th>
+  <th align="left" rowspan="2">[% lang.m14007 %]</th>
+  <th colspan="3">SMB</th>
+  <th colspan="3">FTP</th>
+</tr>
+<tr>
+  <th width="50px" align="left">[% lang.m10006 %]</th>
+  <th width="50px" align="left">[% lang.m10007 %]</th>
+  <th width="50px" align="left">[% lang.m10008 %]</th>
+  <th width="50px" align="left">[% lang.m10006 %]</th>
+  <th width="50px" align="left">[% lang.m10007 %]</th>
+  <th width="50px" align="left">[% lang.m10008 %]</th>
 </tr>
 [% FOREACH user IN users %]
 <tr>
   <td>[% user.name %]</td>
-  <td><input type="radio" name="u_[% user.uid %]_perm" value="f"[% IF user.perm == "f" %] CHECKED[% END %]></td>
-  <td><input type="radio" name="u_[% user.uid %]_perm" value="r"[% IF user.perm == "r" %] CHECKED[% END %]></td>
-  <td><input type="radio" name="u_[% user.uid %]_perm" value="n"[% IF user.perm == "n" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_smbperm" value="f"[% IF user.smbperm == "f" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_smbperm" value="r"[% IF user.smbperm == "r" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_smbperm" value="n"[% IF user.smbperm == "n" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_ftpperm" value="f"[% IF user.ftpperm == "f" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_ftpperm" value="r"[% IF user.ftpperm == "r" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_ftpperm" value="n"[% IF user.ftpperm == "n" %] CHECKED[% END %]></td>
 </tr>
 [% END %]
 </table>
