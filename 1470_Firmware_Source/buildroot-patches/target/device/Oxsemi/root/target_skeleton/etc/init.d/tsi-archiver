@@ -21,7 +21,7 @@ push @files, "var/private/lighttpd.htdigest.user";
 push @files, "etc/passwd";
 push @files, "etc/group";
 push @files, "etc/shadow";
-
+push @files, "/var/oxsemi/proftpd.sqlite3.dump"  ### created on the fly below
 my $files = join(" ",@files);
 
 sub is_clean($) {
@@ -63,6 +63,7 @@ sub tsi_list($) {
 sub tsi_backup($$) {
 	my ($disk,$comment) = @_;
 	my $id = strftime "%Y%m%d-%H%M%S", localtime;
+	system "sqlite3 /var/oxsemi/proftpd.sqlite3 .dump >  /var/oxsemi/proftpd.sqlite3.dump"; exit $? if $? != 0;
 	system "tar c --ignore-failed-read -C / -f $disk/opt/backups/$id.tar.gz $files"; exit $? if $? != 0;
         system "echo -e '$id\t$comment' >> $disk/opt/backups/INDEX"; exit $? if $? != 0;
 }
@@ -79,6 +80,8 @@ sub tsi_restore($$) {
 #        system "/etc/init.d/mlnet.sh resetpw";
 #        system "/etc/init.d/mlnet.sh stop";
 	system "tar x -C / -f $disk/opt/backups/$id.tar.gz";
+	system "sqlite3 /var/oxsemi/proftpd.sqlite3 < /var/oxsemi/proftpd.sqlite3.dump"; exit $? if $? != 0;
+	system "rm /var/oxsemi/proftpd.sqlite3.dump"; exit $? if $? != 0;
 #        system "/etc/init.d/network_servers.sh start";
 #	system "reboot";
 }
