@@ -30,12 +30,12 @@ document.getElementById( [% IF focusOn %] "[% focusOn %]" [% ELSE %] "pword1" [%
 [% FOREACH user IN users %]
 <tr>
   <td>[% user.name %]</td>
-  <td><input type="radio" name="u_[% user.uid %]_smbperm" value="f"[% IF user.smbperm == "f" %] CHECKED[% END %]></td>
-  <td><input type="radio" name="u_[% user.uid %]_smbperm" value="r"[% IF user.smbperm == "r" %] CHECKED[% END %]></td>
-  <td><input type="radio" name="u_[% user.uid %]_smbperm" value="n"[% IF user.smbperm == "n" %] CHECKED[% END %]></td>
-  <td><input type="radio" name="u_[% user.uid %]_ftpperm" value="f"[% IF user.ftpperm == "f" %] CHECKED[% END %]></td>
-  <td><input type="radio" name="u_[% user.uid %]_ftpperm" value="r"[% IF user.ftpperm == "r" %] CHECKED[% END %]></td>
-  <td><input type="radio" name="u_[% user.uid %]_ftpperm" value="n"[% IF user.ftpperm == "n" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_smb_perm" value="f"[% IF user.smb_perm == "f" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_smb_perm" value="r"[% IF user.smb_perm == "r" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_smb_perm" value="n"[% IF user.smb_perm == "n" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_ftp_perm" value="f"[% IF user.ftp_perm == "f" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_ftp_perm" value="r"[% IF user.ftp_perm == "r" %] CHECKED[% END %]></td>
+  <td><input type="radio" name="u_[% user.uid %]_ftp_perm" value="n"[% IF user.ftp_perm == "n" %] CHECKED[% END %]></td>
 </tr>
 [% END %]
 </table>

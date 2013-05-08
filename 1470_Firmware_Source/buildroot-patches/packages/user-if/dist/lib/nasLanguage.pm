@@ -561,6 +561,7 @@ WARNING:
 		f00039 => 'Couldn\'t rebuild FTP access database.',
 		f00040 => 'Couldn\'t reconfig FTP server.',
 		f00041 => 'Couldn\'t set FTP access options.',
+		f00042 => 'Failed to open ftp access database for reading',
 		eTooManyUsers => 'There are too many users. Please logout or wait.',
 		eWaitTime1 => 'Please try again in ',
 		eWaitTime2 => ' seconds.',

@@ -14,9 +14,8 @@ use strict;
 use nasCommon;
 use Service::Shares;
 use IO::File;
-
+#===============================================================================
 sub main($$$) {
-
   my ($self, $cgi, $config) = @_;
 
   {
@@ -37,13 +36,12 @@ sub main($$$) {
       $self->fatalError($config, 'f00022');
       return;
     }
-    
-    my $accessType = $smbConf->val('global', 'security');
-    
+
     # IMPORTANT !!!!!
     #
     # Access Type is to be HARDCODED to 'user' for the time being
     #
+    # my $accessType = $smbConf->val('global', 'security');
     my $accessType = 'user';
     
     $self->outputTemplate(
@@ -55,7 +53,7 @@ sub main($$$) {
 			  } );
   }
 }
-
+#===============================================================================
 sub stage1($$$) {
   my ($self, $cgi, $config) = @_;
 
@@ -70,12 +68,12 @@ sub stage1($$$) {
     return;
   }
     
+  my $allUsers = {};
+    
   unless (open(SPW, "<" . nasCommon->smbpasswd ) ) {
     $self->fatalError($config, 'f00005');
     return;
   }
-    
-  my $allUsers = {};
     
   while (<SPW>) {
     $_ =~ /^([^:]+):([\d]+):.+$/;
@@ -85,7 +83,29 @@ sub stage1($$$) {
     }
   }
   close(SPW);
-    
+
+#
+# read FTP perms for current share
+#
+
+  my %ftp_perm;
+  unless (open(FTPACL, "$nbin/ftpacl.pl show $sharename |")) {
+    $self->fatalError($config, 'f00042');
+    return;
+  }
+  while (<FTPACL>) {
+    chomp();
+    for (split(/\n/)) {
+      my ($user, $perm) = split(/\|/);
+      $ftp_perm{$user} = $perm;
+    }
+  }
+  close(FTPACL);
+
+#
+# open smb share include file
+#
+
   my $sharesInc = undef;
   if ( -z nasCommon->shares_inc ) { 
     # empty file so create a new config
@@ -114,35 +134,41 @@ sub stage1($$$) {
   # add the default public user to all users list.
   my $guestUID = $name2uid->{$shareGuest};
   $allUsers->{$shareGuest} =  $guestUID;
-    
+
   # Determine all full-access users
   #
   foreach my $u (split(/ /, $sharesInc->val($sharename, 'write list'))) {
     if (exists $name2uid->{$u}) {
       push @$users, { uid => $name2uid->{$u}, 
                       name => $u eq $shareGuest ? getMessage($config, 'm11020') : $u, 
-                      perm => 'f' };
+                      smb_perm => 'f',
+		      ftp_perm => $ftp_perm{$u}
+		    };
       delete($allUsers->{$u});
     }
   }
-    
+
   # Determine all read-only users
   #
   foreach my $u (split(/ /, $sharesInc->val($sharename, 'read list'))) {
     if (exists $name2uid->{$u}) {
       push @$users, { uid => $name2uid->{$u}, 
                       name => $u eq $shareGuest ? getMessage($config, 'm11020') : $u, 
-                      perm => 'r' };
+                      smb_perm => 'r',
+		      ftp_perm => $ftp_perm{$u}
+		    };
       delete($allUsers->{$u});
     }
   }
-    
+
   # all users which remain in allUsers are 'none' access
   #
   foreach my $u (keys %$allUsers) {
     push @$users, { uid => $allUsers->{$u},   
 		    name => $u eq $shareGuest ? getMessage($config, 'm11020') : $u, 
-		    perm => 'n' };
+		    smb_perm => 'n',
+		    ftp_perm => $ftp_perm{$u}
+		  };
   }
 
   ###    my @usersSorted = sort { $a->{name} cmp $b->{name} } @$users;
@@ -162,7 +188,7 @@ sub stage1($$$) {
 
   $self->outputTemplate( 'fs_updsecurity2.tpl', $vars );
 }
-
+#===============================================================================
 sub stage2($$$) {
   my ($self, $cgi, $config) = @_;
     
@@ -174,19 +200,18 @@ sub stage2($$$) {
     $self->fatalError($config, 'f00022');
     return;
   }
-    
-  my $accessType = $smbConf->val('global', 'security');
-    
+
   # IMPORTANT !!!!!
   #
   # Access Type is to be HARDCODED to 'user' for the time being
   #
+  # my $accessType = $smbConf->val('global', 'security');
   my $accessType = 'user';
     
   my $sharename = $cgi->param('sharename');
-  my $pword1    = $cgi->param('pword1');
-  my $pword2    = $cgi->param('pword2');            
-  my $ecode;
+  # my $pword1    = $cgi->param('pword1');
+  # my $pword2    = $cgi->param('pword2');            
+  # my $ecode;
     
   # if ($accessType ne 'user') 
   # {
@@ -222,15 +247,23 @@ sub stage2($$$) {
     # for the share, pick up each user/perm variable and add to appropriate perms list.
     # Update the Samba share config
     #
-    my @allPubUsers = ();
-    my @allUsers    = ();
-    my @fullUsers   = ();
-    my @roUsers     = ();
+    my @smb_allPubUsers = ();
+    my @smb_allUsers    = ();
+    my @smb_fullUsers   = ();
+    my @smb_roUsers     = ();
+
+    my @ftp_allPubUsers = ();
+    my @ftp_allUsers    = ();
+    my @ftp_fullUsers   = ();
+    my @ftp_roUsers     = ();
         
-    my $publicAccess = 'n';
-        
+    my $smb_publicAccess = 'n';
+    my $ftp_publicAccess = 'n';
+
+    my $mpnt = $sharesInc->val($sharename,'path');
+    $mpnt =~ s,/$sharename$,,;
     foreach my $p ($cgi->param()) {
-      if ($p =~ /^u_(\d+)_perm$/) {
+      if ($p =~ /^u_(\d+)_smbperm$/) {
 	my $uid = $1;
 	my $uname = $uid2name->{$uid};
                 
@@ -242,44 +275,69 @@ sub stage2($$$) {
 	if ($uname eq $shareGuest) {
 	  # Note public access level requested
 	  #
-	  $publicAccess = $cgi->param($p);
+	  $smb_publicAccess = $cgi->param($p);
 	} else {
-	  push @allPubUsers, $uname;
-	  push @allUsers, $uname unless ($cgi->param($p) eq 'n');
-	  push @fullUsers, $uname if ($cgi->param($p) eq 'f');
-	  push @roUsers, $uname if ($cgi->param($p) eq 'r');
+	  push @smb_allPubUsers, $uname;
+	  push @smb_allUsers, $uname unless ($cgi->param($p) eq 'n');
+	  push @smb_fullUsers, $uname if ($cgi->param($p) eq 'f');
+	  push @smb_roUsers, $uname if ($cgi->param($p) eq 'r');
+	}
+      } elsif ($p =~ /^u_(\d+)_ftp_perm$/) {
+	my $uid = $1;
+	my $uname = $uid2name->{$uid};
+	unless ($uname) {
+	  $self->fatalError($config, 'f00018');
+	  return;
+	}
+                
+	if ($uname eq $shareGuest) {
+	  # Note public access level requested
+	  #
+	  $ftp_publicAccess = $cgi->param($p);
+	} else {
+	  my $ftpperm = $cgi->param($p);
+	  if ($ftpperm eq 'f') {
+	    ludo("$nbin/ftpacl.pl full $uname $mpnt $sharename");
+	  } elsif ($ftpperm eq 'r') {
+	    ludo("$nbin/ftpacl.pl read $uname $mpnt $sharename");
+	  } elsif ($ftpperm eq 'n') {
+	    ludo("$nbin/ftpacl.pl none $uname $mpnt $sharename");
+	  } else {
+	    $self->fatalError($config, 'f00041');
+	    return;
+	  }
 	}
       }
     }
         
     #
-    if ($publicAccess ne 'n') {
+    if ($smb_publicAccess ne 'n') {
       $sharesInc->newval($sharename, 'guest ok', 'Yes');
-      @allUsers = @allPubUsers;
-      push @allUsers, $shareGuest;
+      @smb_allUsers = @smb_allPubUsers;
+      push @smb_allUsers, $shareGuest;
             
-      if ($publicAccess eq 'r') {
+      if ($smb_publicAccess eq 'r') {
 	# Read only users are all those valid users who are NOT to have specific full access,
 	#   plus www-data (guest)
 	#
-	@roUsers = grep { my $ret = 1;
-                          foreach my $u (@fullUsers) {
+	@smb_roUsers = grep { my $ret = 1;
+                          foreach my $u (@smb_fullUsers) {
                             if ($u eq $_) {
                               $ret = 0;
                             }
                           }
                           $ret;
-                        } @allPubUsers;
-	push @roUsers, $shareGuest;    
+                        } @smb_allPubUsers;
+	push @smb_roUsers, $shareGuest;    
       }
         
-      if ($publicAccess eq 'f') {
+      if ($smb_publicAccess eq 'f') {
 	# Full users are all the valid users plus www-data (guest). The logic here is that
 	# if you have granted Public write access, there is no way to give someone specifically
 	# readonly access as all they have to do is connect as someone else.
 	#
-	@fullUsers = @allUsers;
-	@roUsers = ();
+	@smb_fullUsers = @smb_allUsers;
+	@smb_roUsers = ();
       }
     } else {
       # Remove any existing guest access
@@ -288,23 +346,23 @@ sub stage2($$$) {
 
       # Ensure there's still a user listed, but without a pwd so that Samba
       # does not default to granting access to anyone.
-      push @allUsers, $shareGuest;
+      push @smb_allUsers, $shareGuest;
     }
         
-    if (@allUsers) {
-      $sharesInc->newval($sharename, 'valid users', join(' ', @allUsers)) if (@allUsers);
+    if (@smb_allUsers) {
+      $sharesInc->newval($sharename, 'valid users', join(' ', @smb_allUsers)) if (@smb_allUsers);
     } else {
       $sharesInc->delval($sharename, 'valid users');
     }
         
-    if (@fullUsers) {
-      $sharesInc->newval($sharename, 'write list', join(' ', @fullUsers)) if (@fullUsers);
+    if (@smb_fullUsers) {
+      $sharesInc->newval($sharename, 'write list', join(' ', @smb_fullUsers)) if (@smb_fullUsers);
     } else {
       $sharesInc->delval($sharename, 'write list');
     }
         
-    if (@roUsers) {
-      $sharesInc->newval($sharename, 'read list', join(' ', @roUsers)) if (@roUsers);
+    if (@smb_roUsers) {
+      $sharesInc->newval($sharename, 'read list', join(' ', @smb_roUsers)) if (@smb_roUsers);
     } else {
       $sharesInc->delval($sharename, 'read list');
     }
@@ -321,6 +379,14 @@ sub stage2($$$) {
     #        }
     unless (sudo("$nbin/reconfigSamba.sh")) {
       $self->fatalError($config, 'f00034');
+      return;
+    }
+    unless (ludo("$nbin/ftpacl.pl rebuild")) {
+      $self->fatalError($config, 'f00039');
+      return;
+    }
+    unless (sudo("$nbin/rereadFTPconfig.sh")) {
+      $self->fatalError($config, 'f00040');
       return;
     }
   } # else {

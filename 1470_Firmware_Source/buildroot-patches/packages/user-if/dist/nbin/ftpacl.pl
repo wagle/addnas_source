@@ -48,6 +48,7 @@ sub ftpMakeSchema () {
 		path TEXT NOT NULL,
 		user TEXT NOT NULL,
 		hidden TEXT NOT NULL,
+		overall TEXT NOT NULL,
 		read_acl TEXT NOT NULL,
 		write_acl TEXT NOT NULL,
 		delete_acl TEXT NOT NULL,
@@ -71,8 +72,8 @@ sub ftpInsertUser ($) {
   my $query = <<EOF;
 	BEGIN TRANSACTION;
 	INSERT INTO ftpacl
-		( mpnt, path , user    , hidden, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
-	 VALUES ( NULL, "/"  , "$user" , "no"  , "allow" , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,  "allow", "allow"      )
+		( mpnt, path , user    , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
+	 VALUES ( NULL, "/"  , "$user" , "no"  , "read" , "allow" , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,  "allow", "allow"      )
 	;
 	COMMIT;
 EOF
@@ -93,8 +94,8 @@ sub ftpUpsertUserToFULL ($$$) {
 	BEGIN TRANSACTION;
 	DELETE FROM ftpacl WHERE mpnt = "$mpnt" and path = "/$share" and user = "$user";
 	INSERT INTO ftpacl
-		 ( mpnt   , path     , user   , hidden, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
-	  VALUES ( "$mpnt", "/$share", "$user", "no"  , "allow" , "allow"  , "allow"   , "allow"   , "allow"   , "allow" ,  "allow", "allow"      )
+		 ( mpnt   , path     , user   , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
+	  VALUES ( "$mpnt", "/$share", "$user", "no"  , "f"    , "allow" , "allow"  , "allow"   , "allow"   , "allow"   , "allow" ,  "allow", "allow"      )
 	;
 	COMMIT;
 EOF
@@ -107,8 +108,8 @@ sub ftpUpsertUserToREAD ($$$) {
 	BEGIN TRANSACTION;
 	DELETE FROM ftpacl WHERE mpnt = "$mpnt" and path = "/$share" and user = "$user";
 	INSERT INTO ftpacl
-	         ( mpnt   , path     , user  , hidden, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
-	  VALUES ( "$mpnt", "/$share", "$user", "no"  , "allow" , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,  "allow", "allow"      )
+	         ( mpnt   , path     , user  , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
+	  VALUES ( "$mpnt", "/$share", "$user", "no" , "r"    , "allow" , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,  "allow", "allow"      )
 	;
 	COMMIT;
 EOF
@@ -121,12 +122,23 @@ sub ftpUpsertUserToNONE ($$$) {
 	BEGIN TRANSACTION;
 	DELETE FROM ftpacl WHERE mpnt = "$mpnt" and path = "/$share" and user = "$user";
 	INSERT INTO ftpacl
-	         ( mpnt   , path     , user   , hidden, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
-	  VALUES ( "$mpnt", "/$share", "$user", "yes" , "deny"  , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,   "deny", "deny"       )
+	         ( mpnt   , path     , user   , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
+	  VALUES ( "$mpnt", "/$share", "$user", "yes" , "n"    , "deny"  , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,   "deny", "deny"       )
 	;
 	COMMIT;
 EOF
   return doQuery($query);
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub ftpShowAccessToShare ($) {
+  my ($share) = @_;
+  my $query .= <<EOF;
+	SELECT user, overall FROM ftpacl WHERE path = "/$share" ;
+EOF
+  my @output = doQuery($query);
+  for my $line (@output) {
+    print $line, "\n";
+  }
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
@@ -197,7 +209,6 @@ sub ftpRebuildConfig () {
   print $file $aliases;
   close $file;
 }
-
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 if (@ARGV == 1 && $ARGV[0] eq "init") {
   ftpMakeSchema();
@@ -213,6 +224,8 @@ if (@ARGV == 1 && $ARGV[0] eq "init") {
   ftpUpsertUserToNONE($ARGV[1] ,$ARGV[2], $ARGV[3]);
 } elsif (@ARGV == 1 && $ARGV[0] eq "rebuild") {
   ftpRebuildConfig();
+} elsif (@ARGV == 2 && $ARGV[0] eq "show") {
+  ftpShowAccessToShare($ARGV[1]);
 } else {
   open(my $con, "> /dev/console");
   print $con "usage:\n";
@@ -228,6 +241,7 @@ if (@ARGV == 1 && $ARGV[0] eq "init") {
   print STDERR "ftpacl full <user> <mpnt> <share>\n";
   print STDERR "ftpacl read <user> <mpnt> <share>\n";
   print STDERR "ftpacl none <user> <mpnt> <share>\n";
+  print STDERR "ftpacl show <share>\n";
   exit 1;
 }
 exit 0;
