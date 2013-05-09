@@ -6,10 +6,10 @@
 start() {
 	echo "Starting ProFTPD"
 	if [ \! -r /var/oxsemi/proftpd.sqlite3 ] ; then
-		/usr/www/nbin/ftpacl.pl init
+		sudo -u www-data /usr/www/nbin/ftpacl.pl init
 	fi
 	if [ \! -r /var/oxsemi/proftpd.vrootaliases ] ; then
-		/usr/www/nbin/ftpacl.pl rebuild
+		sudo -u www-data /usr/www/nbin/ftpacl.pl rebuild
 	fi
 	/usr/sbin/proftpd 
 }
