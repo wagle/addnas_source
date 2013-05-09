@@ -143,13 +143,13 @@ sub stage4($$$) {
       return;
     }
 
-    my $accessType = undef;
+    # my $accessType = undef;
 
-    if ($smbConf->val('global', 'security') eq 'user') {
-      $accessType = 'user';
-    } else {
-      $accessType = 'pw';
-    }
+    # if ($smbConf->val('global', 'security') eq 'user') {
+    #   $accessType = 'user';
+    # } else {
+    #   $accessType = 'pw';
+    # }
 
     # IMPORTANT !!!!!
     #
@@ -207,9 +207,9 @@ sub stage4($$$) {
       $vars->{users} = \@sorted;
 
       $self->outputTemplate('fs_addshare4user.tpl', $vars);
-    } else {
-      $self->outputTemplate('fs_addshare4password.tpl', $vars);
-    }
+    } # else {
+    #   $self->outputTemplate('fs_addshare4password.tpl', $vars);
+    # }
   } elsif ($cgi->param('nfs')) {
     $self->outputTemplate('fs_addshare4user.tpl', $vars);
   } else {
@@ -339,13 +339,13 @@ sub stage6($$$) {
       return;
     }
 
-    my $accessType = undef;
+    # my $accessType = undef;
 
-    if ($smbConf->val('global', 'security') eq 'user') {
-      $accessType = 'user';
-    } else {
-      $accessType = 'pw';
-    }
+    # if ($smbConf->val('global', 'security') eq 'user') {
+    #   $accessType = 'user';
+    # } else {
+    #   $accessType = 'pw';
+    # }
 
     # IMPORTANT !!!!!
     #
@@ -453,33 +453,33 @@ sub stage6($$$) {
         $sharesInc->delval($sharename, 'read list');
       }
 
-    } else {
+    } # else {
 
-      if ($cgi->param('pword') ne '') {
+    #   if ($cgi->param('pword') ne '') {
 
-        # Password protected share required
-        # Create a unique user for this share and assign the requested password to it.
-        #
-        my $username = 'sh' . `date +%s`;
-        chomp $username;
+    #     # Password protected share required
+    #     # Create a unique user for this share and assign the requested password to it.
+    #     #
+    #     my $username = 'sh' . `date +%s`;
+    #     chomp $username;
 
-        unless (sudo("$nbin/fs_addUser.sh $username '" . $cgi->param('pword') . "'")) {
-          $self->fatalError($config, 'f00014');
-          return;
-        }
+    #     unless (sudo("$nbin/fs_addUser.sh $username '" . $cgi->param('pword') . "'")) {
+    #       $self->fatalError($config, 'f00014');
+    #       return;
+    #     }
 
-        $sharesInc->newval($sharename, 'username', $username);
-        $sharesInc->newval($sharename, 'read only', 'no');
-        $sharesInc->newval($sharename, 'public', 'no');
+    #     $sharesInc->newval($sharename, 'username', $username);
+    #     $sharesInc->newval($sharename, 'read only', 'no');
+    #     $sharesInc->newval($sharename, 'public', 'no');
 
-      } else {			# Public access (no password required)
+    #   } else {			# Public access (no password required)
 
-        $sharesInc->newval($sharename, 'public', 'yes');
-        $sharesInc->newval($sharename, 'read only', 'no');
+    #     $sharesInc->newval($sharename, 'public', 'yes');
+    #     $sharesInc->newval($sharename, 'read only', 'no');
 
-      }
+    #   }
 
-    }
+    # }
 
     unless ($sharesInc->RewriteConfig) {
       $self->fatalError($config, 'f00013');
