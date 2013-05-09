@@ -5,7 +5,7 @@
 
 start() {
 	echo "Starting ProFTPD"
-	if [ -r /var/oxsemi/proftpd.sqlite3 ] ; then
+	if [ \! -r /var/oxsemi/proftpd.sqlite3 ] ; then
 		/usr/www/nbin/ftpacl.pl init
 		/usr/www/nbin/ftpacl.pl rebuild
 	fi
