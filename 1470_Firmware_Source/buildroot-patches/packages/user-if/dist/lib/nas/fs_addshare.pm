@@ -16,214 +16,214 @@ use nasCommon;
 
 sub main($$$) {
 
-	my ($self, $cgi, $config) = @_;
+  my ($self, $cgi, $config) = @_;
 
-	{
-		if ($cgi->param('nextstage') == 1) {
-			$self->outputTemplate('fs_addshare1.tpl', { tabon => 'fileshare' } );
-			last;
-		}
+  {
+    if ($cgi->param('nextstage') == 1) {
+      $self->outputTemplate('fs_addshare1.tpl', { tabon => 'fileshare' } );
+      last;
+    }
 
-		if ($cgi->param('nextstage') == 2) {
-			$self->stage2($cgi, $config);
-			last;
-		}
+    if ($cgi->param('nextstage') == 2) {
+      $self->stage2($cgi, $config);
+      last;
+    }
 
-		if ($cgi->param('nextstage') == 3) {
-			$self->stage3($cgi, $config);
-			last;
-		}
+    if ($cgi->param('nextstage') == 3) {
+      $self->stage3($cgi, $config);
+      last;
+    }
 
-		if ($cgi->param('nextstage') == 4) {
-			$self->stage4($cgi, $config);
-			last;
-		}
+    if ($cgi->param('nextstage') == 4) {
+      $self->stage4($cgi, $config);
+      last;
+    }
 
-		if ($cgi->param('nextstage') == 5) {
-			$self->stage5($cgi, $config);
-			last;
-		}
+    if ($cgi->param('nextstage') == 5) {
+      $self->stage5($cgi, $config);
+      last;
+    }
 
-		if ($cgi->param('nextstage') == 6) {
-			$self->stage6($cgi, $config);
-			last;
-		}
+    if ($cgi->param('nextstage') == 6) {
+      $self->stage6($cgi, $config);
+      last;
+    }
 
-		# default
-		#
-		$self->outputTemplate('fs_addshare.tpl', { tabon => 'fileshare' } );
-	}
+    # default
+    #
+    $self->outputTemplate('fs_addshare.tpl', { tabon => 'fileshare' } );
+  }
 
 }
 
 sub reserved_filename_p($) {
-	my $file = uc $_[0];
-	return 1 if $file eq "DEV";
-	return 1 if $file eq "OPT";
-	return 1 if $file eq "FW.TAR.GZ";
-	return 0;
+  my $file = uc $_[0];
+  return 1 if $file eq "DEV";
+  return 1 if $file eq "OPT";
+  return 1 if $file eq "FW.TAR.GZ";
+  return 0;
 }
 
 sub stage2($$$) {
-	my ($self, $cgi, $config) = @_;
+  my ($self, $cgi, $config) = @_;
 
-	# Select the filesharing tab for display
-	my $vars = { tabon => 'fileshare' };
+  # Select the filesharing tab for display
+  my $vars = { tabon => 'fileshare' };
 
-	# Copy the form data into our local storage
-	copyFormVars($cgi, $vars);
+  # Copy the form data into our local storage
+  copyFormVars($cgi, $vars);
 
-        # Convert the share name to uppercase UTF-8
-        my $utf8name = uc Encode::decode("utf8", $vars->{frm}->{sharename});
+  # Convert the share name to uppercase UTF-8
+  my $utf8name = uc Encode::decode("utf8", $vars->{frm}->{sharename});
 
-	# Check that the share name is allowed and not a duplicate
-	my $error = nasCommon::validateSharename($utf8name, $self->getShares($config));
-	if ($error) {
-		nasCommon::setErrorMessage($vars, $config, 'sharename', $error);
-		$self->outputTemplate('fs_addshare1.tpl', $vars);
-		return;
-	} elsif ( reserved_filename_p($utf8name) ) {
-		nasCommon::setErrorMessage($vars,$config, 'sharename', 'f00036');
-		$self->outputTemplate('fs_addshare1.tpl', $vars);
-                return;
-	}
+  # Check that the share name is allowed and not a duplicate
+  my $error = nasCommon::validateSharename($utf8name, $self->getShares($config));
+  if ($error) {
+    nasCommon::setErrorMessage($vars, $config, 'sharename', $error);
+    $self->outputTemplate('fs_addshare1.tpl', $vars);
+    return;
+  } elsif ( reserved_filename_p($utf8name) ) {
+    nasCommon::setErrorMessage($vars,$config, 'sharename', 'f00036');
+    $self->outputTemplate('fs_addshare1.tpl', $vars);
+    return;
+  }
 
-	# Add to the list of volumes any found in the external directory (ie,
-	# pendrives, etc) so that these can be presented to the user as options
-	# for volumes onto which the new share can be mapped
-	my @vols = ();
-	unless (nasCommon::listExternals(\@vols)) {
-		$self->fatalError($config, 'f00026');
-		return;
-	}
-	$vars->{extvols} = \@vols;
+  # Add to the list of volumes any found in the external directory (ie,
+  # pendrives, etc) so that these can be presented to the user as options
+  # for volumes onto which the new share can be mapped
+  my @vols = ();
+  unless (nasCommon::listExternals(\@vols)) {
+    $self->fatalError($config, 'f00026');
+    return;
+  }
+  $vars->{extvols} = \@vols;
 
-	# Feed back the uppercased share name to the next form
-	$vars->{frm}->{sharename} = $utf8name;
+  # Feed back the uppercased share name to the next form
+  $vars->{frm}->{sharename} = $utf8name;
 
-	# Display the next form
-	$self->outputTemplate('fs_addshare2.tpl', $vars);
+  # Display the next form
+  $self->outputTemplate('fs_addshare2.tpl', $vars);
 }
 
 sub stage3($$$) {
 
-	my ($self, $cgi, $config) = @_;
+  my ($self, $cgi, $config) = @_;
 
-	my $vars = { tabon => 'fileshare' };
+  my $vars = { tabon => 'fileshare' };
 
-	copyFormVars($cgi, $vars);
-	$self->outputTemplate('fs_addshare3.tpl', $vars);
+  copyFormVars($cgi, $vars);
+  $self->outputTemplate('fs_addshare3.tpl', $vars);
 
 }
 
 sub stage4($$$) {
 
-	my ($self, $cgi, $config) = @_;
+  my ($self, $cgi, $config) = @_;
 
-	my $vars = { tabon => 'fileshare' };
-	my $error = 0;
+  my $vars = { tabon => 'fileshare' };
+  my $error = 0;
 
-	copyFormVars($cgi, $vars);
+  copyFormVars($cgi, $vars);
 
-	if ($cgi->param('cif')) {
-		my ($errcode,$errmessage) = checkForFilenameCaseBraindamage("/shares/external/".$cgi->param('volume')."/".$vars->{frm}->{sharename});
-		if ( $errcode ) {
-			$self->fatalError($config, $errcode, $errmessage);
-			return;
-		}	
+  if ($cgi->param('cif')) {
+    my ($errcode,$errmessage) = checkForFilenameCaseBraindamage("/shares/external/".$cgi->param('volume')."/".$vars->{frm}->{sharename});
+    if ( $errcode ) {
+      $self->fatalError($config, $errcode, $errmessage);
+      return;
+    }	
 
-		unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smb_conf )) {
-			$self->fatalError($config, 'f00020');
-			return;
-		}
+    unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smb_conf )) {
+      $self->fatalError($config, 'f00020');
+      return;
+    }
 
-		my $smbConf = new Config::IniFiles( -file => nasCommon->smb_conf );
-		unless ($smbConf) {
-			$self->fatalError($config, 'f00005');
-			return;
-		}
+    my $smbConf = new Config::IniFiles( -file => nasCommon->smb_conf );
+    unless ($smbConf) {
+      $self->fatalError($config, 'f00005');
+      return;
+    }
 
-		my $accessType = undef;
+    my $accessType = undef;
 
-		if ($smbConf->val('global', 'security') eq 'user') {
-			$accessType = 'user';
-		} else {
-			$accessType = 'pw';
-		}
+    if ($smbConf->val('global', 'security') eq 'user') {
+      $accessType = 'user';
+    } else {
+      $accessType = 'pw';
+    }
 
-		# IMPORTANT !!!!!
-		#
-		# Access Type is to be HARDCODED to 'user' for the time being
-		#
-		my $accessType = 'user';
+    # IMPORTANT !!!!!
+    #
+    # Access Type is to be HARDCODED to 'user' for the time being
+    #
+    my $accessType = 'user';
 
-		# Are we using user level security, or password/public?
-		#
-		if ($accessType eq 'user') {
+    # Are we using user level security, or password/public?
+    #
+    if ($accessType eq 'user') {
 
-			# List all existing users
-			#
-			my $users = [];
+      # List all existing users
+      #
+      my $users = [];
 
-			unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smbpasswd )) {
-				$self->fatalError($config, 'f00020');
-				return;
-			}
+      unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smbpasswd )) {
+	$self->fatalError($config, 'f00020');
+	return;
+      }
 
-			unless (open(SPW, "<" . nasCommon->smbpasswd ) ) {
-				$self->fatalError($config, 'f00005');
-				return;
-			}
+      unless (open(SPW, "<" . nasCommon->smbpasswd ) ) {
+	$self->fatalError($config, 'f00005');
+	return;
+      }
 
-			while (<SPW>) {
-				$_ =~ /^([^:]+):([^:]+).*$/;
-				my ($uname, $uid) = ($1, $2);
-				unless (($uname eq 'root') || ($uname eq $shareGuest) || ($uname =~ /^sh\d+$/) || ($uname eq 'guest')) {
-					push @$users, { name => $uname, id => $uid };
-				}
-			}
-			close(SPW);
-
-			# Add the 'guest' user - this is used for 'public' accessing of this share
-			#
-			my $name2uid = mapNameToUid();
-
-			push @$users, {
-				name => getMessage($config, 'm11020'),
-				id => $name2uid->{$shareGuest} 
-			};
-
-			### my @sorted = sort { $a->{name} cmp $b->{name} } @$users;
-			my @sorted = sort {
-				if ($a->{name} eq getMessage($config, 'm11020')) {
-					-1;
-				} elsif ($b->{name} eq getMessage($config, 'm11020')) {
-					1;
-				} else {
-					$a->{name} cmp $b->{name};
-				}
-			} @$users;
-			###  
-			$vars->{users} = \@sorted;
-
-			$self->outputTemplate('fs_addshare4user.tpl', $vars);
-		} else {
-			$self->outputTemplate('fs_addshare4password.tpl', $vars);
-		}
-	} elsif ($cgi->param('nfs')) {
-		$self->outputTemplate('fs_addshare4user.tpl', $vars);
-	} else {
-		$self->outputTemplate('fs_addshare5.tpl', $vars);
-
+      while (<SPW>) {
+	$_ =~ /^([^:]+):([^:]+).*$/;
+	my ($uname, $uid) = ($1, $2);
+	unless (($uname eq 'root') || ($uname eq $shareGuest) || ($uname =~ /^sh\d+$/) || ($uname eq 'guest')) {
+	  push @$users, { name => $uname, id => $uid };
 	}
+      }
+      close(SPW);
+
+      # Add the 'guest' user - this is used for 'public' accessing of this share
+      #
+      my $name2uid = mapNameToUid();
+
+      push @$users, {
+		     name => getMessage($config, 'm11020'),
+		     id => $name2uid->{$shareGuest} 
+		    };
+
+      ### my @sorted = sort { $a->{name} cmp $b->{name} } @$users;
+      my @sorted = sort {
+	if ($a->{name} eq getMessage($config, 'm11020')) {
+	  -1;
+	} elsif ($b->{name} eq getMessage($config, 'm11020')) {
+	  1;
+	} else {
+	  $a->{name} cmp $b->{name};
+	}
+      } @$users;
+      ###  
+      $vars->{users} = \@sorted;
+
+      $self->outputTemplate('fs_addshare4user.tpl', $vars);
+    } else {
+      $self->outputTemplate('fs_addshare4password.tpl', $vars);
+    }
+  } elsif ($cgi->param('nfs')) {
+    $self->outputTemplate('fs_addshare4user.tpl', $vars);
+  } else {
+    $self->outputTemplate('fs_addshare5.tpl', $vars);
+
+  }
 }
 
 sub stage5($$$) {
 
-	my ($self, $cgi, $config) = @_;
+  my ($self, $cgi, $config) = @_;
 
-	my $vars = { tabon => 'fileshare' };
-	my $error = 0;
+  my $vars = { tabon => 'fileshare' };
+  my $error = 0;
 
   copyFormVars($cgi, $vars);
 
@@ -247,22 +247,22 @@ sub stage5($$$) {
 #
 sub stage6($$$) {
 
-	my ($self, $cgi, $config) = @_;
+  my ($self, $cgi, $config) = @_;
 
-	my $vars = { tabon => 'fileshare' };
-	my $error = 0;
-    my $sharenameNospaces;
+  my $vars = { tabon => 'fileshare' };
+  my $error = 0;
+  my $sharenameNospaces;
 
-	my $sharesInc = undef;
-	$sharesInc = new Config::IniFiles( -file => nasCommon->shares_inc );
-	unless ($sharesInc) {
-		$sharesInc = new Config::IniFiles();
-		unless ($sharesInc) {
-			$self->fatalError($config, 'f00012');
-			return undef;
-		}
-		$sharesInc->SetFileName(nasCommon->shares_inc);
-	}
+  my $sharesInc = undef;
+  $sharesInc = new Config::IniFiles( -file => nasCommon->shares_inc );
+  unless ($sharesInc) {
+    $sharesInc = new Config::IniFiles();
+    unless ($sharesInc) {
+      $self->fatalError($config, 'f00012');
+      return undef;
+    }
+    $sharesInc->SetFileName(nasCommon->shares_inc);
+  }
 
   my $sharename = $cgi->param('sharename');
   my $sharenameNospaces = $sharename;
@@ -472,7 +472,7 @@ sub stage6($$$) {
         $sharesInc->newval($sharename, 'read only', 'no');
         $sharesInc->newval($sharename, 'public', 'no');
 
-      } else {    # Public access (no password required)
+      } else {			# Public access (no password required)
 
         $sharesInc->newval($sharename, 'public', 'yes');
         $sharesInc->newval($sharename, 'read only', 'no');
@@ -486,10 +486,10 @@ sub stage6($$$) {
       return;
     }
 
-#    unless (sudo("$nbin/restartSamba.sh")) {
-#      $self->fatalError($config, 'f00017');
-#      return;
-#    }
+    #    unless (sudo("$nbin/restartSamba.sh")) {
+    #      $self->fatalError($config, 'f00017');
+    #      return;
+    #    }
     unless (sudo("$nbin/reconfigSamba.sh")) {
       $self->fatalError($config, 'f00034');
       return;
