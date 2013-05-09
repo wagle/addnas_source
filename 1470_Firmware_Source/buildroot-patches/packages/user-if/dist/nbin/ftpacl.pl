@@ -12,7 +12,7 @@ use IPC::Filter qw(filter);
 
 my $SQL = '/usr/bin/sqlite3';
 my $DBASE = '/var/oxsemi/proftpd.sqlite3';
-my $ALIASES = '/var/oxsemi/proftpd.aliases';
+my $ALIASES = '/var/oxsemi/proftpd.vrootaliases';
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 # sub dumpQuery {
 #   my ($output, $exitcode) = @_;
@@ -201,6 +201,7 @@ sub ftpRebuildConfig () {
     $aliases .= ALIASES_HEAD_TEMPLATE();
     foreach (@output) {
       my ($mpnt, $share, $user) = split(/\|/);
+      $share =~ s,^/,,;  # strip leading "/"
       $aliases .= ALIASES_BODY_TEMPLATE($share, $user);
     }
     $aliases .= ALIASES_TAIL_TEMPLATE();
