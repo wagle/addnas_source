@@ -207,7 +207,7 @@ sub stage4($$$) {
       $vars->{users} = \@sorted;
 
       $self->outputTemplate('fs_addshare4user.tpl', $vars);
-    } # else {
+    }	 # else {
     #   $self->outputTemplate('fs_addshare4password.tpl', $vars);
     # }
   } elsif ($cgi->param('nfs')) {
@@ -232,8 +232,10 @@ sub stage5($$$) {
 
     # Copy the user share permissions required to the next page
     #
-    if ($p =~ /^user_(\d+)_perm$/) {
-      push @$users, { id => $1, perm => $cgi->param($p) };
+    if ($p =~ /^user_(\d+)_smb_perm$/) {
+      push @$users, { id => $1, smb_perm => $cgi->param($p) };
+    } elsif ($p =~ /^user_(\d+)_ftp_perm$/) {
+      push @$users, { id => $1, ftp_perm => $cgi->param($p) };
     }
   }
   $vars->{users} = $users;
@@ -242,9 +244,9 @@ sub stage5($$$) {
 
 }
 
-#
+####################################################################################################
 # Actually create the share
-#
+####################################################################################################
 sub stage6($$$) {
 
   my ($self, $cgi, $config) = @_;
@@ -365,95 +367,119 @@ sub stage6($$$) {
   
       my $uid2name = mapUidToName();
 
-      my $publicAccess = 'n';
-      my @allUsers = ();
-      my @allPubUsers = ();
-      my @roUsers = ();
-      my @fullUsers = ();
+      #
+      # loop over the radio buttons returned from the form
+      #
+      my $smb_publicAccess = 'n';
+      my @smb_allUsers = ();
+      my @smb_allPubUsers = ();
+      my @smb_roUsers = ();
+      my @smb_fullUsers = ();
+      my @ftp_noneUsers = ();
+      my @ftp_readUsers = ();
+      my @ftp_fullUsers = ();
 
       foreach my $p ($cgi->param()) {
-
-        if ($p =~ /^user_(\d+)_perm$/) {
-
+        if ($p =~ /^user_(\d+)_smb_perm$/) {
           my $uid = $1;
-
-          # get name of user from passwd file
-          #
           my $uname = $uid2name->{$uid};
           unless ($uname) {
             $self->fatalError($config, 'f00018');
             return;
           }
-
+	  #
           # For a public share, we have to explicitly allow guest access as user www-data
           #
           if ($uname eq $shareGuest) {
-            # Note public access level requested
-            #
-            $publicAccess = $cgi->param($p);
+            $smb_publicAccess = $cgi->param($p);
           } else {
-            push @allPubUsers, $uname;
-            push @allUsers, $uname unless ($cgi->param($p) eq 'n');
-            push @fullUsers, $uname if ($cgi->param($p) eq 'f');
-            push @roUsers, $uname if ($cgi->param($p) eq 'r');
+            push @smb_allPubUsers, $uname;
+            push @smb_allUsers, $uname unless ($cgi->param($p) eq 'n');
+            push @smb_fullUsers, $uname if ($cgi->param($p) eq 'f');
+            push @smb_roUsers, $uname if ($cgi->param($p) eq 'r');
           }
+        } elsif ($p =~ /^user_(\d+)_ftp_perm$/) {
+          my $uid = $1;
+          my $uname = $uid2name->{$uid};
+          unless ($uname) {
+            $self->fatalError($config, 'f00018');
+            return;
+          }
+	  #
+          # For a public share, we have to explicitly allow guest access as user www-data
+          #
+	  push @ftp_fullUsers, $uname if ($cgi->param($p) eq 'f');
+	  push @ftp_readUsers, $uname if ($cgi->param($p) eq 'r');
+	  push @ftp_noneUsers, $uname if ($cgi->param($p) eq 'n');
         }
-
       }
-
+      #
       # Has public access been specified?
       #
-      if ($publicAccess ne 'n') {
+      if ($smb_publicAccess ne 'n') {
         $sharesInc->newval($sharename, 'guest ok', 'Yes');
-        @allUsers = @allPubUsers;
-        push @allUsers, $shareGuest;
+        @smb_allUsers = @smb_allPubUsers;
+        push @smb_allUsers, $shareGuest;
 
-        if ($publicAccess eq 'r') {
+        if ($smb_publicAccess eq 'r') {
 
           # Read only users are all those valid users who are NOT to have specific full access,
           #   plus www-data (guest)
           #
-          @roUsers = grep { my $ret = 1;
-                            foreach my $u (@fullUsers) {
-                              if ($u eq $_) {
-                                $ret = 0;
-                              }
-                            }
-                            $ret;
-                          } @allPubUsers;
-          push @roUsers, $shareGuest;
+          @smb_roUsers = grep { my $ret = 1;
+				foreach my $u (@smb_fullUsers) {
+				  if ($u eq $_) {
+				    $ret = 0;
+				  }
+				}
+				$ret;
+			      } @smb_allPubUsers;
+          push @smb_roUsers, $shareGuest;
 
         }
 
-        if ($publicAccess eq 'f') {
+        if ($smb_publicAccess eq 'f') {
 
           # Full users are all the valid users plus www-data (guest). The logic here is that
           # if you have granted Public write access, there is no way to give someone specifically
           # readonly access as all they have to do is connect as someone else.
           #
-          @fullUsers = @allUsers;
-          @roUsers = ();
+          @smb_fullUsers = @smb_allUsers;
+          @smb_roUsers = ();
 
         }
       }
 
-      if (@allUsers) {
-        $sharesInc->newval($sharename, 'valid users', join(' ', @allUsers)) if (@allUsers);
+      if (@smb_allUsers) {
+        $sharesInc->newval($sharename, 'valid users', join(' ', @smb_allUsers)) if (@smb_allUsers);
       } else {
         $sharesInc->delval($sharename, 'valid users');
       }
-      if (@fullUsers) {
-        $sharesInc->newval($sharename, 'write list', join(' ', @fullUsers)) if (@fullUsers);
+      if (@smb_fullUsers) {
+        $sharesInc->newval($sharename, 'write list', join(' ', @smb_fullUsers)) if (@smb_fullUsers);
       } else {
         $sharesInc->delval($sharename, 'write list');
       }
-      if (@roUsers) {
-        $sharesInc->newval($sharename, 'read list', join(' ', @roUsers)) if (@roUsers);
+      if (@smb_roUsers) {
+        $sharesInc->newval($sharename, 'read list', join(' ', @smb_roUsers)) if (@smb_roUsers);
       } else {
         $sharesInc->delval($sharename, 'read list');
       }
-
-    } # else {
+      #
+      #  FTP
+      #
+      my $mpnt = $sharesInc->val($sharename, 'path');
+      $mpnt =~ s,/$sharename$,,;
+      for my $username (@ftp_fullUsers) {
+	ludo("$nbin/ftpacl.pl full $username $mpnt $sharename");
+      }
+      for my $username (@ftp_readUsers) {
+	ludo("$nbin/ftpacl.pl read $username $mpnt $sharename");
+      }
+      for my $username (@ftp_noneUsers) {
+	ludo("$nbin/ftpacl.pl none $username $mpnt $sharename");
+      }
+    }				# else {
 
     #   if ($cgi->param('pword') ne '') {
 
@@ -494,7 +520,14 @@ sub stage6($$$) {
       $self->fatalError($config, 'f00034');
       return;
     }
-
+    unless (ludo("$nbin/ftpacl.pl rebuild")) {
+      $self->fatalError($config, 'f00039');
+      return;
+    }
+    unless (sudo("$nbin/rereadFTPconfig.sh")) {
+      $self->fatalError($config, 'f00040');
+      return;
+    }
   }
 
   if ($cgi->param('ftp') eq 'y') {
