@@ -130,7 +130,7 @@ EOF
   return doQuery($query);
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ftpRemoveShare ($$$) {
+sub ftpRemoveShare ($$) {
   my ($mpnt, $share) = @_;
   my $query .= <<EOF;
 	BEGIN TRANSACTION;
