@@ -13,5 +13,5 @@ DIR=$*
 
 mkdir "/shares/$DIR"
 
-chmod o-rwx "/shares/$DIR"
 chown www-data.www-data "/shares/$DIR"
+chmod 0770 "/shares/$DIR"
