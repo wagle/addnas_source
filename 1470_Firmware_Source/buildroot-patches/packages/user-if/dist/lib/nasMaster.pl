@@ -151,7 +151,7 @@ if (! -w nasCommon->smbpasswd ) {
 	sudo("$nbin/touch.sh ".nasCommon->smbpasswd );
 	sudo("$nbin/chown.sh www-data:www-data ".nasCommon->smbpasswd);
 	sudo("$nbin/chmod.sh 0664 ".nasCommon->smbpasswd);
-	sudo("$nbin/fs_addUser.sh 'www-data' 'blank'" );
+	sudo("$nbin/fs_addUser.sh 'www-data' 'h4rd3;gu155pw0d'" );
 }
 
 # BUG#2890 bruce - smb.conf and /usr/local/samba/lib/ should be owned by www-data
