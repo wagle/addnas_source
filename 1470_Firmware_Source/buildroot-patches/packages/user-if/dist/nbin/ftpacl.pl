@@ -130,6 +130,16 @@ EOF
   return doQuery($query);
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub ftpRemoveShare ($$$) {
+  my ($mpnt, $share) = @_;
+  my $query .= <<EOF;
+	BEGIN TRANSACTION;
+	DELETE FROM ftpacl WHERE mpnt = "$mpnt" and path = "/$share";
+	COMMIT;
+EOF
+  return doQuery($query);
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpShowAccessToShare ($) {
   my ($share) = @_;
   my $query .= <<EOF;
@@ -225,6 +235,8 @@ if (@ARGV == 1 && $ARGV[0] eq "init") {
   ftpUpsertUserToNONE($ARGV[1] ,$ARGV[2], $ARGV[3]);
 } elsif (@ARGV == 1 && $ARGV[0] eq "rebuild") {
   ftpRebuildConfig();
+} elsif (@ARGV == 3 && $ARGV[0] eq "remove_share") {
+  ftpRemoveShare($ARGV[1] ,$ARGV[2]);
 } elsif (@ARGV == 2 && $ARGV[0] eq "show") {
   ftpShowAccessToShare($ARGV[1]);
 } else {

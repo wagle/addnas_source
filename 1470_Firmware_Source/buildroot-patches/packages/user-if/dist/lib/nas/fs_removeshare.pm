@@ -72,7 +72,8 @@ sub stage1($$$) {
   if ($sharesInc->SectionExists($sharename)) {
 
     $path = $sharesInc->val($sharename, 'path');
-        
+    $mpnt =~ s,/$sharename$,,;
+
     $sharesInc->DeleteSection($sharename);
         
     unless ($sharesInc->RewriteConfig) {
@@ -81,6 +82,16 @@ sub stage1($$$) {
     }
     unless (sudo("$nbin/reconfigSamba.sh")) {
       $self->fatalError($config, 'f00034');
+      return;
+    }
+
+    ludo("$nbin/ftpacl.pl remove_share $mpnt $sharename");
+    unless (ludo("$nbin/ftpacl.pl rebuild")) {
+      $self->fatalError($config, 'f00039');
+      return;
+    }
+    unless (sudo("$nbin/rereadFTPconfig.sh")) {
+      $self->fatalError($config, 'f00040');
       return;
     }
   }
