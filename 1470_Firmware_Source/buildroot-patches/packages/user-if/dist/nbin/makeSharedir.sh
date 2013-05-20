@@ -13,5 +13,5 @@ DIR=$*
 
 mkdir "/shares/$DIR"
 
-chmod go-rwx "/shares/$DIR"
-chown www-data "/shares/$DIR"
+chmod o-rwx "/shares/$DIR"
+chown www-data.www-data "/shares/$DIR"
