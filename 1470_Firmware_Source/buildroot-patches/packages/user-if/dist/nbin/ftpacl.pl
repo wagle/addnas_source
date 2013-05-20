@@ -182,9 +182,9 @@ EOF
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ALIASES_BODY_TEMPLATE($$) {
-  my ($share, $user) = @_;
+  my ($sharelist, $user) = @_;
   my $template = <<EOF;
-  HideFiles $share user $user
+  HideFiles "($sharelist)" user $user
 EOF
   return $template;
 }
@@ -209,10 +209,18 @@ sub ftpRebuildConfig () {
   my @output = doQuery(FTPACL_HIDDEN_SHARE_QUERY());
   if (scalar @output != 0) {
     $aliases .= ALIASES_HEAD_TEMPLATE();
+    my %user2hidden;
     foreach (@output) {
       my ($mpnt, $share, $user) = split(/\|/);
       $share =~ s,^/,,;  # strip leading "/"
-      $aliases .= ALIASES_BODY_TEMPLATE($share, $user);
+      if (exists $user2hidden{$user}) {
+	$user2hidden{$user} .= "|$share"
+      } else {
+	$user2hidden{$user} = "$share"
+      }
+    }
+    for my $user (keys %user2hidden) {
+      $aliases .= ALIASES_BODY_TEMPLATE($user2hidden{$user}, $user);
     }
     $aliases .= ALIASES_TAIL_TEMPLATE();
   }

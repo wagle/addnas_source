@@ -15,6 +15,7 @@ if [ -n "$UNAME" ]
 then
 	$SMB_HOME/bin/pdbedit -x "$UNAME" -s ${SMB_CONF}
 	deluser "$UNAME"
+	delgroup "$UNAME" www-data
 	rm /home/"$UNAME"
 	rmdir /top/"$UNAME"  ### should always be empty
 fi

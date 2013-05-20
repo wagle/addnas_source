@@ -39,7 +39,8 @@ sub stage1($$$) {
   my $vars = { tabon => 'fileshare' };
   my $error = 0;
 
-  my $username = uc $cgi->param('new_username');
+#  my $username = uc $cgi->param('new_username');
+  my $username = $cgi->param('new_username');
   my $pword1 = $cgi->param('pword1');
   my $pword2 = $cgi->param('pword2');
   my $usehomedd;
