@@ -13,9 +13,16 @@
 </table>
 <br />
 [% IF frm.cif == 'y' %]
-<table border="0" width="90%">
+<table border="1" width="100%">
 <tr>
-  <th align="left">[% lang.m11015 %]</th>
+  <th align="left" rowspan="2">[% lang.m11015 %]</th>
+  <th colspan="3">SMB</th>
+  <th colspan="3">FTP</th>
+</tr>
+<tr>
+  <th width="50px" align="left">[% lang.m10006 %]</th>
+  <th width="50px" align="left">[% lang.m10007 %]</th>
+  <th width="50px" align="left">[% lang.m10008 %]</th>
   <th width="50px" align="left">[% lang.m10006 %]</th>
   <th width="50px" align="left">[% lang.m10007 %]</th>
   <th width="50px" align="left">[% lang.m10008 %]</th>
@@ -23,9 +30,12 @@
 [% FOREACH user IN users %]
 <tr>
   <td>[% user.name %]</td>
-  <td><input type="radio" name="user_[% user.id %]_perm"  value="f"></td>
-  <td><input type="radio" name="user_[% user.id %]_perm"  value="r"></td>
-  <td><input type="radio" name="user_[% user.id %]_perm"  value="n" CHECKED></td>
+  <td><input type="radio" name="user_[% user.id %]_smb_perm"  value="f"></td>
+  <td><input type="radio" name="user_[% user.id %]_smb_perm"  value="r"></td>
+  <td><input type="radio" name="user_[% user.id %]_smb_perm"  value="n" CHECKED></td>
+  <td><input type="radio" name="user_[% user.id %]_ftp_perm"  value="f"></td>
+  <td><input type="radio" name="user_[% user.id %]_ftp_perm"  value="r"></td>
+  <td><input type="radio" name="user_[% user.id %]_ftp_perm"  value="n" CHECKED></td>
 </tr>
 [% END %]
 </table>

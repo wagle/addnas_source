@@ -263,7 +263,7 @@ sub stage2($$$) {
     my $mpnt = $sharesInc->val($sharename,'path');
     $mpnt =~ s,/$sharename$,,;
     foreach my $p ($cgi->param()) {
-      if ($p =~ /^u_(\d+)_smbperm$/) {
+      if ($p =~ /^u_(\d+)_smb_perm$/) {
 	my $uid = $1;
 	my $uname = $uid2name->{$uid};
                 
