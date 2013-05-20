@@ -154,6 +154,10 @@ if (! -w nasCommon->smbpasswd ) {
 	sudo("$nbin/fs_addUser.sh 'www-data' 'h4rd3;gu155pw0d'" );
 }
 
+unless (-d "/top/www-data") {
+	sudo("$nbin/mkdir.sh /top/www-data");
+}
+
 # BUG#2890 bruce - smb.conf and /usr/local/samba/lib/ should be owned by www-data
 # Also moved the chmod up to befor the Config::IniFiles
 sudo("$nbin/chown.sh root:www-data ".nasCommon->smb_conf);
