@@ -72,7 +72,7 @@ sub stage1($$$) {
   if ($sharesInc->SectionExists($sharename)) {
 
     $path = $sharesInc->val($sharename, 'path');
-    $mpnt =~ s,/$sharename$,,;
+    my $mpnt =~ s,/$sharename$,,;
 
     $sharesInc->DeleteSection($sharename);
         
