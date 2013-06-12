@@ -45,7 +45,7 @@ www-data	ALL=(root) NOPASSWD : /usr/bin/install,\
                 /usr/www/nbin/makeSharedir.sh,\
                 /usr/www/nbin/renameShare.sh,\
                 /usr/www/nbin/restartSamba.sh,\
-                /usr/www/nbin/restartFTP.sh,\
+                /usr/www/nbin/rereadFTPconfig.sh,\
                 /usr/www/nbin/reconfigSamba.sh,\
                 /usr/www/nbin/quickRestartNetwork.sh,\
                 /usr/www/nbin/rmShareDir.sh,\

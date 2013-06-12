@@ -24,8 +24,8 @@ restart() {
 }
 
 reread_config() {
-###	kill -TERM `cat /usr/local/var/proftpd.pid`  # right way
-  	killall -TERM proftpd
+###	kill -HUP `cat /usr/local/var/proftpd.pid`  # right way
+  	killall -HUP proftpd
 }
 
 case "$1" in
