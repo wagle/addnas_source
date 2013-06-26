@@ -290,22 +290,16 @@ sub stage2($$$) {
 	  return;
 	}
                 
-	if ($uname eq $shareGuest) {
-	  # Note public access level requested
-	  #
-	  $ftp_publicAccess = $cgi->param($p);
+	my $ftpperm = $cgi->param($p);
+	if ($ftpperm eq 'f') {
+	  ludo("$nbin/ftpacl.pl full $uname $mpnt $sharename");
+	} elsif ($ftpperm eq 'r') {
+	  ludo("$nbin/ftpacl.pl read $uname $mpnt $sharename");
+	} elsif ($ftpperm eq 'n') {
+	  ludo("$nbin/ftpacl.pl none $uname $mpnt $sharename");
 	} else {
-	  my $ftpperm = $cgi->param($p);
-	  if ($ftpperm eq 'f') {
-	    ludo("$nbin/ftpacl.pl full $uname $mpnt $sharename");
-	  } elsif ($ftpperm eq 'r') {
-	    ludo("$nbin/ftpacl.pl read $uname $mpnt $sharename");
-	  } elsif ($ftpperm eq 'n') {
-	    ludo("$nbin/ftpacl.pl none $uname $mpnt $sharename");
-	  } else {
-	    $self->fatalError($config, 'f00041');
-	    return;
-	  }
+	  $self->fatalError($config, 'f00041');
+	  return;
 	}
       }
     }

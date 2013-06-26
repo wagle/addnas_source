@@ -13,6 +13,7 @@ use IPC::Filter qw(filter);
 my $SQL = '/usr/bin/sqlite3';
 my $DBASE = '/var/oxsemi/proftpd.sqlite3';
 my $ALIASES = '/var/oxsemi/proftpd.vrootaliases';
+my $HIDDENS = '/var/oxsemi/proftpd.hiddens';
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 # sub dumpQuery {
 #   my ($output, $exitcode) = @_;
@@ -174,14 +175,14 @@ EOF
   return $template;
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ALIASES_HEAD_TEMPLATE() {
+sub HIDDENS_HEAD_TEMPLATE() {
   my $template .= <<EOF;
 <Directory />
 EOF
   return $template;
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ALIASES_BODY_TEMPLATE($$) {
+sub HIDDENS_BODY_TEMPLATE($$) {
   my ($sharelist, $user) = @_;
   my $template = <<EOF;
   HideFiles "($sharelist)" user $user
@@ -189,7 +190,7 @@ EOF
   return $template;
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ALIASES_TAIL_TEMPLATE() {
+sub HIDDENS_TAIL_TEMPLATE() {
   my $template .= <<EOF;
   <Limit ALL>
     IgnoreHidden on
@@ -199,16 +200,17 @@ EOF
   return $template;
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ftpRebuildConfig () {
+sub ftpRebuildConfigs () {
   my $aliases = "";
   foreach (doQuery(FTPACL_SHARE_QUERY())) {
     my ($mpnt, $share) = split(/\|/);
     $share =~ s,^/,,;  # strip leading "/"
     $aliases .= ALIASES_TOP_TEMPLATE($mpnt, $share);
   }
+  my $hiddens = "";
   my @output = doQuery(FTPACL_HIDDEN_SHARE_QUERY());
   if (scalar @output != 0) {
-    $aliases .= ALIASES_HEAD_TEMPLATE();
+    $hiddens .= HIDDENS_HEAD_TEMPLATE();
     my %user2hidden;
     foreach (@output) {
       my ($mpnt, $share, $user) = split(/\|/);
@@ -220,12 +222,15 @@ sub ftpRebuildConfig () {
       }
     }
     for my $user (keys %user2hidden) {
-      $aliases .= ALIASES_BODY_TEMPLATE($user2hidden{$user}, $user);
+      $hiddens .= HIDDENS_BODY_TEMPLATE($user2hidden{$user}, $user);
     }
-    $aliases .= ALIASES_TAIL_TEMPLATE();
+    $hiddens .= HIDDENS_TAIL_TEMPLATE();
   }
   open(my $file, "> $ALIASES");
   print $file $aliases;
+  close $file;
+  open(my $file, "> $HIDDENS");
+  print $file $hiddens;
   close $file;
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
@@ -242,7 +247,7 @@ if (@ARGV == 1 && $ARGV[0] eq "init") {
 } elsif (@ARGV == 4 && $ARGV[0] eq "none") {
   ftpUpsertUserToNONE($ARGV[1] ,$ARGV[2], $ARGV[3]);
 } elsif (@ARGV == 1 && $ARGV[0] eq "rebuild") {
-  ftpRebuildConfig();
+  ftpRebuildConfigs();
 } elsif (@ARGV == 3 && $ARGV[0] eq "remove_share") {
   ftpRemoveShare($ARGV[1] ,$ARGV[2]);
 } elsif (@ARGV == 2 && $ARGV[0] eq "show") {
