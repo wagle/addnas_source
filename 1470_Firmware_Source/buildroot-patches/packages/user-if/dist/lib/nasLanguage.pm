@@ -172,6 +172,7 @@ $message = {
 		m07002 => 'New Workgroup',
 		m07003 => 'Device name and Workgroup updated',
 		m07004 => 'Update Device/Workgroup Names',
+		m07005 => 'FTP Port Number updated',
 		e07001 => 'Device Name is required',
 		e07002 => 'Workgroup is required',
 		e07003 => 'Device Name contains invalid characters use characters a-z, 0-9',
