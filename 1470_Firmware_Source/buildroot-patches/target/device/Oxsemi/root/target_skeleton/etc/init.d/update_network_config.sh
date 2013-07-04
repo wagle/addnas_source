@@ -10,7 +10,6 @@ domain=$2
 current_hostname=`/bin/hostname`
 hostsfile=/etc/hosts
 mDNSconfig=/etc/mDNSResponderPosix
-SMBconf="/etc/smb.conf"
 
 # Write a new /etc/hosts with the IP adr and domain
 echo "127.0.0.1	localhost" > $hostsfile
@@ -34,16 +33,15 @@ echo "$current_hostname file server user interface" >> $mDNSconfig
 # allowing this to be overridden by hostname from /var/oxsemi/network-settings
 . /var/oxsemi/network-settings
 
-### WAGLE replace /etc/smb.conf if empty or non-existent
-[ ! -s $SMBconf ] && cp $SMBconf.factory $SMBconf
-
 # Update the interfaces/server string/workgroup settings in Samba config file
 INTERFACES=$( ip -f inet address show | awk -v ORS=" " '$1 == "inet" {print $2}' )
-sed -i.BAK -e "s:interfaces[ ]*=.*\$:interfaces=$INTERFACES:" $SMBconf
-sed -i.BAK -e "s:workgroup[ ]*=.*\$:workgroup=$workgroup:" $SMBconf
-sed -i.BAK -e "s:server string[ ]*=.*\$:server string=$current_hostname:" $SMBconf
+cat <<EOF > /var/oxsemi/smb.header.conf
+server string=$current_hostname
+interfaces=$INTERFACES
+workgroup=$workgroup
+EOF
 
 # Ensure correct ownership and permissions on the Samba config file
-chown www-data:www-data $SMBconf
-chmod 664 $SMBconf
+chown www-data:www-data  /var/oxsemi/smb.header.conf
+chmod 664  /var/oxsemi/smb.header.conf
 

@@ -15,7 +15,7 @@ resetconfigs()
 	rm /var/oxsemi/mlpath
 	rm /var/oxsemi/network-settings
 	rm /var/oxsemi/shares.inc
-	rm /etc/smb.conf
+	rm /var/oxsemi/smb.header.conf
 	rm /var/private/smbpasswd
 	rm /var/private/lighttpd.htdigest.user
         rm /var/oxsemi/proftpd.sqlite3
@@ -33,9 +33,9 @@ resetconfigs()
 	chmod 666 /var/osemi/nas.ini
 	chown www-data:www-data /var/oxsemi/nas.ini
 
-	cp /etc/smb.conf.factory /etc/smb.conf
-	chmod 666 /etc/smb.conf
-	chown root:www-data /etc/smb.conf
+	cp /var/oxsemi/smb.header.conf.factory /var/oxsemi/smb.header.conf
+	chmod 666 /var/oxsemi/smb.header.conf
+	chown root:www-data /var/oxsemi/smb.header.conf
 
 	cp /var/private/lighttpd.htdigest.user.factory /var/private/lighttpd.htdigest.user
 	chmod 644 /var/private/lighttpd.htdigest.user
