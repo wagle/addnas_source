@@ -50,10 +50,14 @@ sub main($$$) {
 	open(CMD, "$script $volume list |");
 	while (<CMD>){
   		chomp;
-  		my ($id, $comment) = split (/\t/);
+  		my ($id, $version, $comment) = split (/\t/);
+		unless (defined $comment) {
+			$version = "v58";
+			$comment = $version;
+		}
 		my ($date,$time) = split /\-/, $id;
 		my $fdate = substr($date,0,4).'-'.substr($date,4,2).'-'.substr($date,6,2);
-		push @options, "<option value=\"$id\">$fdate $comment</option>";
+		push @options, "<option value=\"$id\">$fdate $version $comment</option>";
 	}
 	close(CMD);
 	if(@options){
