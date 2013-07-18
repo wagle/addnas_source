@@ -8,6 +8,7 @@ use warnings;
 # @EXPORT = qw(doConsole ftpMakeSchema ftpInsertUser ftpDeleteUser ftpUpsertUserToFULL ftpUpsertUserToREAD ftpUpsertUserToNONE);
 # use Exporter;
 
+use nasCommon;
 use IPC::Filter qw(filter);
 
 my $SQL = '/usr/bin/sqlite3';
@@ -200,6 +201,9 @@ EOF
   return $template;
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
+# rebuild ftp aliases config file
+# rebuild ftp hiddens config file
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpRebuildConfigs () {
   my $aliases = "";
   foreach (doQuery(FTPACL_SHARE_QUERY())) {
@@ -226,12 +230,52 @@ sub ftpRebuildConfigs () {
     }
     $hiddens .= HIDDENS_TAIL_TEMPLATE();
   }
-  open(my $file, "> $ALIASES");
-  print $file $aliases;
-  close $file;
-  open(my $file, "> $HIDDENS");
-  print $file $hiddens;
-  close $file;
+  open(my $file1, "> $ALIASES");
+  print $file1 $aliases;
+  close $file1;
+  open(my $file2, "> $HIDDENS");
+  print $file2 $hiddens;
+  close $file2;
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+# populate new (post-upgrade) ftp acl database from /var/private/smbpasswd and /var/oxsemi/shares.inc
+# -- different error handling regime, so I couldn't DontRepeatYourself
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub ftpRepopulateDatabase () {
+  ###
+  ### Load a list of all known users (Samba passwd file)
+  ###
+  my $allUsers = {};
+  return unless (sudo("$nbin/chmod.sh 0644 " . nasCommon->smbpasswd ));
+  return unless (open(SPW, "<" . nasCommon->smbpasswd));
+  while (<SPW>) {
+    $_ =~ /^([^:]+):([\d]+):.+$/;
+    my ($uname, $uid) = ($1, $2);
+    unless (($uname eq 'root') || ($uname =~ /^sh\d+$/) || ($uname eq 'guest')) {
+      ftpInsertUser($uname);
+      $allUsers->{$uname} = $uid;
+    }
+  }
+  close(SPW);
+
+  ###
+  ### open smb share include file, and walk thrugh shares
+  ###
+  my $sharesInc = new Config::IniFiles( -file => nasCommon->shares_inc );
+  return unless $sharesInc;
+
+  foreach my $sharename ($sharesInc->Sections()) {
+    chomp $sharename;
+    my $mpnt = $sharesInc->val($sharename,'path');
+    $mpnt =~ s,/$sharename$,,;
+
+    foreach my $uname (keys %$allUsers) {
+      ftpUpsertUserToNONE($uname, $mpnt, $sharename);
+    }
+  }
+
+  ftpRebuildConfigs();
+  return unless (sudo("$nbin/rereadFTPconfig.sh"));
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 if (@ARGV == 1 && $ARGV[0] eq "init") {
@@ -248,6 +292,8 @@ if (@ARGV == 1 && $ARGV[0] eq "init") {
   ftpUpsertUserToNONE($ARGV[1] ,$ARGV[2], $ARGV[3]);
 } elsif (@ARGV == 1 && $ARGV[0] eq "rebuild") {
   ftpRebuildConfigs();
+} elsif (@ARGV == 1 && $ARGV[0] eq "repopulate") {
+  ftpRepopulateDatabase();
 } elsif (@ARGV == 3 && $ARGV[0] eq "remove_share") {
   ftpRemoveShare($ARGV[1] ,$ARGV[2]);
 } elsif (@ARGV == 2 && $ARGV[0] eq "show") {
