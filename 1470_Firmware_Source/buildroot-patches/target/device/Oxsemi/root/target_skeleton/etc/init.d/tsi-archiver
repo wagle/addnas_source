@@ -114,7 +114,7 @@ sub tsi_restore($$) {
 		  mkdir "/top/$uname";
 		}
 		close(SPW);
-		system "$nbin/ftpacl.pl repopulate");
+		system "/usr/www/nbin/ftpacl.pl repopulate";
 		### /var/oxsemi/proftpd.sqlite3 created on the fly at boot-time
 	} elsif ((grep { $previous_version eq $_ } @epoch1) and (grep { $current_version eq $_ } @epoch1))  {
 		### ignore "var/lib/current-version";
