@@ -95,7 +95,7 @@ sub tsi_restore($$) {
   chomp ($current_version);
   ### abstract this better later when I know what to do
   my @epoch0 = qw(v58);
-  my @epoch1 = qw(v79a v85a);
+  my @epoch1 = qw(v79a v86a);
   if ((grep { $previous_version eq $_ } @epoch0) and (grep { $current_version eq $_ } @epoch1)) {
     ### ignore "var/lib/current-version";
     rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
