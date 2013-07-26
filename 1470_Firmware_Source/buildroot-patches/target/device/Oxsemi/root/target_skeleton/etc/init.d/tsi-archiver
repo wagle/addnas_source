@@ -110,6 +110,7 @@ sub tsi_restore($$) {
     # begin special handling
     system "egrep '^server string=|^workgroup=|^interfaces=' /etc/smb.conf > /tmp/restores/var/oxsemi/smb.header.conf";
     rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
+    mkdir "/top";
     open(SPW, "< /var/private/smbpasswd");
     while (<SPW>) {
       my ($uname) = split(/:/);
