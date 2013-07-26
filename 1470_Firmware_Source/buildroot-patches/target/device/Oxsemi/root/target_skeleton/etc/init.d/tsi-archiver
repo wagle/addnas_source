@@ -7,7 +7,7 @@ use POSIX qw(strftime);
 my $version = 1;
 
 sub usage() {
-	print STDERR "error\n";
+  print STDERR "error\n";
 }
 
 my @files;
@@ -23,133 +23,135 @@ push @files, "etc/passwd";
 push @files, "etc/group";
 push @files, "etc/shadow";
 push @files, "top";
-push @files, "var/oxsemi/proftpd.sqlite3.dump";  ### created on the fly below
+push @files, "var/oxsemi/proftpd.sqlite3.dump";	### created on the fly below
 my $files = join(" ",@files);
 
 sub is_clean($) {
-	my ($comment) = @_;
-	return 0 if $comment =~/\t/;
-        return 0 if $comment =~/\n/;
-	return 1;
+  my ($comment) = @_;
+  return 0 if $comment =~/\t/;
+  return 0 if $comment =~/\n/;
+  return 1;
 }
 
 sub is_an_archive_file($$) {
-	my ($disk,$id) = @_;
-	return -e "$disk/opt/backups/$id.tar.gz";
+  my ($disk,$id) = @_;
+  return -e "$disk/opt/backups/$id.tar.gz";
 }
 
 sub is_a_potential_archive_disk($) {
-	my ($disk) = @_;
-	return 1 if $disk =~ m,/shares/external/[^/]+,;
-###	return 1 if $disk =~ m,/tmp,;
-	return 0;
+  my ($disk) = @_;
+  return 1 if $disk =~ m,/shares/external/[^/]+,;
+  ###	return 1 if $disk =~ m,/tmp,;
+  return 0;
 }
 
 sub is_an_actual_archive_disk($) {
-	my ($disk) = @_;
-	return 0 unless is_a_potential_archive_disk($disk);
-	return -e "$disk/opt/backups/INDEX";
+  my ($disk) = @_;
+  return 0 unless is_a_potential_archive_disk($disk);
+  return -e "$disk/opt/backups/INDEX";
 }
 
 sub tsi_init($) {
-	my ($disk) = @_;
-	system "mkdir -p $disk/opt/backups"; exit $? if $? != 0;
-	system "echo $version > $disk/opt/backups/INDEX"; exit $? if $? != 0;
+  my ($disk) = @_;
+  system "mkdir -p $disk/opt/backups"; exit $? if $? != 0;
+  system "echo $version > $disk/opt/backups/INDEX"; exit $? if $? != 0;
 }
 
 sub tsi_list($) {
-	my ($disk) = @_;
-	system "tail -n +2 $disk/opt/backups/INDEX"; exit $? if $? != 0;
+  my ($disk) = @_;
+  system "tail -n +2 $disk/opt/backups/INDEX"; exit $? if $? != 0;
 }
 
 sub tsi_backup($$) {
-	my ($disk,$comment) = @_;
-	my $id = strftime "%Y%m%d-%H%M%S", localtime;
-	my $version = `cut -f 1 -d " " /var/lib/current-version`;
-	chomp ($version);
-	system "sqlite3 /var/oxsemi/proftpd.sqlite3 .dump >  /var/oxsemi/proftpd.sqlite3.dump"; exit $? if $? != 0;
-	system "tar c --ignore-failed-read -C / -f $disk/opt/backups/$id.tar.gz $files"; exit $? if $? != 0;
-        system "echo -e '$id\t$version\t$comment' >> $disk/opt/backups/INDEX"; exit $? if $? != 0;
+  my ($disk,$comment) = @_;
+  my $id = strftime "%Y%m%d-%H%M%S", localtime;
+  my $version = `cut -f 1 -d " " /var/lib/current-version`;
+  chomp ($version);
+  system "sqlite3 /var/oxsemi/proftpd.sqlite3 .dump >  /var/oxsemi/proftpd.sqlite3.dump"; exit $? if $? != 0;
+  system "tar c --ignore-failed-read -C / -f $disk/opt/backups/$id.tar.gz $files"; exit $? if $? != 0;
+  system "echo -e '$id\t$version\t$comment' >> $disk/opt/backups/INDEX"; exit $? if $? != 0;
 }
 
 sub tsi_delete($$) {
-	my ($disk,$id) = @_;
-	system "rm $disk/opt/backups/$id.tar.gz "; exit $? if $? != 0;
-	system "sed -i '/^$id\t/d' $disk/opt/backups/INDEX";
+  my ($disk,$id) = @_;
+  system "rm $disk/opt/backups/$id.tar.gz "; exit $? if $? != 0;
+  system "sed -i '/^$id\t/d' $disk/opt/backups/INDEX";
 }
 
 sub tsi_restore($$) {
-	my ($disk,$id) = @_;
-#        system "/etc/init.d/network_servers.sh stop";
-#        system "/etc/init.d/mlnet.sh resetpw";
-#        system "/etc/init.d/mlnet.sh stop";
-	system "rm -rf /tmp/restores";
-	system "mkdir /tmp/restores";
-	system "tar x -C /tmp/restores -f $disk/opt/backups/$id.tar.gz";
-	my $previous_version = `cut -f 1 -d " " /tmp/restores/var/lib/current-version`;
-	chomp ($previous_version);
-	if ($previous_version eq "") { $previous_version = "v58"; }
-	my $current_version = `cut -f 1 -d " " /var/lib/current-version`;
-	chomp ($current_version);
-### abstract this better later when I know what to do
-	my @epoch0 = qw(v58);
-	my @epoch1 = qw(v79a v80a v84a);
-	if ((grep { $previous_version eq $_ } @epoch0) and (grep { $current_version eq $_ } @epoch1))  {
-	  	### ignore "var/lib/current-version";
-		rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
-		rename "/tmp/restores/var/oxsemi/mlpath", "/var/oxsemi/mlpath";
-		rename "/tmp/restores/var/oxsemi/network-settings", "/var/oxsemi/network-settings";
-		rename "/tmp/restores/var/oxsemi/shares.inc", "/var/oxsemi/shares.inc";
-		rename "/tmp/restores/var/private/smbpasswd", "/var/private/smbpasswd";
-		rename "/tmp/restores/var/private/lighttpd.htdigest.user", "/var/private/lighttpd.htdigest.user";
-		rename "/tmp/restores/etc/passwd", "/etc/passwd";
-		rename "/tmp/restores/etc/group", "/etc/group";
-		rename "/tmp/restores/etc/shadow", "/etc/shadow";
-		# begin special handling
-		system "egrep '^server string=|^workgroup=|^interfaces=' /etc/smb.conf > /tmp/restores/var/oxsemi/smb.header.conf";
-		rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
-		open(SPW, "< /var/private/smbpasswd");
-     		while (<SPW>) {
-		  my ($uname) = split(/:/);
-		  mkdir "/top/$uname";
-		}
-		close(SPW);
-		system "/usr/www/nbin/ftpacl.pl init";
-		system "/usr/www/nbin/ftpacl.pl repopulate";
-		### /var/oxsemi/proftpd.sqlite3 created on the fly at boot-time
-	} elsif ((grep { $previous_version eq $_ } @epoch1) and (grep { $current_version eq $_ } @epoch1))  {
-		### ignore "var/lib/current-version";
-		rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
-		rename "/tmp/restores/var/oxsemi/mlpath", "/var/oxsemi/mlpath";
-		rename "/tmp/restores/var/oxsemi/network-settings", "/var/oxsemi/network-settings";
-		rename "/tmp/restores/var/oxsemi/shares.inc", "/var/oxsemi/shares.inc";
-		rename "/tmp/restores/var/private/smbpasswd", "/var/private/smbpasswd";
-		rename "/tmp/restores/var/private/lighttpd.htdigest.user", "/var/private/lighttpd.htdigest.user";
-		rename "/tmp/restores/etc/passwd", "/etc/passwd";
-		rename "/tmp/restores/etc/group", "/etc/group";
-		rename "/tmp/restores/etc/shadow", "/etc/shadow";
-		rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
-		system "rm -rf /top";
-		rename "/tmp/restores/top", "/top";  ### directory move is supposed to work on linux
-		system "rm /var/oxsemi/proftpd.sqlite3";  # required by the dept of redundancy dept
-		system "sudo -u www-data sqlite3 /var/oxsemi/proftpd.sqlite3 < /tmp/restores/var/oxsemi/proftpd.sqlite3.dump"; exit $? if $? != 0;
-	}
-#        system "/etc/init.d/network_servers.sh start";
-#	system "reboot";
+  my ($disk,$id) = @_;
+  #        system "/etc/init.d/network_servers.sh stop";
+  #        system "/etc/init.d/mlnet.sh resetpw";
+  #        system "/etc/init.d/mlnet.sh stop";
+  system "rm -rf /tmp/restores";
+  system "mkdir /tmp/restores";
+  system "tar x -C /tmp/restores -f $disk/opt/backups/$id.tar.gz";
+  my $previous_version = `cut -f 1 -d " " /tmp/restores/var/lib/current-version`;
+  chomp ($previous_version);
+  if ($previous_version eq "") {
+    $previous_version = "v58";
+  }
+  my $current_version = `cut -f 1 -d " " /var/lib/current-version`;
+  chomp ($current_version);
+  ### abstract this better later when I know what to do
+  my @epoch0 = qw(v58);
+  my @epoch1 = qw(v79a v84a);
+  if ((grep { $previous_version eq $_ } @epoch0) and (grep { $current_version eq $_ } @epoch1)) {
+    ### ignore "var/lib/current-version";
+    rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
+    rename "/tmp/restores/var/oxsemi/mlpath", "/var/oxsemi/mlpath";
+    rename "/tmp/restores/var/oxsemi/network-settings", "/var/oxsemi/network-settings";
+    rename "/tmp/restores/var/oxsemi/shares.inc", "/var/oxsemi/shares.inc";
+    rename "/tmp/restores/var/private/smbpasswd", "/var/private/smbpasswd";
+    rename "/tmp/restores/var/private/lighttpd.htdigest.user", "/var/private/lighttpd.htdigest.user";
+    rename "/tmp/restores/etc/passwd", "/etc/passwd";
+    rename "/tmp/restores/etc/group", "/etc/group";
+    rename "/tmp/restores/etc/shadow", "/etc/shadow";
+    # begin special handling
+    system "egrep '^server string=|^workgroup=|^interfaces=' /etc/smb.conf > /tmp/restores/var/oxsemi/smb.header.conf";
+    rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
+    open(SPW, "< /var/private/smbpasswd");
+    while (<SPW>) {
+      my ($uname) = split(/:/);
+      mkdir "/top/$uname";
+    }
+    close(SPW);
+    ### /var/oxsemi/proftpd.sqlite3 created on the fly at boot-time, but maybe not soon enough
+    system "sudo -u www-data /usr/www/nbin/ftpacl.pl init";
+    system "sudo -u www-data /usr/www/nbin/ftpacl.pl repopulate";
+  } elsif ((grep { $previous_version eq $_ } @epoch1) and (grep { $current_version eq $_ } @epoch1)) {
+    ### ignore "var/lib/current-version";
+    rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
+    rename "/tmp/restores/var/oxsemi/mlpath", "/var/oxsemi/mlpath";
+    rename "/tmp/restores/var/oxsemi/network-settings", "/var/oxsemi/network-settings";
+    rename "/tmp/restores/var/oxsemi/shares.inc", "/var/oxsemi/shares.inc";
+    rename "/tmp/restores/var/private/smbpasswd", "/var/private/smbpasswd";
+    rename "/tmp/restores/var/private/lighttpd.htdigest.user", "/var/private/lighttpd.htdigest.user";
+    rename "/tmp/restores/etc/passwd", "/etc/passwd";
+    rename "/tmp/restores/etc/group", "/etc/group";
+    rename "/tmp/restores/etc/shadow", "/etc/shadow";
+    rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
+    system "rm -rf /top";
+    rename "/tmp/restores/top", "/top";	### directory move is supposed to work on linux
+    system "rm /var/oxsemi/proftpd.sqlite3"; # required by the dept of redundancy dept
+    system "sudo -u www-data sqlite3 /var/oxsemi/proftpd.sqlite3 < /tmp/restores/var/oxsemi/proftpd.sqlite3.dump"; exit $? if $? != 0;
+  }
+  #        system "/etc/init.d/network_servers.sh start";
+  #	system "reboot";
 }
 
 if (@ARGV == 2 && is_a_potential_archive_disk($ARGV[0]) && ! is_an_actual_archive_disk($ARGV[0]) && $ARGV[1] eq "init") {
-	tsi_init($ARGV[0]);
+  tsi_init($ARGV[0]);
 } elsif (@ARGV == 2 && is_an_actual_archive_disk($ARGV[0]) && $ARGV[1] eq "list") {
-	tsi_list($ARGV[0]);
+  tsi_list($ARGV[0]);
 } elsif (@ARGV == 3 && is_an_actual_archive_disk($ARGV[0]) && $ARGV[1] eq "backup" && is_clean($ARGV[2])) {
-	tsi_backup($ARGV[0],$ARGV[2]);
+  tsi_backup($ARGV[0],$ARGV[2]);
 } elsif (@ARGV == 3 && is_an_actual_archive_disk($ARGV[0]) && $ARGV[1] eq "delete" && is_an_archive_file($ARGV[0],$ARGV[2])) {
-	tsi_delete($ARGV[0],$ARGV[2]);
+  tsi_delete($ARGV[0],$ARGV[2]);
 } elsif (@ARGV == 3 && is_an_actual_archive_disk($ARGV[0]) && $ARGV[1] eq "restore" && is_an_archive_file($ARGV[0],$ARGV[2])) {
-	tsi_restore($ARGV[0], $ARGV[2]);
+  tsi_restore($ARGV[0], $ARGV[2]);
 } else {
-	usage();
-	exit 1;
+  usage();
+  exit 1;
 }
 exit 0;
