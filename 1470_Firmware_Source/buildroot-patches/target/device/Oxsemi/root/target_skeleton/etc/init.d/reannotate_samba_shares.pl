@@ -39,6 +39,9 @@ for $share ( $sharesInc->Sections ) {
 	my $xfs = 0;
 	my $fstransport = "unavailable";
 	my $path = $sharesInc->val($share,'path');
+	my $tcreatedir = $path;
+	$tcreatedir =~ s,^/shares,,;
+	system "/usr/www/nbin/makeSharedir.sh $tcreatedir";  ### chown and chmod
 	for my $mpnt ( keys %fstype ) {
 		if ( $path eq "$mpnt/$share" ) {
 			if ( $fstype{$mpnt} eq "xfs" ) {
