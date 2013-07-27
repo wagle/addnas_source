@@ -115,6 +115,7 @@ sub tsi_restore($$) {
     while (<SPW>) {
       my ($uname) = split(/:/);
       mkdir "/top/$uname";
+      system "addgroup $uname www-data"
     }
     close(SPW);
     ### /var/oxsemi/proftpd.sqlite3 created on the fly at boot-time, but maybe not soon enough
