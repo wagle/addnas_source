@@ -27,9 +27,9 @@ if [ -n "$HOMED" ] ; then
 	ln -s "$HOMED" /home/$UNAME
 fi
 
-adduser -D -H "$UNAME"
+adduser -D -H -G www-data "$UNAME"
 nas_passwd.sh "$UNAME" "$PWORD"
-addgroup "$UNAME" www-data  ### give access to shares
+###addgroup "$UNAME" www-data  ### give access to shares
 mkdir -p /top/"$UNAME"      ### initial dir for proftpd magic
 
 if [ -n "$HOMED" ] ; then
