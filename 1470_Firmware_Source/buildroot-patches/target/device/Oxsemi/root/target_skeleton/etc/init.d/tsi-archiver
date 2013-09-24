@@ -96,7 +96,8 @@ sub tsi_restore($$) {
   ### abstract this better later when I know what to do
   my @epoch0 = qw(v58);
   my @epoch1 = qw(v79a v87a);
-  if ((grep { $previous_version eq $_ } @epoch0) and (grep { $current_version eq $_ } @epoch1)) {
+  my @epoch2 = qw(v88a);  ### the current version (grep { $current_version eq $_ } @epoch2)
+  if (grep { $previous_version eq $_ } @epoch0) {
     ### ignore "var/lib/current-version";
     rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
     rename "/tmp/restores/var/oxsemi/mlpath", "/var/oxsemi/mlpath";
@@ -104,25 +105,76 @@ sub tsi_restore($$) {
     rename "/tmp/restores/var/oxsemi/shares.inc", "/var/oxsemi/shares.inc";
     rename "/tmp/restores/var/private/smbpasswd", "/var/private/smbpasswd";
     rename "/tmp/restores/var/private/lighttpd.htdigest.user", "/var/private/lighttpd.htdigest.user";
-    rename "/tmp/restores/etc/passwd", "/etc/passwd";
+    ### rename "/tmp/restores/etc/passwd", "/etc/passwd";
     rename "/tmp/restores/etc/group", "/etc/group";
     rename "/tmp/restores/etc/shadow", "/etc/shadow";
     # begin special handling
     system "egrep '^server string=|^workgroup=|^interfaces=' /etc/smb.conf > /tmp/restores/var/oxsemi/smb.header.conf";
     rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
     mkdir "/top";
+    my @smbusers = qw();
     open(SPW, "< /var/private/smbpasswd");
     while (<SPW>) {
       my ($uname) = split(/:/);
       mkdir "/top/$uname";
-      system "addgroup $uname www-data"
+      push (@smbusers, $uname);
     }
     close(SPW);
+    open(OPW, "< /tmp/restores/etc/passwd");
+    open(NPW, "> /etc/passwd");
+    while (<OPW>) {
+      chomp;
+      ### foo:x:1002:33:Linux User,,,:/home/foo:/bin/sh
+      my ($ouser,$opwd,$ouid,$ogid,$ogecos,$ohome,$oshell) = split(/:/);
+      if (grep { $ouser eq $_ } @smbusers) {
+	$ogid = 33;
+      }
+      printf NPW "%s:%s:%s:%s:%s:%s:%s\n",$ouser,$opwd,$ouid,$ogid,$ogecos,$ohome,$oshell
+    }
+    close(NPW);
+    close(OPW);
     ### /var/oxsemi/proftpd.sqlite3 created on the fly at boot-time, but maybe not soon enough
     system "chown www-data /var/oxsemi/proftpd.*"; 
     system "sudo -u www-data /usr/www/nbin/ftpacl.pl init";
     system "sudo -u www-data /usr/www/nbin/ftpacl.pl repopulate";
-  } elsif ((grep { $previous_version eq $_ } @epoch1) and (grep { $current_version eq $_ } @epoch1)) {
+  } elsif (grep { $previous_version eq $_ } @epoch1) {
+    ### ignore "var/lib/current-version";
+    rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
+    rename "/tmp/restores/var/oxsemi/mlpath", "/var/oxsemi/mlpath";
+    rename "/tmp/restores/var/oxsemi/network-settings", "/var/oxsemi/network-settings";
+    rename "/tmp/restores/var/oxsemi/shares.inc", "/var/oxsemi/shares.inc";
+    rename "/tmp/restores/var/private/smbpasswd", "/var/private/smbpasswd";
+    rename "/tmp/restores/var/private/lighttpd.htdigest.user", "/var/private/lighttpd.htdigest.user";
+    ### rename "/tmp/restores/etc/passwd", "/etc/passwd";
+    rename "/tmp/restores/etc/group", "/etc/group";
+    rename "/tmp/restores/etc/shadow", "/etc/shadow";
+    rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
+    system "rm -rf /top";
+    rename "/tmp/restores/top", "/top";	### directory move is supposed to work on linux
+    system "rm /var/oxsemi/proftpd.sqlite3"; # required by the dept of redundancy dept
+    system "sudo -u www-data sqlite3 /var/oxsemi/proftpd.sqlite3 < /tmp/restores/var/oxsemi/proftpd.sqlite3.dump"; exit $? if $? != 0;
+    my @smbusers = qw();
+    open(SPW, "< /var/private/smbpasswd");
+    while (<SPW>) {
+      my ($uname) = split(/:/);
+      push (@smbusers, $uname);
+      system "delgroup $uname www-data";
+    }
+    close(SPW);
+    open(OPW, "< /tmp/restores/etc/passwd");
+    open(NPW, "> /etc/passwd");
+    while (<OPW>) {
+      chomp;
+      ### foo:x:1002:33:Linux User,,,:/home/foo:/bin/sh
+      my ($ouser,$opwd,$ouid,$ogid,$ogecos,$ohome,$oshell) = split(/:/);
+      if (grep { $ouser eq $_ } @smbusers) {
+	$ogid = 33;
+      }
+      printf NPW "%s:%s:%s:%s:%s:%s:%s\n",$ouser,$opwd,$ouid,$ogid,$ogecos,$ohome,$oshell
+    }
+    close(NPW);
+    close(OPW);
+  } elsif (grep { $previous_version eq $_ } @epoch2) {
     ### ignore "var/lib/current-version";
     rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
     rename "/tmp/restores/var/oxsemi/mlpath", "/var/oxsemi/mlpath";
