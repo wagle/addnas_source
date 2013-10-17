@@ -15,8 +15,7 @@
 <br />
 <br />
 <br />
-<input type="hidden" name="cif" value="y">
 <input type="button" name="back" tabindex="2" value="[% lang.m08021 %]"  onClick="location='/auth/fs_addshare.pl'">
 <input type="button" name="cancel" tabindex="3" value="[% lang.m01027 %]"  onClick="location='/auth/fileshare.pl'">
-<input type="hidden" name="nextstage" value="4">
+<input type="hidden" name="nextstage" value="2">
 </form>

@@ -14,10 +14,11 @@ use strict;
 
 use nasCommon;
 
-# [ ] -> fs_addshare.tpl      (start wizard)   -> [1]
-# [1] -> fs_addshare1.tpl     (get sharename)  -> [2]
-# [2] -> fs_addshare2.tpl     (get volumename) -> [4]
-# [4] -> fs_addshare4user.tpl (set perms)      -> [6]
+# [ ] -> fs_addshare.tpl      (start wizard)    -> [1]
+# [1] -> fs_addshare2.tpl     (get volumename)  -> [2]
+# [2] -> fs_addshare1.tpl     (get sharename)   -> [4]
+# [4] -> fs_addshare4user.tpl (get perms)       -> [6]
+# [6] -> ...                  (perform actions)
 
 sub main($$$) {
 
@@ -25,7 +26,8 @@ sub main($$$) {
 
   {
     if ($cgi->param('nextstage') == 1) {
-      $self->outputTemplate('fs_addshare1.tpl', { tabon => 'fileshare' } );
+###      $self->outputTemplate('fs_addshare1.tpl', { tabon => 'fileshare' } );
+      $self->stage1($cgi, $config);
       last;
     }
 
@@ -34,20 +36,20 @@ sub main($$$) {
       last;
     }
 
-    if ($cgi->param('nextstage') == 3) {
-      $self->stage3($cgi, $config);
-      last;
-    }
+    # if ($cgi->param('nextstage') == 3) {
+    #   $self->stage3($cgi, $config);
+    #   last;
+    # }
 
     if ($cgi->param('nextstage') == 4) {
       $self->stage4($cgi, $config);
       last;
     }
 
-    if ($cgi->param('nextstage') == 5) {
-      $self->stage5($cgi, $config);
-      last;
-    }
+    # if ($cgi->param('nextstage') == 5) {
+    #   $self->stage5($cgi, $config);
+    #   last;
+    # }
 
     if ($cgi->param('nextstage') == 6) {
       $self->stage6($cgi, $config);
@@ -69,6 +71,31 @@ sub reserved_filename_p($) {
   return 0;
 }
 
+# start wizard (fs_addshare.tpl) -> stage 1 -> select volume (fs_addshare2.tpl)
+sub stage1($$$) {
+  my ($self, $cgi, $config) = @_;
+
+  # Select the filesharing tab for display
+  my $vars = { tabon => 'fileshare' };
+
+  # Copy the form data into our local storage
+  copyFormVars($cgi, $vars);
+
+  # Add to the list of volumes any found in the external directory (ie,
+  # pendrives, etc) so that these can be presented to the user as options
+  # for volumes onto which the new share can be mapped
+  my @vols = ();
+  unless (nasCommon::listExternals(\@vols)) {
+    $self->fatalError($config, 'f00026');
+    return;
+  }
+  $vars->{extvols} = \@vols;
+
+  # Display the next form
+  $self->outputTemplate('fs_addshare2.tpl', $vars); # select a volume
+}
+
+# select volume (fs_addshare2.tpl) -> stage 1 -> select share (fs_addshare2.tpl)
 sub stage2($$$) {
   my ($self, $cgi, $config) = @_;
 
@@ -93,33 +120,25 @@ sub stage2($$$) {
     return;
   }
 
-  # Add to the list of volumes any found in the external directory (ie,
-  # pendrives, etc) so that these can be presented to the user as options
-  # for volumes onto which the new share can be mapped
-  my @vols = ();
-  unless (nasCommon::listExternals(\@vols)) {
-    $self->fatalError($config, 'f00026');
-    return;
-  }
-  $vars->{extvols} = \@vols;
-
   # Feed back the uppercased share name to the next form
   $vars->{frm}->{sharename} = $utf8name;
 
+  $vars->{frm}->{volume} = $cgi->param('volume');
+
   # Display the next form
-  $self->outputTemplate('fs_addshare2.tpl', $vars);
+  $self->outputTemplate('fs_addshare1.tpl', $vars);
 }
 
-sub stage3($$$) {
-
-  my ($self, $cgi, $config) = @_;
-
-  my $vars = { tabon => 'fileshare' };
-
-  copyFormVars($cgi, $vars);
-  $self->outputTemplate('fs_addshare3.tpl', $vars);
-
-}
+# sub stage3($$$) {
+#
+#   my ($self, $cgi, $config) = @_;
+#
+#   my $vars = { tabon => 'fileshare' };
+#
+#   copyFormVars($cgi, $vars);
+#   $self->outputTemplate('fs_addshare3.tpl', $vars);
+#
+# }
 
 sub stage4($$$) {
 
@@ -130,8 +149,8 @@ sub stage4($$$) {
 
   copyFormVars($cgi, $vars);
 
-  if ($cgi->param('cif')) {
-    my ($errcode,$errmessage) = checkForFilenameCaseBraindamage("/shares/external/".$cgi->param('volume')."/".$vars->{frm}->{sharename});
+  ###if ($cgi->param('cif')) {
+    my ($errcode,$errmessage) = checkForFilenameCaseBraindamage("/shares/external/".$vars->{frm}->{volume}."/".$vars->{frm}->{sharename});
     if ( $errcode ) {
       $self->fatalError($config, $errcode, $errmessage);
       return;
@@ -215,39 +234,38 @@ sub stage4($$$) {
     }	 # else {
     #   $self->outputTemplate('fs_addshare4password.tpl', $vars);
     # }
-  } elsif ($cgi->param('nfs')) {
-    $self->outputTemplate('fs_addshare4user.tpl', $vars);
-  } else {
-    $self->outputTemplate('fs_addshare5.tpl', $vars);
-
-  }
+  ###} elsif ($cgi->param('nfs')) {
+  ###  $self->outputTemplate('fs_addshare4user.tpl', $vars);
+  ###} else {
+  ###  $self->outputTemplate('fs_addshare5.tpl', $vars);
+  ###}
 }
 
-sub stage5($$$) {
-
-  my ($self, $cgi, $config) = @_;
-
-  my $vars = { tabon => 'fileshare' };
-  my $error = 0;
-
-  copyFormVars($cgi, $vars);
-
-  my $users = [];
-  foreach my $p ($cgi->param()) {
-
-    # Copy the user share permissions required to the next page
-    #
-    if ($p =~ /^user_(\d+)_smb_perm$/) {
-      push @$users, { id => $1, smb_perm => $cgi->param($p) };
-    } elsif ($p =~ /^user_(\d+)_ftp_perm$/) {
-      push @$users, { id => $1, ftp_perm => $cgi->param($p) };
-    }
-  }
-  $vars->{users} = $users;
-
-  $self->outputTemplate('fs_addshare5.tpl', $vars);
-
-}
+# sub stage5($$$) {
+#
+#   my ($self, $cgi, $config) = @_;
+#
+#   my $vars = { tabon => 'fileshare' };
+#   my $error = 0;
+#
+#   copyFormVars($cgi, $vars);
+#
+#   my $users = [];
+#   foreach my $p ($cgi->param()) {
+#
+#     # Copy the user share permissions required to the next page
+#     #
+#     if ($p =~ /^user_(\d+)_smb_perm$/) {
+#       push @$users, { id => $1, smb_perm => $cgi->param($p) };
+#     } elsif ($p =~ /^user_(\d+)_ftp_perm$/) {
+#       push @$users, { id => $1, ftp_perm => $cgi->param($p) };
+#     }
+#   }
+#   $vars->{users} = $users;
+#
+#   $self->outputTemplate('fs_addshare5.tpl', $vars);
+#
+# }
 
 ####################################################################################################
 # Actually create the share
@@ -279,6 +297,7 @@ sub stage6($$$) {
   # volume 'main'.
   #
   my $volume = $cgi->param('volume');
+ 
   if ($volume =~ /main/i) {
   }
 
