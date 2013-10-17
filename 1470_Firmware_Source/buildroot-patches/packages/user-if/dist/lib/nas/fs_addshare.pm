@@ -14,6 +14,11 @@ use strict;
 
 use nasCommon;
 
+# [ ] -> fs_addshare.tpl      (start wizard)   -> [1]
+# [1] -> fs_addshare1.tpl     (get sharename)  -> [2]
+# [2] -> fs_addshare2.tpl     (get volumename) -> [4]
+# [4] -> fs_addshare4user.tpl (set perms)      -> [6]
+
 sub main($$$) {
 
   my ($self, $cgi, $config) = @_;
