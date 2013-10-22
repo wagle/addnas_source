@@ -22,6 +22,7 @@ function isValid(tf) {
 [% END %]
 </select>
 <br />
+<br />
 [% lang.m12004 %]: <input type="text" name="new_sharename" id="new_sharename" tabindex="1" size="32" maxlength="32" value="[% frm.new_sharename %]"><span class="valerror">[% err.new_sharename %]</span>
 <br />
 <br />
