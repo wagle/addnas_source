@@ -15,8 +15,8 @@ use strict;
 use nasCommon;
 
 # [ ] -> fs_addshare.tpl      (start wizard)    -> [1]
-# [1] -> fs_addshare2.tpl     (get volumename)  -> [2]
-# [2] -> fs_addshare1.tpl     (get sharename)   -> [4]
+# [1] -> fs_addshare1.tpl     (get volumename)  -> [2]
+# [2] -> fs_addshare2.tpl     (get sharename)   -> [4]
 # [4] -> fs_addshare4user.tpl (get perms)       -> [6]
 # [6] -> ...                  (perform actions)
 
@@ -26,7 +26,6 @@ sub main($$$) {
 
   {
     if ($cgi->param('nextstage') == 1) {
-###      $self->outputTemplate('fs_addshare1.tpl', { tabon => 'fileshare' } );
       $self->stage1($cgi, $config);
       last;
     }
@@ -84,7 +83,7 @@ sub stage1($$$) {
   $vars->{extvols} = \@vols;
 
   # Display the next form
-  $self->outputTemplate('fs_addshare2.tpl', $vars); # select a volume
+  $self->outputTemplate('fs_addshare1.tpl', $vars); # select a volume
 }
 
 sub listTopLevelFolders($$) {
@@ -101,7 +100,7 @@ sub listTopLevelFolders($$) {
 }
 
 
-# select volume (fs_addshare2.tpl) -> stage 1 -> select share (fs_addshare1.tpl)
+# select volume (fs_addshare2.tpl) -> stage 1 -> select share (fs_addshare2.tpl)
 sub stage2($$$) {
   my ($self, $cgi, $config) = @_;
 
@@ -121,7 +120,7 @@ sub stage2($$$) {
   $vars->{extfolders} = \@folders;
 
   # Display the next form
-  $self->outputTemplate('fs_addshare1.tpl', $vars);
+  $self->outputTemplate('fs_addshare2.tpl', $vars);
 }
 
 # sub stage3($$$) {
@@ -161,7 +160,7 @@ sub stage4($$$) {
   my $error = nasCommon::validateSharename($utf8name, $self->getShares($config));
   if ($error) {
     nasCommon::setErrorMessage($vars, $config, 'sharename', $error);
-    $self->outputTemplate('fs_addshare1.tpl', $vars);
+    $self->outputTemplate('fs_addshare2.tpl', $vars);
     return;
   }
 
