@@ -159,6 +159,12 @@ sub stage4($$$) {
   # Check that the share name is allowed and not a duplicate
   my $error = nasCommon::validateSharename($utf8name, $self->getShares($config));
   if ($error) {
+    my @folders = ();
+    unless (listTopLevelFolders($vars->{frm}->{volume}, \@folders)) {
+      $self->fatalError($config, 'f00026');
+      return;
+    }
+    $vars->{extfolders} = \@folders;
     nasCommon::setErrorMessage($vars, $config, 'sharename', $error);
     $self->outputTemplate('fs_addshare2.tpl', $vars);
     return;
