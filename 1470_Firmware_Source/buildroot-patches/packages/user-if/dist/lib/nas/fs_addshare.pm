@@ -63,14 +63,6 @@ sub main($$$) {
 
 }
 
-sub reserved_filename_p($) {
-  my $file = uc $_[0];
-  return 1 if $file eq "DEV";
-  return 1 if $file eq "OPT";
-  return 1 if $file eq "FW.TAR.GZ";
-  return 0;
-}
-
 # start wizard (fs_addshare.tpl) -> stage 1 -> select volume (fs_addshare2.tpl)
 sub stage1($$$) {
   my ($self, $cgi, $config) = @_;
@@ -95,7 +87,21 @@ sub stage1($$$) {
   $self->outputTemplate('fs_addshare2.tpl', $vars); # select a volume
 }
 
-# select volume (fs_addshare2.tpl) -> stage 1 -> select share (fs_addshare2.tpl)
+sub listTopLevelFolders($$) {
+  my ($volume, $folders) = @_;
+  for (`find /shares/external/$volume -type d -maxdepth 1`) {
+    chomp;
+    next if m,^/shares/external/$volume$,;
+    s,^/shares/external/$volume/,,;
+    next if nasCommon::reserved_filename_p($_);
+    push @$folders, { path => "$_" };
+  }
+  @$folders = sort { $a->{path} cmp $b->{path} } @$folders;
+  return SUCCESS;
+}
+
+
+# select volume (fs_addshare2.tpl) -> stage 1 -> select share (fs_addshare1.tpl)
 sub stage2($$$) {
   my ($self, $cgi, $config) = @_;
 
@@ -105,25 +111,14 @@ sub stage2($$$) {
   # Copy the form data into our local storage
   copyFormVars($cgi, $vars);
 
-  # Convert the share name to uppercase UTF-8
-  my $utf8name = uc Encode::decode("utf8", $vars->{frm}->{sharename});
+  $vars->{frm}->{volume} = $cgi->param('volume');
 
-  # Check that the share name is allowed and not a duplicate
-  my $error = nasCommon::validateSharename($utf8name, $self->getShares($config));
-  if ($error) {
-    nasCommon::setErrorMessage($vars, $config, 'sharename', $error);
-    $self->outputTemplate('fs_addshare1.tpl', $vars);
-    return;
-  } elsif ( reserved_filename_p($utf8name) ) {
-    nasCommon::setErrorMessage($vars,$config, 'sharename', 'f00036');
-    $self->outputTemplate('fs_addshare1.tpl', $vars);
+  my @folders = ();
+  unless (listTopLevelFolders($vars->{frm}->{volume}, \@folders)) {
+    $self->fatalError($config, 'f00026');
     return;
   }
-
-  # Feed back the uppercased share name to the next form
-  $vars->{frm}->{sharename} = $utf8name;
-
-  $vars->{frm}->{volume} = $cgi->param('volume');
+  $vars->{extfolders} = \@folders;
 
   # Display the next form
   $self->outputTemplate('fs_addshare1.tpl', $vars);
@@ -148,6 +143,30 @@ sub stage4($$$) {
   my $error = 0;
 
   copyFormVars($cgi, $vars);
+
+  # open (my $con, "> /dev/console");
+  # print $con "SUBMIT1! ", "" ne $vars->{frm}->{submit1}, " : ", $vars->{frm}->{sharename}, "\n";
+  # print $con "SUBMIT2! ", "" ne $vars->{frm}->{submit2}, " : ", $vars->{frm}->{folder}, "\n";
+  # print $con "SUBMIT3! ", "" ne $vars->{frm}->{submit3}, "\n";
+  # close $con;
+
+  if ($vars->{frm}->{submit2} ne "") {
+    $vars->{frm}->{sharename} = $vars->{frm}->{folder};
+  }
+
+  # Convert the share name to uppercase UTF-8
+  my $utf8name = uc Encode::decode("utf8", $vars->{frm}->{sharename});
+
+  # Check that the share name is allowed and not a duplicate
+  my $error = nasCommon::validateSharename($utf8name, $self->getShares($config));
+  if ($error) {
+    nasCommon::setErrorMessage($vars, $config, 'sharename', $error);
+    $self->outputTemplate('fs_addshare1.tpl', $vars);
+    return;
+  }
+
+  # Feed back the uppercased share name to the next form
+  $vars->{frm}->{sharename} = $utf8name;
 
   ###if ($cgi->param('cif')) {
     my ($errcode,$errmessage) = checkForFilenameCaseBraindamage("/shares/external/".$vars->{frm}->{volume}."/".$vars->{frm}->{sharename});

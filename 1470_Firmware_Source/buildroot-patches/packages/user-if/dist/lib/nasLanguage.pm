@@ -287,7 +287,8 @@ $message = {
 		m11018 => 'Create Share Folder',
 		m11019 => 'Share Type',
 		m11020 => 'Everyone (Set Minimum Permissions)',
-        m11021 => 'A CIF share type will be created',
+		m11021 => 'A CIF share type will be created',
+		m11022 => 'Existing Folder',
 
 		# file Share - rename share
 		#
@@ -556,7 +557,7 @@ WARNING:
 		f00033 => 'Failed to refresh the NFS server',
 		f00034 => 'Failed to open disk for reading existing folders.  Disk trouble?',
 		f00035 => 'A folder of the same name, but containing lower case letters already exists on that partition.',
-		f00036 => 'That share name is reserved for system use.  Try another.',
+		f00036 => 'That name is reserved for system use.  Try another.',
 		f00037 => 'Couldn\'t delete user from FTP access database.',
 		f00038 => 'Couldn\'t add user to FTP access database.',
 		f00039 => 'Couldn\'t rebuild FTP access database.',

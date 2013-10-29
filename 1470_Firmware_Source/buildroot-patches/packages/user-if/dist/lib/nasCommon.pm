@@ -289,34 +289,47 @@ sub getUsernameError {
 	return 0;
 }
 
+sub reserved_filename_p($) {
+  my $file = uc $_[0];
+  return 1 if $file eq "DEV";
+  return 1 if $file eq "OPT";
+  return 1 if $file eq "FW.TAR.GZ";
+  return 1 if $file eq "LOST+FOUND";
+  return 0;
+}
+
 # Validity check for share names in UTF-8 encoded string
 #
 sub validateSharename {
-	my ($utf8sharename, $shares) = @_;
+  my ($utf8sharename, $shares) = @_;
 
-        # Share name cannot be zero length
-        if ($utf8sharename eq '') {
-		return 'e12001';
-        }
+  # Share name cannot be zero length
+  if ($utf8sharename eq '') {
+    return 'e12001';
+  }
 
-        # Share names shall contain only letters, numbers and underscores
-	if (!validateIsAlnum($utf8sharename)) {
-		return 'e12003';
-	}
+  # Share names shall contain only letters, numbers and underscores
+  if (!validateIsAlnum($utf8sharename)) {
+    return 'e12003';
+  }
 
-        # Share name shall not start with a digit
-        if ($utf8sharename =~ /^\p{IsDigit}/) {
-		return 'e12004';
-        }
+  # Share name shall not start with a digit
+  if ($utf8sharename =~ /^\p{IsDigit}/) {
+    return 'e12004';
+  }
 
-	# Is there already a share with this name?
- 	map {
-		if ($_->{name} eq $utf8sharename) {
-			return 'e12002';
-		}
- 	} @$shares;
+  # Is there already a share with this name?
+  map {
+    if ($_->{name} eq $utf8sharename) {
+      return 'e12002';
+    }
+  } @$shares;
 
-	return 0;
+  if ( reserved_filename_p($utf8sharename) ) {
+    return 'f00036';
+  }
+
+  return 0;
 }
 
 # Validity check for workgroup name
