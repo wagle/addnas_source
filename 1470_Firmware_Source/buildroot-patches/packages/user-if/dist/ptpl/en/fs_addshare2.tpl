@@ -20,8 +20,12 @@
 <br />
 <br />
 <br />
-<input type="button" name="back" tabindex="4" value="[% lang.m08021 %]"  onClick="location='/auth/fs_addshare.pl'">
-<input type="button" name="cancel" tabindex="5" value="[% lang.m01027 %]"  onClick="location='/auth/fileshare.pl'">
+<input type="submit" name="submit3" tabindex="4" value="[% lang.m08023 %]" >
+<br />
+<br />
+<br />
+<input type="button" name="back" tabindex="5" value="[% lang.m08021 %]"  onClick="location='/auth/fs_addshare.pl'">
+<input type="button" name="cancel" tabindex="6" value="[% lang.m01027 %]"  onClick="location='/auth/fileshare.pl'">
 <input type="hidden" name="cif" value="y">
 <input type="hidden" name="sharename" value="[% frm.sharename %]" >
 <input type="hidden" name="volume" value="[% frm.volume %]" >

@@ -205,6 +205,7 @@ $message = {
 		m08020 => 'Recommended subnet mask is 255.255.255.0',
 		m08021 => 'Back',
 		m08022 => 'Subnet Mask',
+		m08023 => 'Share Entire Disk',
 
 		e08001 => 'A value between 0 and 255 is required',
 		e08002 => 'The address range above 224.0.0.0 is reserved',
@@ -263,6 +264,9 @@ $message = {
 		m10009 => 'User Settings Updated',
 		m10010 => 'Drive',
 		m10011 => 'Available?',
+		m10012 => 'Volume Name',
+		m10013 => 'Sharing Whole Disk',
+
 		e10001 => 'Username already exists',
 
 		# File Share - Add new Share
@@ -289,6 +293,7 @@ $message = {
 		m11020 => 'Everyone (Set Minimum Permissions)',
 		m11021 => 'A CIF share type will be created',
 		m11022 => 'Existing Folder',
+		m11023 => 'Share Entire Disk',
 
 		# file Share - rename share
 		#

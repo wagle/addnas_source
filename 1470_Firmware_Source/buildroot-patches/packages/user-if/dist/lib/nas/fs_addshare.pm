@@ -153,6 +153,8 @@ sub stage4($$$) {
     $vars->{frm}->{sharename} = $vars->{frm}->{folder};
   }
 
+  $vars->{frm}->{wholedisk} = ($vars->{frm}->{submit3} ne "");
+
   # Convert the share name to uppercase UTF-8
   my $utf8name = uc Encode::decode("utf8", $vars->{frm}->{sharename});
 
@@ -313,6 +315,8 @@ sub stage6($$$) {
     $sharesInc->SetFileName(nasCommon->shares_inc);
   }
 
+  my $sharewholedisk = $cgi->param('wholedisk');
+
   my $sharename = $cgi->param('sharename');
   my $sharenameNospaces = $sharename;
   $sharenameNospaces =~ s/ /_/g;
@@ -322,25 +326,24 @@ sub stage6($$$) {
   #
   my $volume = $cgi->param('volume');
  
-  if ($volume =~ /main/i) {
-  }
-
   # if we're creating any internal share, replace spaces with underscores and
   # create the directory
   if ($cgi->param('cif') eq 'y') {
-    if ($volume =~ /main/i) {
-      my $tcreatedir = "internal/".$sharenameNospaces;
-      unless (sudo("$nbin/makeSharedir.sh $tcreatedir")) {
-        $self->fatalError($config, 'f00019');
-        return;
-      }
-    } else {
+    # if ($volume =~ /main/i) {
+    #   my $tcreatedir = "internal/".$sharenameNospaces;
+    #   unless (sudo("$nbin/makeSharedir.sh $tcreatedir")) {
+    #     $self->fatalError($config, 'f00019');
+    #     return;
+    #   }
+    # } else {
+    if (! $sharewholedisk) {
       my $tcreatedir = "external"."/".$volume."/".$sharenameNospaces;
       unless (sudo("$nbin/makeSharedir.sh $tcreatedir")) {
         $self->fatalError($config, 'f00019');
         return;
       }
     }
+    # }
   }
 
   # The parameters from the CGI will be some of :
@@ -357,11 +360,15 @@ sub stage6($$$) {
     $sharesInc->AddSection($sharename);
     # internal and external directories have different top level dir...
     #
-    if ($volume =~ /main/i) {
-      $sharesInc->newval($sharename, 'path', "$sharesHome/internal/$sharenameNospaces");
-      $sharesInc->newval($sharename, 'preallocate', 'Yes');
-    } else {
-      $sharesInc->newval($sharename, 'path', "$sharesHome/external/$volume/$sharenameNospaces");
+    # if ($volume =~ /main/i) {
+    #   $sharesInc->newval($sharename, 'path', "$sharesHome/internal/$sharenameNospaces");
+    #   $sharesInc->newval($sharename, 'preallocate', 'Yes');
+    # } else {
+      if ($sharewholedisk) {
+        $sharesInc->newval($sharename, 'path', "$sharesHome/external/$volume");
+      } else {
+        $sharesInc->newval($sharename, 'path', "$sharesHome/external/$volume/$sharenameNospaces");
+      }
       for (`cat /proc/mounts`) {
         chomp;
         my ($dev,$mpnt,$fstype) = split /\s+/, $_;
@@ -372,7 +379,7 @@ sub stage6($$$) {
           last;
         }
       }
-    }
+    # }
 
     $sharesInc->newval($sharename, 'force user', 'www-data');
 

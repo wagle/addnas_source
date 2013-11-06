@@ -47,6 +47,7 @@ sub ftpMakeSchema () {
 	DROP TABLE IF EXISTS ftpacl;
 	CREATE TABLE ftpacl (
 		mpnt TEXT,
+                wdisk TEXT,
 		path TEXT NOT NULL,
 		user TEXT NOT NULL,
 		hidden TEXT NOT NULL,
@@ -69,13 +70,48 @@ EOF
   return doQuery($query);
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub ftpConvert_pre_v89_Schema_to_v89a () {
+  my $query = <<EOF;
+	PRAGMA foreign_keys=OFF;
+	BEGIN TRANSACTION;
+	DROP TABLE ftpacl2;
+	CREATE TABLE ftpacl2 (
+			mpnt TEXT,
+			wdisk TEXT,
+			path TEXT NOT NULL,
+			user TEXT NOT NULL,
+			hidden TEXT NOT NULL,
+			overall TEXT NOT NULL,
+			read_acl TEXT NOT NULL,
+			write_acl TEXT NOT NULL,
+			delete_acl TEXT NOT NULL,
+			create_acl TEXT NOT NULL,
+			modify_acl TEXT NOT NULL,
+			move_acl TEXT NOT NULL,
+			view_acl TEXT NOT NULL,
+			navigate_acl TEXT NOT NULL,
+				UNIQUE(path, user)
+		);
+	INSERT INTO "ftpacl2" (mpnt,path,user,hidden,overall,read_acl,write_acl,delete_acl,create_acl,modify_acl,move_acl,view_acl,navigate_acl)
+	  SELECT * FROM ftpacl;
+	UPDATE ftpacl2 SET wdisk = 'no' WHERE mpnt is not NULL and wdisk is NULL;
+	CREATE INDEX ftpacl_mpnt_idx ON ftpacl2 (mpnt);
+	CREATE INDEX ftpacl_path_idx ON ftpacl2 (path);
+	CREATE INDEX ftpacl_user_idx ON ftpacl2 (user);
+	DROP TABLE ftpacl;
+	ALTER TABLE ftpacl2 RENAME TO ftpacl;
+	COMMIT;
+EOF
+  return doQuery($query);
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpInsertUser ($) {
   my ($user) = @_;
   my $query = <<EOF;
 	BEGIN TRANSACTION;
 	INSERT INTO ftpacl
-		( mpnt, path , user    , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
-	 VALUES ( NULL, "/"  , "$user" , "no"  , "read" , "allow" , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,  "allow", "allow"      )
+		( mpnt, wdisk, path , user    , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
+	 VALUES ( NULL, NULL , "/"  , $user" , "no"  , "read" , "allow" , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,  "allow", "allow"      )
 	;
 	COMMIT;
 EOF
@@ -90,42 +126,42 @@ EOF
   return doQuery($query);
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ftpUpsertUserToFULL ($$$) {
-  my ($user, $mpnt, $share) = @_;
+sub ftpUpsertUserToFULL ($$$$) {
+  my ($wdisk, $user, $mpnt, $share) = @_;
   my $query .= <<EOF;
 	BEGIN TRANSACTION;
 	DELETE FROM ftpacl WHERE mpnt = "$mpnt" and path = "/$share" and user = "$user";
 	INSERT INTO ftpacl
-		 ( mpnt   , path     , user   , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
-	  VALUES ( "$mpnt", "/$share", "$user", "no"  , "f"    , "allow" , "allow"  , "allow"   , "allow"   , "allow"   , "allow" ,  "allow", "allow"      )
+		 ( mpnt   , wdisk   , path     , user   , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
+	  VALUES ( "$mpnt", "$wdisk", "/$share", "$user", "no"  , "f"    , "allow" , "allow"  , "allow"   , "allow"   , "allow"   , "allow" ,  "allow", "allow"      )
 	;
 	COMMIT;
 EOF
   return doQuery($query);
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ftpUpsertUserToREAD ($$$) {
-  my ($user, $mpnt, $share) = @_;
+sub ftpUpsertUserToREAD ($$$$) {
+  my ($wdisk, $user, $mpnt, $share) = @_;
   my $query .= <<EOF;
 	BEGIN TRANSACTION;
 	DELETE FROM ftpacl WHERE mpnt = "$mpnt" and path = "/$share" and user = "$user";
 	INSERT INTO ftpacl
-	         ( mpnt   , path     , user  , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
-	  VALUES ( "$mpnt", "/$share", "$user", "no" , "r"    , "allow" , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,  "allow", "allow"      )
+	         ( mpnt   , wdisk   , path     , user  , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
+	  VALUES ( "$mpnt", "$wdisk", "/$share", "$user", "no" , "r"    , "allow" , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,  "allow", "allow"      )
 	;
 	COMMIT;
 EOF
   return doQuery($query);
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ftpUpsertUserToNONE ($$$) {
-  my ($user, $mpnt, $share) = @_;
+sub ftpUpsertUserToNONE ($$$$) {
+  my ($wdisk, $user, $mpnt, $share) = @_;
   my $query .= <<EOF;
 	BEGIN TRANSACTION;
 	DELETE FROM ftpacl WHERE mpnt = "$mpnt" and path = "/$share" and user = "$user";
 	INSERT INTO ftpacl
-	         ( mpnt   , path     , user   , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
-	  VALUES ( "$mpnt", "/$share", "$user", "yes" , "n"    , "deny"  , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,   "deny", "deny"       )
+	         ( mpnt   , wdisk   , path     , user   , hidden, overall, read_acl, write_acl, delete_acl, create_acl, modify_acl, move_acl, view_acl, navigate_acl )
+	  VALUES ( "$mpnt", "$wdisk", "/$share", "$user", "yes" , "n"    , "deny"  , "deny"   , "deny"    , "deny"    , "deny"    , "deny"  ,   "deny", "deny"       )
 	;
 	COMMIT;
 EOF
@@ -156,7 +192,7 @@ EOF
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub FTPACL_SHARE_QUERY() {
   my $query = <<EOF;
-    select distinct mpnt,path from ftpacl where mpnt is not NULL;
+    select distinct mpnt, wdisk, path from ftpacl where mpnt is not NULL;
 EOF
   return $query;
 }
@@ -172,6 +208,14 @@ sub ALIASES_TOP_TEMPLATE($$) {
   my ($mpnt, $share) = @_;
   my $template .= <<EOF;
 VRootAlias $mpnt/$share /$share
+EOF
+  return $template;
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub ALIASES_TOP_WDISK_TEMPLATE($$) {
+  my ($mpnt, $share) = @_;
+  my $template .= <<EOF;
+VRootAlias $mpnt /$share
 EOF
   return $template;
 }
@@ -207,9 +251,13 @@ EOF
 sub ftpRebuildConfigs () {
   my $aliases = "";
   foreach (doQuery(FTPACL_SHARE_QUERY())) {
-    my ($mpnt, $share) = split(/\|/);
+    my ($mpnt, $wdisk, $share) = split(/\|/);
     $share =~ s,^/,,;  # strip leading "/"
-    $aliases .= ALIASES_TOP_TEMPLATE($mpnt, $share);
+    if ($wdisk eq 'yes') {
+      $aliases .= ALIASES_TOP_WDISK_TEMPLATE($mpnt, $share);
+    } else {
+      $aliases .= ALIASES_TOP_TEMPLATE($mpnt, $share);
+    }
   }
   my $hiddens = "";
   my @output = doQuery(FTPACL_HIDDEN_SHARE_QUERY());
@@ -267,10 +315,11 @@ sub ftpRepopulateDatabase () {
   foreach my $sharename ($sharesInc->Sections()) {
     chomp $sharename;
     my $mpnt = $sharesInc->val($sharename,'path');
+    my $sharewholedisk = !($mpnt =~ m,/$sharename$,);
     $mpnt =~ s,/$sharename$,,;
 
     foreach my $uname (keys %$allUsers) {
-      ftpUpsertUserToNONE($uname, $mpnt, $sharename);
+      ftpUpsertUserToNONE($sharewholedisk, $uname, $mpnt, $sharename);
     }
   }
 
@@ -280,16 +329,24 @@ sub ftpRepopulateDatabase () {
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 if (@ARGV == 1 && $ARGV[0] eq "init") {
   ftpMakeSchema();
+} elsif (@ARGV == 1 && $ARGV[0] eq "upgrade_to_v89a") {
+  ftpConvert_pre_v89_Schema_to_v89a();
 } elsif (@ARGV == 2 && $ARGV[0] eq "add") {
   ftpInsertUser($ARGV[1]);
 } elsif (@ARGV == 2 && $ARGV[0] eq "del") {
   ftpDeleteUser($ARGV[1]);
 } elsif (@ARGV == 4 && $ARGV[0] eq "full") {
-  ftpUpsertUserToFULL($ARGV[1], $ARGV[2], $ARGV[3]);
+  ftpUpsertUserToFULL('no', $ARGV[1], $ARGV[2], $ARGV[3]);
 } elsif (@ARGV == 4 && $ARGV[0] eq "read") {
-  ftpUpsertUserToREAD($ARGV[1], $ARGV[2], $ARGV[3]);
+  ftpUpsertUserToREAD('no', $ARGV[1], $ARGV[2], $ARGV[3]);
 } elsif (@ARGV == 4 && $ARGV[0] eq "none") {
-  ftpUpsertUserToNONE($ARGV[1] ,$ARGV[2], $ARGV[3]);
+  ftpUpsertUserToNONE('no', $ARGV[1] ,$ARGV[2], $ARGV[3]);
+} elsif (@ARGV == 4 && $ARGV[0] eq "wd_full") {
+  ftpUpsertUserToFULL('yes', $ARGV[1], $ARGV[2], $ARGV[3]);
+} elsif (@ARGV == 4 && $ARGV[0] eq "wd_read") {
+  ftpUpsertUserToREAD('yes', $ARGV[1], $ARGV[2], $ARGV[3]);
+} elsif (@ARGV == 4 && $ARGV[0] eq "wd_none") {
+  ftpUpsertUserToNONE('yes', $ARGV[1] ,$ARGV[2], $ARGV[3]);
 } elsif (@ARGV == 1 && $ARGV[0] eq "rebuild") {
   ftpRebuildConfigs();
 } elsif (@ARGV == 1 && $ARGV[0] eq "repopulate") {

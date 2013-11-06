@@ -3,6 +3,13 @@
 <br />
 <table>
 	<tr>
+		<td>[% lang.m10012 %]:</td>
+		<td><b>[% frm.volume %]</b></td>
+[% IF frm.wholedisk %]
+		<td><b>[% lang.m10013 %]</b></td>
+[% END %]
+	</tr>
+	<tr>
 		<td>[% lang.m10005 %]:</td>
 		<td><b>[% frm.sharename %]</b></td>
 	</tr>
@@ -42,7 +49,11 @@
 [% END %]
 <br />
 <br />
+[% IF frm.wholedisk %]
 <input type="submit" name="submit" tabindex="1" value="[% lang.m11018 %]" >
+[% ELSE %]
+<input type="submit" name="submit" tabindex="1" value="[% lang.m11023 %]" >
+[% END %]
 <br />
 <br />
 <br />
@@ -52,6 +63,7 @@
 <input type="hidden" name="nextstage" value="6">
 <input type="hidden" name="sharename" value="[% frm.sharename %]" >
 <input type="hidden" name="volume" value="[% frm.volume %]" >
+<input type="hidden" name="wholedisk" value="[% frm.wholedisk %]" >
 <input type="hidden" name="cif" value="[% frm.cif %]" >
 <input type="hidden" name="http" value="[% frm.http %]" >
 <input type="hidden" name="nfs" value="[% frm.nfs %]" >
