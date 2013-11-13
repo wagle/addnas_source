@@ -525,14 +525,26 @@ sub stage6($$$) {
       #
       my $mpnt = $sharesInc->val($sharename, 'path');
       $mpnt =~ s,/$sharename$,,;
-      for my $username (@ftp_fullUsers) {
-	ludo("$nbin/ftpacl.pl full $username $mpnt $sharename");
-      }
-      for my $username (@ftp_readUsers) {
-	ludo("$nbin/ftpacl.pl read $username $mpnt $sharename");
-      }
-      for my $username (@ftp_noneUsers) {
-	ludo("$nbin/ftpacl.pl none $username $mpnt $sharename");
+      if ($sharewholedisk) {
+	for my $username (@ftp_fullUsers) {
+	  ludo("$nbin/ftpacl.pl wd_full $username $mpnt $sharename");
+	}
+	for my $username (@ftp_readUsers) {
+	  ludo("$nbin/ftpacl.pl wd_read $username $mpnt $sharename");
+	}
+	for my $username (@ftp_noneUsers) {
+	  ludo("$nbin/ftpacl.pl wd_none $username $mpnt $sharename");
+	}
+      } else {
+	for my $username (@ftp_fullUsers) {
+	  ludo("$nbin/ftpacl.pl full $username $mpnt $sharename");
+	}
+	for my $username (@ftp_readUsers) {
+	  ludo("$nbin/ftpacl.pl read $username $mpnt $sharename");
+	}
+	for my $username (@ftp_noneUsers) {
+	  ludo("$nbin/ftpacl.pl none $username $mpnt $sharename");
+	}
       }
     }				# else {
 

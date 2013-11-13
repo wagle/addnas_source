@@ -50,9 +50,9 @@
 <br />
 <br />
 [% IF frm.wholedisk %]
-<input type="submit" name="submit" tabindex="1" value="[% lang.m11018 %]" >
-[% ELSE %]
 <input type="submit" name="submit" tabindex="1" value="[% lang.m11023 %]" >
+[% ELSE %]
+<input type="submit" name="submit" tabindex="1" value="[% lang.m11018 %]" >
 [% END %]
 <br />
 <br />
