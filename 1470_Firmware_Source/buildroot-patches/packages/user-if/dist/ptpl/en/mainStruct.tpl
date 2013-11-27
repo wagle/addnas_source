@@ -172,7 +172,7 @@ function moveArrow(ycord) // vert cord of layer
 <!-- Footer -->
 <table width="1000" border="0" cellspacing="0" cellpadding="0"><tr>
   <td align="center" class="footertext">
-For Technical Support Contact: <a href="http://www.addonics.com/support/ticketid/create.asp">http://www.addonics.com/support/ticketid/create.asp</a> or phone USA 408-453-6212
+For Technical Support Contact: <a href="http://www.gdc-tech.com/english/technical.php">http://www.gdc-tech.com/english/technical.php</a> or phone USA +1 877 743 2872 (Toll Free)
 <br>
 <br>
 Copyright &copy; 2011 Addonics Technologies, All rights reserved.
