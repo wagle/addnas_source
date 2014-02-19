@@ -177,6 +177,7 @@ sub deleteAllRemovedExternal {
 # TSI: commenting out following line, we want to just set the share inactive, not delete it.
 #					$smbConf->DeleteSection($sharename);
 $smbConf->newval($sharename,'available','no');
+ludo("$nbin/ftpacl.pl disable $sharename");
 				} else {
 					# The first occurance of an external share not matching with
 					# an available directory will cause a 10s delay to allow

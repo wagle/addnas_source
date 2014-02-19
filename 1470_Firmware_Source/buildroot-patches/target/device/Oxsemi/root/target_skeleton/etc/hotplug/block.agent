@@ -62,8 +62,9 @@ remove)
 
     ###WAGLE###
     if is_a_drive $DEVPATH ; then
-	/etc/init.d/S28shares_cleanup restart
+	/etc/init.d/S28shares_cleanup restart  ### do both samba and ftpd
 	/etc/init.d/samba.sh reconfig
+	/etc/init.d/proftpd.sh reread_config
     fi
     ;;
 *)
