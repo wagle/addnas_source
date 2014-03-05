@@ -89,7 +89,7 @@ sub stage1($$$) {
 #
 
   my %ftp_perm;
-  unless (open(FTPACL, "$nbin/ftpacl.pl show $sharename |")) {
+  unless (open(FTPACL, "$nbin/ftpacl.pl show_share \"$sharename\" |")) {
     $self->fatalError($config, 'f00042');
     return;
   }
@@ -292,11 +292,11 @@ sub stage2($$$) {
                 
 	my $ftpperm = $cgi->param($p);
 	if ($ftpperm eq 'f') {
-	  ludo("$nbin/ftpacl.pl full $uname $mpnt $sharename");
+	  ludo("$nbin/ftpacl.pl full \"$uname\" \"$sharename\"");
 	} elsif ($ftpperm eq 'r') {
-	  ludo("$nbin/ftpacl.pl read $uname $mpnt $sharename");
+	  ludo("$nbin/ftpacl.pl read \"$uname\" \"$sharename\"");
 	} elsif ($ftpperm eq 'n') {
-	  ludo("$nbin/ftpacl.pl none $uname $mpnt $sharename");
+	  ludo("$nbin/ftpacl.pl none \"$uname\" \"$sharename\"");
 	} else {
 	  $self->fatalError($config, 'f00041');
 	  return;
@@ -360,7 +360,7 @@ sub stage2($$$) {
     } else {
       $sharesInc->delval($sharename, 'read list');
     }
-        
+
     unless ($sharesInc->RewriteConfig) {
       $self->fatalError($config, 'f00013');
       return;

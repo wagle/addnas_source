@@ -15,7 +15,7 @@ DLABELT=$3
 . /usr/www/nbin/commonfuncs                                                            
 
 # Strip off any preceding /dev/
-DEVICE=`echo $DEVICE|sed -e's/\/dev\///'`
+DEVICE=`echo $DEVICE|sed -e's,/dev/,,'`
 
 if [ ! -b "/dev/$DEVICE" ] ; then                                                  
         echo "WARNING: $DEVICE is not a block device."                               
@@ -49,10 +49,10 @@ if [ "$FTYPE" = "xfs" ] ; then
 	/bin/xfs_admin -U generate /dev/${DEVICE}1 > /dev/console 2>&1
 fi
 if [ "$FTYPE" = "ext3" ] ; then
-	/sbin/mkfs.ext3 /dev/${DEVICE}1 #1>>/root/formatdebug 2>>/root/formatdebug
+	/sbin/mkfs.ext3 /dev/${DEVICE}1 ###1>>/root/formatdebug 2>>/root/formatdebug
 fi
                                                                                    
-# Call the hotplug script to remount the device                                    
+# call the hotplug script to remount the device                                    
 cd /etc/hotplug; ./mount-external-drive $DEVICE                                    
 
 rm /tmp/dm_progress

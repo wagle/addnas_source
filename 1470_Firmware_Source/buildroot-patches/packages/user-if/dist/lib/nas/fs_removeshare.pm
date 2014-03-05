@@ -86,7 +86,7 @@ sub stage1($$$) {
       return;
     }
 
-    ludo("$nbin/ftpacl.pl remove_share $mpnt $sharename");
+    ludo("$nbin/ftpacl.pl remove_share \"$sharename\"");
     unless (ludo("$nbin/ftpacl.pl rebuild")) {
       $self->fatalError($config, 'f00039');
       return;

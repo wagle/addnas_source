@@ -30,7 +30,7 @@
 # mode should be used when hot-plugging an iButton to try to decrypt already 
 # attached external drives. To activate this mode supply a second parameter.
 #
-# @param $1 device (sda, sdc, etc)
+# @param $1 disk (not partition) device (sda, sdc, etc)
 
 . ./hotplug.functions
 
@@ -40,6 +40,7 @@ LOCKFILE=/tmp/mount-external-drive
 DEBUG=yes
 export DEBUG
 
+################################################################################
 # mount with uid set to www-data
 FATMOUNTOPTIONS=uid=33,gid=33,fmask=0111,dmask=0000,flush
 UNIXMOUNTOPTIONS=nosuid
@@ -87,7 +88,9 @@ if [ `/bin/mount | /bin/grep -c /dev/$1` -gt 0 ] ; then
     exit 1
 fi
 
+################################################################################
 # enter critical section
+################################################################################
 down "$LOCKFILE"
 
 # start blink LED during critical section
@@ -166,6 +169,13 @@ for partition in ${partition_devices} ; do
 
 	    # Propagate the SUID/GUID state and set correct permissions
 	    chmod +rx,u+w,+s "$mountpoint"
+
+	    echo "$0: $1 -- doing reEnableExternalShares.pl" > /dev/console
+	    su -c "/usr/local/bin/perl -I /usr/www/lib /usr/www/lib/enableExternalPartition.pl $uuid" www-data
+	    cat <<EOF >> ${temp_removal_script}
+su -c "/usr/local/bin/perl -I /usr/www/lib /usr/www/lib/disableExternalPartition.pl $uuid" www-data
+EOF
+
 	fi
 
         # just in case the move didn't work
@@ -188,15 +198,15 @@ echo 1024 > /sys/block/$1/device/max_sectors
 echo "$0: $1 -- doing reannotate_samba_shares.pl" > /dev/console
 su www-data -c /etc/init.d/reannotate_samba_shares.pl
 
-echo "$0: $1 -- doing reEnableExternalShares.pl" > /dev/console
-su -c "/usr/local/bin/perl -I /usr/www/lib /usr/www/lib/reEnableExternalShares.pl" www-data
-
 echo "$0: $1 -- doing cleanupunuseddirectories" > /dev/console
 cleanupunuseddirectories
 
 # stop blink LED during critical section
 /bin/echo 1 > /sys/kernel/timer_booting_flag 
 
+################################################################################
+# exit critical section
+################################################################################
 up "$LOCKFILE"
 
 echo "$0: $1 -- end of script" > /dev/console

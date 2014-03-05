@@ -5,4 +5,4 @@
 
 . /usr/www/nbin/commonfuncs
 
-/etc/init.d/samba.sh reconfig
+/etc/init.d/samba.sh reread_config

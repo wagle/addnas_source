@@ -1,5 +1,7 @@
 #!/usr/local/bin/perl
 
+# should be named "optimize_samba_share_configs.pl"
+
 package wagle::reannotate_samba_shares;
 
 use strict;
@@ -41,7 +43,7 @@ for $share ( $sharesInc->Sections ) {
 	my $path = $sharesInc->val($share,'path');
 	my $tcreatedir = $path;
 	$tcreatedir =~ s,^/shares,,;
-	system "/usr/www/nbin/makeSharedir.sh $tcreatedir";  ### chown and chmod
+	system "/usr/www/nbin/makeSharedir.sh $tcreatedir";  ### to chown and chmod
 	for my $mpnt ( keys %fstype ) {
 		if ( $path eq "$mpnt/$share" ) {
 			if ( $fstype{$mpnt} eq "xfs" ) {

@@ -89,7 +89,7 @@ sub stage1($$$) {
     }
   }
 
-  unless (ludo("$nbin/ftpacl.pl add $username")) {
+  unless (ludo("$nbin/ftpacl.pl add_user \"$username\"")) {
     $self->fatalError($config, 'f00038');
     return;
   }
@@ -152,15 +152,15 @@ sub stage1($$$) {
 	if ($ftpperm eq 'f') {
 	  # doConsole("ftp perm f");
 	  # ftpUpsertUserToFULL($username, $mpnt, $name);
-	  ludo("$nbin/ftpacl.pl full $username $mpnt $name");
+	  ludo("$nbin/ftpacl.pl full \"$username\" \"$name\"");
 	} elsif ($ftpperm eq 'r') {
 	  # doConsole("ftp perm r");
 	  # ftpUpsertUserToREAD($username, $mpnt, $name);
-	  ludo("$nbin/ftpacl.pl read $username $mpnt $name");
+	  ludo("$nbin/ftpacl.pl read \"$username\" \"$name\"");
 	} elsif ($ftpperm eq 'n') {
 	  # doConsole("ftp perm n");
 	  # ftpUpsertUserToNONE($username, $mpnt, $name);
-	  ludo("$nbin/ftpacl.pl none $username $mpnt $name");
+	  ludo("$nbin/ftpacl.pl none \"$username\" \"$name\"");
 	} else {
 	  $self->fatalError($config, 'f00041');
 	  return;

@@ -25,5 +25,5 @@ use strict;
 
 use Service::Shares;
 
-Service::Shares->reEnableRemovedExternal();
-
+my $uuid = $ARGV[0];
+Service::Shares->disableExternalPartition($uuid);

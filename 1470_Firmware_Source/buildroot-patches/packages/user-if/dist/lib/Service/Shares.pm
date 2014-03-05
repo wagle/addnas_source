@@ -14,13 +14,13 @@ Service::Shares - Manipulate shares
 
 =head1 SYNOPSIS
 
-my $s=new Service::Shares();
+my $s = new Service::Shares();
 
 my $ini = Service::Shares->open( $iniFileName );
 
 Service::Shares->createDefault();
 
-Service::Shares->deleteAllInternal();
+Service::Shares->deleteAllInternal();  ### removed
 
 Service::Shares->deleteAllExternal();
 
@@ -61,17 +61,15 @@ use nasCommon;
 use Config::IniFiles;
 use Service::Storage;
 
-
-
 sub new {
-	my $class=shift;
-	my $this={};
+	my $class = shift;
+	my $this = {};
 	bless $this, $class;
 
 	return $this;
 }
 
-
+### DEAD
 sub deleteAllInternal {
 	# Go through the shares.inc and remove all internal shares
 	my $class=shift;
@@ -91,6 +89,7 @@ sub deleteAllInternal {
 	return 1;
 }
 
+### DEAD
 sub deleteAllExternal {
 	# Go through the shares.inc and remove all external shares
 	my $class=shift;
@@ -108,18 +107,41 @@ sub deleteAllExternal {
 	return 1;
 }
 
-sub reEnableRemovedExternal {
+### NEW
+sub enableExternalPartition ($$) {
+	my ($self, $uuid) = @_;
 	FILES: foreach my $file ( nasCommon->shares_inc, nasCommon->senvid_inc ) {
 		my $smbConf = new Config::IniFiles( -file => $file ) || next;
 		foreach my $sharename ($smbConf->Sections()) {
 			my $dirpath = $smbConf->val($sharename, 'path');
-			if (($dirpath =~ /$sharesHome\/external\/.+$/) && (-d $dirpath)) {
-				$smbConf->delval($sharename,'available');
+			if (($dirpath =~ m,^$sharesHome/external/$uuid$,) && (-d $dirpath)) {                 ### whole disk
+				$smbConf->delval($sharename,'available');  # default is 'yes'
+			} elsif (($dirpath =~ m,^$sharesHome/external/$uuid/$sharename$,) && (-d $dirpath)) { ### disk of folders
+				$smbConf->delval($sharename,'available');  # default is 'yes'
 			}
 		}
 		$smbConf->RewriteConfig();
 	}
-	sudo("$nbin/restartSamba.sh");
+	sudo("$nbin/reconfigSamba.sh");
+	return 1;
+}
+
+### NEW
+sub disableExternalPartition ($$) {
+	my ($self, $uuid) = @_;
+	FILES: foreach my $file ( nasCommon->shares_inc, nasCommon->senvid_inc ) {
+		my $smbConf = new Config::IniFiles( -file => $file ) || next;
+		foreach my $sharename ($smbConf->Sections()) {
+			my $dirpath = $smbConf->val($sharename, 'path');
+			if (($dirpath =~ m,^$sharesHome/external/$uuid$,) && (-d $dirpath)) {                 ### whole disk
+				$smbConf->newval($sharename,'available','no');
+			} elsif (($dirpath =~ m,^$sharesHome/external/$uuid/$sharename$,) && (-d $dirpath)) { ### disk of folders
+				$smbConf->newval($sharename,'available','no');
+			}
+		}
+		$smbConf->RewriteConfig();
+	}
+	sudo("$nbin/reconfigSamba.sh");
 	return 1;
 }
 
@@ -136,10 +158,11 @@ sub deleteAllExternalFromDev($$) {
 		}
 		$smbConf->RewriteConfig();
 	}
-	sudo("$nbin/restartSamba.sh");
+	sudo("$nbin/reconfigSamba.sh");
 	return 1;
 }
 
+### DEAD
 sub disableExternalDev($$) {
 	my ($self, $name) = @_;
 	system('echo disable name: '.$name.' > /var/oxsemi/debug');
@@ -153,13 +176,14 @@ sub disableExternalDev($$) {
 		}
 		$smbConf->RewriteConfig();
 	}
-	sudo("$nbin/restartSamba.sh");
+	sudo("$nbin/reconfigSamba.sh");
 	return 1;
 }
 
-# This will go through the external shares, check if the storage still exists
-# if the storage has been removed, the share will be removed.
+### DEAD
 sub deleteAllRemovedExternal {
+	# This will go through the external shares, check if the storage still
+	# exists if the storage has been removed, the share will be removed.
 	my $class = shift;
 	my $num_delays = 0;
 
@@ -177,7 +201,7 @@ sub deleteAllRemovedExternal {
 # TSI: commenting out following line, we want to just set the share inactive, not delete it.
 #					$smbConf->DeleteSection($sharename);
 $smbConf->newval($sharename,'available','no');
-ludo("$nbin/ftpacl.pl disable $sharename");
+ludo("$nbin/ftpacl.pl disable \"$sharename\"");
 				} else {
 					# The first occurance of an external share not matching with
 					# an available directory will cause a 10s delay to allow

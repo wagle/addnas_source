@@ -6,6 +6,7 @@
 # private password file and prevents www-data accessing it. This script restarts Samba and also
 # changes the permissions to suit us.
 #
+# 2014/02/19 WAGLE -- switched to reconfig, maybe restarting isn't needed
 
 . /usr/www/nbin/commonfuncs
 

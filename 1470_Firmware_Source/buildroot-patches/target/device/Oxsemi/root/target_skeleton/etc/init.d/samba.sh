@@ -43,7 +43,7 @@ case "$1" in
 		;;
 	cleanup)
 		;;
-	reconfig)
+	reread_config)
 		reconfig
 		;;
 	*)

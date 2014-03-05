@@ -32,11 +32,11 @@ use IO::File;
 use Service::RAIDStatus;
 
 sub new {
-	my $class=shift;
-	my $this={};
+	my $class = shift;
+	my $this = {};
 	bless $this, $class;
 
-	$this->{data}={};
+	$this->{data} = {};
 
 	# Specify the mountpoint from which we collect stats
 	$this->{data}->{mountpoint} = shift || die( "Please specify a mountpoint." );
@@ -53,17 +53,17 @@ sub new {
 
 sub collect {
 	# Collect data from various sources and update the object
-	my $this=shift;
+	my $this = shift;
 	my $fd = new IO::File( SysCmd->df ." -k 2>&1|" );
 	while (<$fd>) {
 		chomp;
 		#print( "df:$_\n" );
 		my ($fs, $total, $used, $available, $pc_used, $mountpoint) = split(/\s+/,$_);
-		next unless $mountpoint =~/^$this->{data}->{mountpoint}/;
-		$this->{data}->{fs}=$fs;
-		$this->{data}->{total}+=$total;
-		$this->{data}->{used}+=$used;
-		$this->{data}->{available}+=$available;
+		next unless $mountpoint =~ /^$this->{data}->{mountpoint}/;
+		$this->{data}->{fs} = $fs;
+		$this->{data}->{total} += $total;
+		$this->{data}->{used} += $used;
+		$this->{data}->{available} += $available;
 	}
 	undef $fd;
 
@@ -72,35 +72,35 @@ sub collect {
 	while( <$fd> ) {
 		chomp;
 		my ($major,$minor,$blocks,$name) = split(/\s+/,$_);
-		$this->{data}->{disks}->{$name}=$blocks;
+		$this->{data}->{disks}->{$name} = $blocks;
 	}
 	undef $fd;
 
 	# Clean up some of the data
-	$this->{data}->{pc_used}=~s/[^\d.]//g;	# Remove any non numeric
+	$this->{data}->{pc_used} =~ s/[^\d.]//g;	# Remove any non numeric
 
-	$this->{data}->{timestamp}=time;
+	$this->{data}->{timestamp} = time;
 	return 1;
 }
 
 sub fs {
-	my $this=shift;
+	my $this = shift;
 	return $this->{data}->{fs};
 }
 sub total {
-	my $this=shift;
+	my $this = shift;
 	return $this->{data}->{total};
 }
 sub used {
-	my $this=shift;
+	my $this = shift;
 	return $this->{data}->{used};
 }
 sub available {
-	my $this=shift;
+	my $this = shift;
 	return $this->{data}->{available};
 }
 sub pc_used {
-	my $this=shift;
+	my $this = shift;
 	my $used;
 	return 0 if ($this->used() < 1);
 	return 100 if ($this->used() >= $this->total);	# !
@@ -110,7 +110,7 @@ sub pc_used {
 	return $used;
 }
 sub pc_free {
-	my $this=shift;
+	my $this = shift;
 	my $free;
 	return 0 if ($this->available() < 1);
 	return 100 if ($this->available() >= $this->total);	# !
@@ -124,7 +124,7 @@ sub pc_free {
 
 sub data_volume_available {
 	# Returns the volume name (/shares/internal) if the device is currently mounted
-	my $this=shift;
+	my $this = shift;
 	my $volume;
         my $fd = new IO::File( '/bin/mount|' );
         while( <$fd> ) {
@@ -144,8 +144,8 @@ sub data_volume {
 
 sub drive_type {
 	# Returns either raid0 or raid1 for the current volume
-	my $this=shift;
-	my $data_volume=$this->data_volume();
+	my $this = shift;
+	my $data_volume = $this->data_volume();
 	my $fd = new IO::File( 'sudo '.SysCmd->mdadm.' --misc --query '.$data_volume."|" );
 	while (<$fd>) {
 		chomp;
@@ -174,11 +174,11 @@ sub rawdata_volumes {
 	# Returns the device nodes that comprise the collection of
 	# raw data volumes (not raided).
 	# [ '/dev/sda4','/dev/sdb4' ]
-	my $this=shift;
+	my $this = shift;
 	my @volumes;
 	
-	my $data_volume=$this->data_volume();
-	($data_volume=~/\w(\d+)$/) && do {
+	my $data_volume = $this->data_volume();
+	($data_volume =~ /\w(\d+)$/) && do {
 		my $part=$1;
 		push( @volumes, '/dev/sda'.$part );
 		push( @volumes, '/dev/sdb'.$part );

@@ -128,7 +128,7 @@ sub stage1($$$) {
     return;
   }
 
-  unless (ludo("$nbin/ftpacl.pl del $username")) {
+  unless (ludo("$nbin/ftpacl.pl del_user \"$username\"")) {
     $self->fatalError($config, 'f00037');
     return;
   }

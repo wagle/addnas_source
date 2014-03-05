@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# admin wants to unplug disk, try to umount it
+# web admin wants to unplug disk, try to umount it
 
 DISK=$1
 PARTITION=$2

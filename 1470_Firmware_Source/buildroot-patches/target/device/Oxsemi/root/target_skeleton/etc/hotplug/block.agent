@@ -18,6 +18,8 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 # 
 
+### see ./lib/kobject_uevent.c in the linux kernel source
+
 cd /etc/hotplug
 . ./hotplug.functions
 
@@ -25,45 +27,28 @@ DEBUG=yes
 export DEBUG
 
 ################################################################################
-# Checks if $1 ends with a number, if it does, then it's a partition and can be
-# ignored.
-
-is_a_drive() {
-    echo $1 | egrep "+[0-9]$"
-    if [ $? -gt 0 ]
-    then
-        return 0
-    else
-        return 1
-    fi
-}
-
-################################################################################
-SYSFS=/sys
-
-REMOVER=`echo /var/run/block/${DEVNAME}`
-
 case $ACTION in
 add)
     # is this a drive or a partition (ignore partitions)
-    if is_a_drive $DEVPATH ; then
-        ./mount-external-drive `echo ${DEVPATH} | sed "s/.*\(sd[a-z]*$\)/\1/"`
+    if [ "$DEVTYPE" = "disk" ] ; then  ### not a partition
+        ./mount-external-drive "$DEVNAME"
     fi
     ;;
 remove)
-    if [ -x $REMOVER ]; then
+    REMOVER=`echo /var/run/block/${DEVNAME}`
+    if [ -x $REMOVER ]; then  ### for each partition, too
 	$REMOVER disk-is-gone
     fi
     rm -f $REMOVER
 
-    if [ -x /usr/sbin/updfstab ]; then
-        /usr/sbin/updfstab
-    fi
+    # if [ -x /usr/sbin/updfstab ]; then
+    #     /usr/sbin/updfstab
+    # fi
 
     ###WAGLE###
-    if is_a_drive $DEVPATH ; then
-	/etc/init.d/S28shares_cleanup restart  ### do both samba and ftpd
-	/etc/init.d/samba.sh reconfig
+    if [ "$DEVTYPE" = "disk" ] ; then  ### not a partition
+	/etc/init.d/S28shares_cleanup restart  ### rmdir stray mount points (etc?)
+	/etc/init.d/samba.sh reread_config
 	/etc/init.d/proftpd.sh reread_config
     fi
     ;;

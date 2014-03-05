@@ -50,7 +50,7 @@ cleanup() {
     up "$LOCKFILE"
 
     # remove external shares
-    su -c "/usr/local/bin/perl -I /usr/www/lib /usr/www/lib/removeExternalShares.pl" www-data
+    ### WAGLE event driven ### su -c "/usr/local/bin/perl -I /usr/www/lib /usr/www/lib/removeExternalShares.pl" www-data
 
 }
 

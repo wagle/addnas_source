@@ -107,6 +107,8 @@ sub stage1() {
 		# Delete the old share
 		$smbConf->DeleteSection($sharename);
 
+		ludo("$nbin/ftpacl.pl rename_share \"$sharename\" \"$new_sharename\"");
+
 		unless ($smbConf->RewriteConfig) {
 			$self->fatalError($config, 'f00013');
 			return;
@@ -114,6 +116,14 @@ sub stage1() {
 		unless (sudo("$nbin/reconfigSamba.sh")) {
 			$self->fatalError($config, 'f00034');
 			return;
+		}
+		unless (ludo("$nbin/ftpacl.pl rebuild")) {
+		  	$self->fatalError($config, 'f00039');
+		  	return;
+		}
+		unless (sudo("$nbin/rereadFTPconfig.sh")) {
+		  	$self->fatalError($config, 'f00040');
+		  	return;
 		}
 
 	} else {
