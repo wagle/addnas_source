@@ -136,6 +136,7 @@ sub tsi_restore($$) {
     ### /var/oxsemi/proftpd.sqlite3 created on the fly at boot-time, but maybe not soon enough
     system "chown www-data /var/oxsemi/proftpd.*"; 
     system "sudo -u www-data /usr/www/nbin/ftpacl.pl init";
+    system "sudo -u www-data /usr/www/nbin/ftpacl.pl add_user www-data";
     system "sudo -u www-data /usr/www/nbin/ftpacl.pl repopulate";
   } elsif (grep { $previous_version eq $_ } @epoch1) {
     ### ignore "var/lib/current-version";
