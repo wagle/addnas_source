@@ -9,7 +9,7 @@ start() {
 		sudo -u www-data /usr/www/nbin/ftpacl.pl init
 	fi
 	if [ \! -r /var/oxsemi/proftpd.vrootaliases ] ; then
-		sudo -u www-data /usr/www/nbin/ftpacl.pl rebuild
+		sudo -u www-data /usr/www/nbin/ftpacl.pl rebuild_configs
 	fi
 	/usr/sbin/proftpd 
 }

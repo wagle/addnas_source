@@ -580,7 +580,7 @@ sub stage6($$$) {
       $self->fatalError($config, 'f00034');
       return;
     }
-    unless (ludo("$nbin/ftpacl.pl rebuild")) {
+    unless (ludo("$nbin/ftpacl.pl rebuild_configs")) {
       $self->fatalError($config, 'f00039');
       return;
     }

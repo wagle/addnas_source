@@ -133,7 +133,7 @@ sub stage1($$$) {
     return;
   }
 
-  unless (ludo("$nbin/ftpacl.pl rebuild")) {
+  unless (ludo("$nbin/ftpacl.pl rebuild_configs")) {
     $self->fatalError($config, 'f00039');
     return;
   }
