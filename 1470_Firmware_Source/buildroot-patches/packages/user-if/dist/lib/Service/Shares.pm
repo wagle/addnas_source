@@ -144,7 +144,7 @@ sub disableExternalPartition ($$) {
 		}
 		$smbConf->RewriteConfig();
 	}
-	ludo("$nbin/ftpacl.pl enable_partition \"$sharesHome/external/$uuid\"");
+	ludo("$nbin/ftpacl.pl disable_partition \"$sharesHome/external/$uuid\"");
 	ludo("$nbin/ftpacl.pl rebuild_configs");
 	sudo("$nbin/reconfigSamba.sh");
 	sudo("$nbin/rereadFTPconfig.sh");
@@ -187,49 +187,49 @@ sub disableExternalDev($$) {
 }
 
 ### DEAD
-sub deleteAllRemovedExternal {
-	# This will go through the external shares, check if the storage still
-	# exists if the storage has been removed, the share will be removed.
-	my $class = shift;
-	my $num_delays = 0;
-
-	FILES: foreach my $file ( nasCommon->shares_inc, nasCommon->senvid_inc ) {
-		my $smbConf = new Config::IniFiles( -file => $file ) || next;
-
-		foreach my $sharename ($smbConf->Sections()) {
-			# If the share path is to an external drive which doesn't exist
-			# delete the share
-			my $dirpath = $smbConf->val($sharename, 'path');
-			if (($dirpath =~ /$sharesHome\/external\/.+$/) && (!(-d $dirpath))) {
-				if ($num_delays >= 6) {
-					# We've waited for 1 minute for the external drive to spin
-					# up so give up and delete the share
-# TSI: commenting out following line, we want to just set the share inactive, not delete it.
-#					$smbConf->DeleteSection($sharename);
-$smbConf->newval($sharename,'available','no');
-ludo("$nbin/ftpacl.pl disable \"$sharename\"");
-				} else {
-					# The first occurance of an external share not matching with
-					# an available directory will cause a 10s delay to allow
-					# slow external disks to become ready
-					my $delay = 10;
-
-					debug("Delaying 10s to allow external drives to spin up");
-					while ($delay > 0) {
-						$delay -= sleep($delay);
-					}
-
-					$num_delays += 1;
-					redo FILES;
-				}
-			}
-		}
-
-		$smbConf->RewriteConfig();
-	}
-
-	return 1;
-}
+# sub deleteAllRemovedExternal {
+# 	# This will go through the external shares, check if the storage still
+# 	# exists if the storage has been removed, the share will be removed.
+# 	my $class = shift;
+# 	my $num_delays = 0;
+#
+# 	FILES: foreach my $file ( nasCommon->shares_inc, nasCommon->senvid_inc ) {
+# 		my $smbConf = new Config::IniFiles( -file => $file ) || next;
+#
+# 		foreach my $sharename ($smbConf->Sections()) {
+# 			# If the share path is to an external drive which doesn't exist
+# 			# delete the share
+# 			my $dirpath = $smbConf->val($sharename, 'path');
+# 			if (($dirpath =~ /$sharesHome\/external\/.+$/) && (!(-d $dirpath))) {
+# 				if ($num_delays >= 6) {
+# 					# We've waited for 1 minute for the external drive to spin
+# 					# up so give up and delete the share
+# # TSI: commenting out following line, we want to just set the share inactive, not delete it.
+# #					$smbConf->DeleteSection($sharename);
+# $smbConf->newval($sharename,'available','no');
+# ludo("$nbin/ftpacl.pl disable \"$sharename\"");
+# 				} else {
+# 					# The first occurance of an external share not matching with
+# 					# an available directory will cause a 10s delay to allow
+# 					# slow external disks to become ready
+# 					my $delay = 10;
+#
+# 					debug("Delaying 10s to allow external drives to spin up");
+# 					while ($delay > 0) {
+# 						$delay -= sleep($delay);
+# 					}
+#
+# 					$num_delays += 1;
+# 					redo FILES;
+# 				}
+# 			}
+# 		}
+#
+# 		$smbConf->RewriteConfig();
+# 	}
+#
+# 	return 1;
+# }
 
 sub findAllUsers {
 	# Returns a hashRef of all share users excluding share_guest
