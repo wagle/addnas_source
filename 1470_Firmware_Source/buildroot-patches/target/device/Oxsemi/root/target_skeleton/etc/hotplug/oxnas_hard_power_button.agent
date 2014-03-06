@@ -20,6 +20,7 @@ resetconfigs()
 	rm /var/private/lighttpd.htdigest.user
         rm /var/oxsemi/proftpd.sqlite3
         rm /var/oxsemi/proftpd.vrootaliases
+        rm /var/oxsemi/proftpd.hiddens
 
 	touch /var/oxsemi/shares.inc
 	chmod 644 /var/osemi/shares/inc
@@ -52,10 +53,6 @@ resetconfigs()
         cp /etc/shadow.factory /etc/shadow
         chmod 644 /etc/shadow
         chown root:root /etc/shadow
-        
-        sudo -u www-data /usr/www/nbin/ftpacl.pl init
-        sudo -u www-data touch /var/oxsemi/proftpd.vrootaliases
-
 }
 case $ACTION in
 
