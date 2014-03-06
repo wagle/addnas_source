@@ -110,7 +110,7 @@ sub deleteAllExternal {
 ### NEW
 sub enableExternalPartition ($$) {
 	my ($self, $uuid) = @_;
-	FILES: foreach my $file ( nasCommon->shares_inc, nasCommon->senvid_inc ) {
+	foreach my $file ( nasCommon->shares_inc, nasCommon->senvid_inc ) {
 		my $smbConf = new Config::IniFiles( -file => $file ) || next;
 		foreach my $sharename ($smbConf->Sections()) {
 			my $dirpath = $smbConf->val($sharename, 'path');
@@ -122,14 +122,17 @@ sub enableExternalPartition ($$) {
 		}
 		$smbConf->RewriteConfig();
 	}
+	ludo("$nbin/ftpacl.pl enable_partition \"$sharesHome/external/$uuid\"");
+	ludo("$nbin/ftpacl.pl rebuild_configs");
 	sudo("$nbin/reconfigSamba.sh");
+	sudo("$nbin/rereadFTPconfig.sh");
 	return 1;
 }
 
 ### NEW
 sub disableExternalPartition ($$) {
 	my ($self, $uuid) = @_;
-	FILES: foreach my $file ( nasCommon->shares_inc, nasCommon->senvid_inc ) {
+	foreach my $file ( nasCommon->shares_inc, nasCommon->senvid_inc ) {
 		my $smbConf = new Config::IniFiles( -file => $file ) || next;
 		foreach my $sharename ($smbConf->Sections()) {
 			my $dirpath = $smbConf->val($sharename, 'path');
@@ -141,7 +144,10 @@ sub disableExternalPartition ($$) {
 		}
 		$smbConf->RewriteConfig();
 	}
+	ludo("$nbin/ftpacl.pl enable_partition \"$sharesHome/external/$uuid\"");
+	ludo("$nbin/ftpacl.pl rebuild_configs");
 	sudo("$nbin/reconfigSamba.sh");
+	sudo("$nbin/rereadFTPconfig.sh");
 	return 1;
 }
 
