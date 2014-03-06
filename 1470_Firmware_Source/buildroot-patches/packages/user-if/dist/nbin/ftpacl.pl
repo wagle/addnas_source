@@ -289,8 +289,7 @@ EOF
   return doQuery($query);
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ftpResetAllPartitions ($) {
-  my ($mpnt) = @_;
+sub ftpResetAllPartitions () {
   my $query .= <<EOF;
 	BEGIN TRANSACTION;
 	UPDATE partitioninfo SET avail = 'no';
