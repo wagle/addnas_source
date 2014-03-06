@@ -20,6 +20,8 @@
 ::sysinit:/bin/ln -s /proc/mounts /etc/mtab
 ::sysinit:/sbin/swapon -a
 
+::sysinit:/usr/www/nbin/ftpacl.pl reset_all_partitions
+
 ::sysinit:/bin/echo 0 > /sys/block/sda/uevent
 ::sysinit:/bin/echo 0 > /sys/block/sdb/uevent
 

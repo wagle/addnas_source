@@ -8,9 +8,8 @@ start() {
 	if [ \! -r /var/oxsemi/proftpd.sqlite3 ] ; then
 		sudo -u www-data /usr/www/nbin/ftpacl.pl init
 	fi
-	if [ \! -r /var/oxsemi/proftpd.vrootaliases ] ; then
-		sudo -u www-data /usr/www/nbin/ftpacl.pl rebuild_configs
-	fi
+	### always rebuild (see /etc/inittab, for example)
+	sudo -u www-data /usr/www/nbin/ftpacl.pl rebuild_configs
 	/usr/sbin/proftpd 
 }
 
