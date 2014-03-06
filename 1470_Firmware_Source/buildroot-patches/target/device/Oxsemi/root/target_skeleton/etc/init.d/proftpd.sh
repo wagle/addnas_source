@@ -7,6 +7,7 @@ start() {
 	echo "Starting ProFTPD"
 	if [ \! -r /var/oxsemi/proftpd.sqlite3 ] ; then
 		sudo -u www-data /usr/www/nbin/ftpacl.pl init
+		sudo -u www-data /usr/www/nbin/ftpacl.pl add_user www-data
 	fi
 	### always rebuild (see /etc/inittab, for example)
 	sudo -u www-data /usr/www/nbin/ftpacl.pl rebuild_configs
