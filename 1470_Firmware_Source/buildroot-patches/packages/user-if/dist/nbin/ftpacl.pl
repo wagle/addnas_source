@@ -371,18 +371,26 @@ EOF
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub FTPACL_SHARE_QUERY() {
+sub FTPACL_WDISK_SHARE_QUERY() {
   my $query = <<EOF;
-    SELECT distinct partitioninfo.mpnt, wdisk, path
-	FROM partitioninfo JOIN pathlist ON partitioninfo.mpnt = pathlist.mpnt;
+    SELECT distinct partitioninfo.mpnt, path
+	FROM partitioninfo JOIN wdisklist ON partitioninfo.mpnt = wdisklist.mpnt;
 EOF
   return $query;
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub FTPACL_DISABLED_DISK_QUERY() {
+sub FTPACL_NORMAL_SHARE_QUERY() {
+  my $query = <<EOF;
+    SELECT distinct partitioninfo.mpnt, path
+	FROM partitioninfo JOIN sharelist ON partitioninfo.mpnt = sharelist.mpnt;
+EOF
+  return $query;
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub FTPACL_DISABLED_SHARE_QUERY() {
   my $query = <<EOF;
 	SELECT distinct path
-		FROM partitioninfo JOIN pathlist ON partitioninfo.mpnt = pathlist.mpnt
+		FROM partitioninfo NATURAL JOIN (SELECT * FROM wdisklist UNION ALL SELECT * FROM sharelist)
 		WHERE avail = "no";
 EOF
   return $query;
@@ -390,14 +398,14 @@ EOF
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub FTPACL_HIDDEN_SHARE_QUERY() {
   my $query = <<EOF;
-	SELECT distinct partitioninfo.mpnt,ftpacl.path,user 
-		FROM partitioninfo JOIN pathlist JOIN ftpacl ON partitioninfo.mpnt = pathlist.mpnt and pathlist.path = ftpacl.path
+	SELECT distinct partitioninfo.mpnt, ftpacl.path, user 
+		FROM partitioninfo NATURAL JOIN (SELECT * FROM wdisklist UNION ALL SELECT * FROM sharelist) NATURAL JOIN ftpacl
 		WHERE hidden = "yes";
 EOF
   return $query;
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ALIASES_TOP_TEMPLATE($$) {
+sub ALIASES_TOP_NORMAL_SHARE_TEMPLATE($$) {
   my ($mpnt, $share) = @_;
   my $template .= <<EOF;
 VRootAlias $mpnt/$share /$share
@@ -405,7 +413,7 @@ EOF
   return $template;
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ALIASES_TOP_WDISK_TEMPLATE($$) {
+sub ALIASES_TOP_WDISK_SHARE_TEMPLATE($$) {
   my ($mpnt, $share) = @_;
   my $template .= <<EOF;
 VRootAlias $mpnt /$share
@@ -451,17 +459,18 @@ EOF
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpRebuildConfigs () {
   my $aliases = "";
-  foreach (doQuery(FTPACL_SHARE_QUERY())) {
-    my ($mpnt, $wdisk, $share) = split(/\|/);
+  foreach (doQuery(FTPACL_WDISK_SHARE_QUERY())) {
+    my ($mpnt, $share) = split(/\|/);
     $share =~ s,^/,,;  # strip leading "/"
-    if ($wdisk eq 'yes') {
-      $aliases .= ALIASES_TOP_WDISK_TEMPLATE($mpnt, $share);
-    } else {
-      $aliases .= ALIASES_TOP_TEMPLATE($mpnt, $share);
-    }
+    $aliases .= ALIASES_TOP_WDISK_SHARE_TEMPLATE($mpnt, $share);
+  }
+  foreach (doQuery(FTPACL_NORMAL_SHARE_QUERY())) {
+    my ($mpnt, $share) = split(/\|/);
+    $share =~ s,^/,,;  # strip leading "/"
+    $aliases .= ALIASES_TOP_NORMAL_SHARE_TEMPLATE($mpnt, $share);
   }
   my $hiddens = "";
-  my @disabled_shares_results = doQuery(FTPACL_DISABLED_DISK_QUERY());
+  my @disabled_shares_results = doQuery(FTPACL_DISABLED_SHARE_QUERY());
   my @hidden_shares_results = doQuery(FTPACL_HIDDEN_SHARE_QUERY());
   if (scalar @disabled_shares_results != 0 || scalar @hidden_shares_results != 0) {
     my %disabled_share;
