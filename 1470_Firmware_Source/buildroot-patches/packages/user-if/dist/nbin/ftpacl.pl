@@ -289,6 +289,16 @@ EOF
   return doQuery($query);
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub ftpResetAllPartitions ($) {
+  my ($mpnt) = @_;
+  my $query .= <<EOF;
+	BEGIN TRANSACTION;
+	UPDATE partitioninfo SET avail = 'no';
+	COMMIT;
+EOF
+  return doQuery($query);
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpCreateNormalShare ($$) {
   my ($mpnt, $share) = @_;
   my $query .= <<EOF;
@@ -542,7 +552,7 @@ if      (@ARGV == 1 && $ARGV[0] eq "init") {				ftpMakeSchema();
 } elsif (@ARGV == 3 && $ARGV[0] eq "full") {				ftpUpsertUserToFULL($ARGV[1], $ARGV[2]);
 } elsif (@ARGV == 3 && $ARGV[0] eq "read") {				ftpUpsertUserToREAD($ARGV[1], $ARGV[2]);
 } elsif (@ARGV == 3 && $ARGV[0] eq "none") {				ftpUpsertUserToNONE($ARGV[1] ,$ARGV[2]);
-} elsif (@ARGV == 1 && $ARGV[0] eq "rebuild") {				ftpRebuildConfigs();
+} elsif (@ARGV == 1 && $ARGV[0] eq "rebuild_configs") {			ftpRebuildConfigs();
 } elsif (@ARGV == 1 && $ARGV[0] eq "repopulate") {			ftpRepopulateDatabase();
 } elsif (@ARGV == 3 && $ARGV[0] eq "create_normal_share") {		ftpCreateNormalShare($ARGV[1], $ARGV[2]);
 } elsif (@ARGV == 3 && $ARGV[0] eq "create_wholedisk_share") {		ftpCreateWholeDiskShare($ARGV[1], $ARGV[2]);
@@ -551,6 +561,7 @@ if      (@ARGV == 1 && $ARGV[0] eq "init") {				ftpMakeSchema();
 } elsif (@ARGV == 2 && $ARGV[0] eq "destroy_partition") {		ftpDestroyPartition($ARGV[1]);
 } elsif (@ARGV == 2 && $ARGV[0] eq "enable_partition") {		ftpEnablePartition($ARGV[1]);
 } elsif (@ARGV == 2 && $ARGV[0] eq "disable_partition") {		ftpDisablePartition($ARGV[1]);
+} elsif (@ARGV == 1 && $ARGV[0] eq "reset_all_partitions") {		ftpResetAllPartitions();
 } elsif (@ARGV == 2 && $ARGV[0] eq "show_share") {			ftpShowAccessToShare($ARGV[1]);
 } else {
   open(my $con, "> /dev/console");
@@ -569,7 +580,7 @@ if      (@ARGV == 1 && $ARGV[0] eq "init") {				ftpMakeSchema();
   print STDERR "$0 full <user> <share>\n";
   print STDERR "$0 read <user> <share>\n";
   print STDERR "$0 none <user> <share>\n";
-  print STDERR "$0 rebuild\n";
+  print STDERR "$0 rebuild_configs\n";
   print STDERR "$0 repopulate\n";
   print STDERR "$0 create_normal_share <mpnt> <share>\n";
   print STDERR "$0 create_wholedisk_share <mpnt> <share>\n";
@@ -578,6 +589,7 @@ if      (@ARGV == 1 && $ARGV[0] eq "init") {				ftpMakeSchema();
   print STDERR "$0 destroy_partition <mpnt>\n";
   print STDERR "$0 enable_partition <mpnt>\n";
   print STDERR "$0 disable_partition <mpnt>\n";
+  print STDERR "$0 reset_all_partitions\n";
   print STDERR "$0 show_share <share>\n";
   exit 1;
 }
