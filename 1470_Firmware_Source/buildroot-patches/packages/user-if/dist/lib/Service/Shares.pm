@@ -154,7 +154,7 @@ sub disableExternalPartition ($$) {
 sub deleteAllExternalFromDev($$) {
 	my ($self, $name) = @_;
 	system('echo delete name: '.$name.' > /var/oxsemi/debug');
-	FILES: foreach my $file ( nasCommon->shares_inc, nasCommon->senvid_inc ) {
+	foreach my $file ( nasCommon->shares_inc, nasCommon->senvid_inc ) {
 		my $smbConf = new Config::IniFiles( -file => $file ) || next;
 		foreach my $sharename ($smbConf->Sections()) {
 			my $dirpath = $smbConf->val($sharename, 'path');
@@ -164,7 +164,10 @@ sub deleteAllExternalFromDev($$) {
 		}
 		$smbConf->RewriteConfig();
 	}
+	ludo("$nbin/ftpacl.pl destroy_partition \"$sharesHome/external/$name\"");
+	ludo("$nbin/ftpacl.pl rebuild_configs");
 	sudo("$nbin/reconfigSamba.sh");
+	sudo("$nbin/rereadFTPconfig.sh");
 	return 1;
 }
 

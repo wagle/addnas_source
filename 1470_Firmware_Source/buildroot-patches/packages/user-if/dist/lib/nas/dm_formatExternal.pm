@@ -162,9 +162,11 @@ sub run {
 		# Remove external shares
 	        my $s = new Service::Storage( '/shares/internal' );
 	        my $external_volumes = $s->external_volumes();
-		my $name = $external_volumes->{$device}->{name};
 
-		Service::Shares->deleteAllExternalFromDev($name);
+		foreach my $part (keys %{$external_volumes->{$device}->{partitions}}) {
+			my $name = $external_volumes->{$device}->{partitions}->{$part}->{name};
+			Service::Shares->deleteAllExternalFromDev($name);
+		}
 
 		# Display the initial page
 		system( 'sudo '.nasCommon->nas_nbin."touch.sh ".nasCommon->nas_lock );
