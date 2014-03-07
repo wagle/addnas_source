@@ -21,7 +21,7 @@
 ::sysinit:/sbin/swapon -a
 
 # no-op if no DB, /etc/init.d/proftpd rebuilds configs before starting
-::sysinit:/usr/www/nbin/ftpacl.pl reset_all_partitions
+::sysinit:[ -f /var/oxsemi/proftpd.sqlite3 ] && /usr/www/nbin/ftpacl.pl reset_all_partitions
 
 ::sysinit:/bin/echo 0 > /sys/block/sda/uevent
 ::sysinit:/bin/echo 0 > /sys/block/sdb/uevent
