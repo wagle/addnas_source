@@ -81,6 +81,10 @@ cleanupunuseddirectories
 if [ -z "$1" ] ; then
     exit 1
 fi
+# return an error if we've not been given a sd[a-z] device name
+if ! ( echo -n "$1" | grep -q "^sd[a-z]$" ) ; then
+    exit 1
+fi
 
 # exit if already mounted
 if [ `/bin/mount | /bin/grep -c /dev/$1` -gt 0 ] ; then
