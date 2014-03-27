@@ -57,7 +57,9 @@ get_partition_devices() {
 ###############################################################################
 # cleanup any unused directories / stray mount-points
 cleanupunuseddirectories() {
-    find /shares/external -xdev -depth -type d  \! -path /shares/external -exec rmdir {} \;
+#    find /shares/external -xdev -depth -type d  \! -path /shares/external -exec rmdir {} \;
+### WAGLE ### the find command is broken for the above CORRECT bottom up approach
+    find /shares/external -xdev -type d  \! -path /shares/external -exec rmdir {} \;
 }
 ###############################################################################
 # Top level of script
