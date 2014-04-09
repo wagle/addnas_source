@@ -1,7 +1,7 @@
 #!/bin/sh
 
 HN=$(hostname)
-WG=$(grep "^workgroup=" /etc/smb.conf | cut -d = -f 2-)
+WG=$(grep "^workgroup=" /var/oxsemi/smb.header.conf | cut -d = -f 2-)
 TS=$(grep ^server /etc/ntp.conf | cut -d " " -f 2)
 SD=$(grep "^network_mode=" /var/oxsemi/network-settings | cut -d = -f 2-)
 IP=$(ip -f inet address show eth0 | tail -1 | sed -r "s/^[ ]+inet ([^ ]+).+$/\1/")
