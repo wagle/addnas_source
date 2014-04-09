@@ -3,12 +3,15 @@
 # Start ProFTPD
 #
 
-start() {
-	echo "Starting ProFTPD"
-	if [ \! -r /var/oxsemi/proftpd.sqlite3 ] ; then
+init() {
+	if [ \! -s /var/oxsemi/proftpd.sqlite3 ] ; then
+	    	echo "Initializing ProFTPD database"
 		sudo -u www-data /usr/www/nbin/ftpacl.pl init
 		sudo -u www-data /usr/www/nbin/ftpacl.pl add_user www-data
 	fi
+}
+
+start() {
 	### always rebuild (see /etc/inittab, for example)
 	sudo -u www-data /usr/www/nbin/ftpacl.pl rebuild_configs
 	/usr/sbin/proftpd 
@@ -29,7 +32,11 @@ reread_config() {
 }
 
 case "$1" in
+	init)
+		init
+		;;
 	start)
+		init  ### just to be robust?
 		start
 		;;
 	stop)
