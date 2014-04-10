@@ -1,0 +1,3 @@
+server pool.ntp.org iburst
+driftfile /etc/ntp.drift
+logfile /var/log/ntp.log

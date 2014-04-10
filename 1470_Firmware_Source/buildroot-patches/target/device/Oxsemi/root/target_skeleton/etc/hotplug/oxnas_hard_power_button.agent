@@ -21,6 +21,7 @@ resetconfigs()
         rm /var/oxsemi/proftpd.sqlite3
         rm /var/oxsemi/proftpd.vrootaliases
         rm /var/oxsemi/proftpd.hiddens
+	rm /etc/ntp.conf
 
 	touch /var/oxsemi/shares.inc
 	chmod 644 /var/osemi/shares/inc
@@ -53,6 +54,10 @@ resetconfigs()
         cp /etc/shadow.factory /etc/shadow
         chmod 644 /etc/shadow
         chown root:root /etc/shadow
+
+        cp /etc/ntp.conf.factory /etc/ntp.conf
+        chmod 644 /etc/ntp.conf
+        chown root:root /etc/ntp.conf
 }
 case $ACTION in
 
