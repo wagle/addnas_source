@@ -22,6 +22,7 @@ push @files, "var/private/lighttpd.htdigest.user";
 push @files, "etc/passwd";
 push @files, "etc/group";
 push @files, "etc/shadow";
+push @files, "etc/ntp.conf";
 push @files, "top";
 push @files, "var/oxsemi/proftpd.sqlite3.dump";	### created on the fly below
 my $files = join(" ",@files);
