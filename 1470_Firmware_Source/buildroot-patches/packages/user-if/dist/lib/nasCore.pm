@@ -294,11 +294,13 @@ sub getShares($$) {
     $names{$sect} = 1;
     my @dpath = split('/',$sharesInc->val($sect,'path'));
     my $drive = $dpath[3];
+    my $wholedisk = $dpath[4] ne $sect;
 ###    if (!($sharesInc->val($sect,'available') eq "no")) {
     push @$shares, {  name  => $sect,        # Name of the share
                       id    => $ct++,        # A unique id
 		      drive => $drive,
 		      avail => $sharesInc->val($sect,'available'),
+		      wholedisk => $wholedisk,
                       accessType =>          # Public or Private for Password based; n/a for user
                         ($accessType eq 'user' ? 'n/a' :
                             $sharesInc->val($sect, 'public') eq 'yes' ? 

@@ -266,6 +266,7 @@ $message = {
 		m10011 => 'Available?',
 		m10012 => 'Volume Name',
 		m10013 => 'Sharing Whole Disk',
+		m10014 => 'Whole Disk?',
 
 		e10001 => 'Username already exists',
 

@@ -7,6 +7,7 @@
   <th align="left">[% lang.m10005 %]</th>
   <th align="left">[% lang.m10010 %]</th>
   <th align="left">[% lang.m10011 %]</th>
+  <th align="left">[% lang.m10014 %]</th>
 [% IF accessType != 'user' %]
   <th>Access Type</th>
 [% END %]
@@ -17,6 +18,7 @@
   <td>[% sh.name %]</td>
   <td>[% sh.drive %]</td>
   <td>[% sh.avail ? sh.avail : 'yes' %]</td>
+  <td>[% sh.wholedisk ? 'yes' : 'no' %]</td>
 [% IF accessType != 'user' %]
   <td>[% sh.accessType %]</td>
 [% END %]
