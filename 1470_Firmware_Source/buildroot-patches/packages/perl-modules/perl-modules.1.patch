@@ -1,0 +1,12 @@
+--- usr/local/lib/perl5/site_perl/5.10.0/Config/IniFiles.pm.ORIG	2003-05-13 18:30:32.000000000 -0700
++++ usr/local/lib/perl5/site_perl/5.10.0/Config/IniFiles.pm	2014-04-16 23:14:54.690644698 -0700
+@@ -985,6 +985,9 @@
+     my $oldfh = select(F);
+     $self->OutputConfig;
+     close(F);
++    system("sync"); ### WAGLE ### want fsync
++    system("sync");
++    system("sync");
+     select($oldfh);
+     rename( $new_file, $file ) || do {
+       carp "Unable to rename temp config file ($new_file) to $file: $!";

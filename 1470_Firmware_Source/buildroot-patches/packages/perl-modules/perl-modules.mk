@@ -17,8 +17,9 @@ $(TARGET_DIR)/usr/local/lib/perl5/site_perl/5.8.8/Module/Build/PodParser.pm: $(D
 	(\
 	cd $(TARGET_DIR);\
 	tar -xjf $(DL_DIR)/$(PERL_MODULES_SOURCE) ;\
+	patch -p 0 < $(BASE_DIR)/package/perl-modules/perl-modules.1.patch ;\
 	)
-	
+
 PERL_MODULES: $(TARGET_DIR)/usr/local/lib/perl5/site_perl/5.8.8/Module/Build/PodParser.pm
 
 PERL_MODULES-clean:
