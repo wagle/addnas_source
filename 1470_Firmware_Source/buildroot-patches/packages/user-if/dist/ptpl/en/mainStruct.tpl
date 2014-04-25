@@ -62,51 +62,57 @@ function moveArrow(ycord) // vert cord of layer
 
 <table width="1000" border="0" cellspacing="0" cellpadding="0">
   <tr>
-    <td valign="top" align="left" background="/images/BG_header.jpg"><table width="100%" border="0" cellpadding="0" cellspacing="0" class="Border_LRTB">
+    <td valign="top" align="left" background="/images/BG_header.jpg">
+      <table width="100%" border="0" cellpadding="0" cellspacing="0" class="Border_LRTB">
+	<tr>
+	  <td align="left" valign="top"><img src="/images/spacer.gif" width="290" height="1"></td>
+	  <td valign="top" align="left"><img src="/images/spacer.gif" width="414" height="1"></td>
+	  <td valign="top" align="left"><img src="/images/spacer.gif" width="296" height="1"></td>
+	</tr>
+	<tr>
+	  <td valign="top" align="left"><img src="/images/spacer.gif" width="130" height="70"></td>
+	  <td valign="middle" align="left">
+	    <table width="100%" border="0" cellspacing="0" cellpadding="2">
+	      <tr>
+		<td class="headertitle"><div align="center">[% lang.m01000 %]</div></td>
+	      </tr>
+	    </table>
+	  </td>
+	  <td width="296" valign="middle" align="left">
+	    <table width="100%" border="0" align="center" cellpadding="2" cellspacing="0">
+	      <tr>
+		<td align="right" valign="top" class="headerdetails">[% lang.m01002 %]: </td>
+		<td valign="top" class="headerdetails">[% fr_device_name %]</td>
+	      </tr>
+	      <tr>
+		<td align="right" valign="top" class="headerdetails">[% lang.m01042 %]: </td>
+		<td valign="top" class="headerdetails">[% fr_workgroup %]</td>
+	      </tr>
+	      <tr>
+		<td align="right" valign="top" class="headerdetails">[% lang.m01003 %]:</td>
+		<td valign="top" class="headerdetails">[% fr_firmware %]</td>
+	      </tr>
+	    </table>
+	  </td>
+	</tr>
+	<tr>
+	  <td colspan="3" align="left" valign="top"><table width="100%" border="0" cellspacing="0" cellpadding="2">
 
-      <tr>
-        <td width="154" align="left" valign="top"><img src="/images/spacer.gif" width="290" height="1"></td>
-        <td valign="top" align="left"><img src="/images/spacer.gif" width="394" height="1"></td>
-        <td valign="top" align="left"><img src="/images/spacer.gif" width="316" height="1"></td>
+	    <tr>
+	      <td width="30" align="left" valign="top"><img src="/images/spacer.gif" width="30" height="20"></td>
+	      <td width="746" align="left" valign="middle" class="timestampwht"><div id="fr_datetime">[% fr_datetime %]</div></td>
+	      <td width="212" align="right" valign="middle" class="headeruserboldwht">[% IF fr_username %][% lang.m01005 %]: [% fr_username %][% END %]&nbsp;&nbsp; </td>
+	    </tr>
+	  </table>
+	</td>
       </tr>
-      <tr>
-        <td valign="top" align="left"><img src="/images/spacer.gif" width="130" height="70"></td>
-        <td valign="middle" align="left"><table width="100%" border="0" cellspacing="0" cellpadding="2">
-          <tr>
 
-            <td class="headertitle"><div align="center">[% lang.m01000 %]</div></td>
-          </tr>
-        </table></td>
-        <td width="316" valign="middle" align="left"><table width="100%" border="0" align="center" cellpadding="2" cellspacing="0">
-          <tr>
-            <td align="right" valign="top" class="headerdetails">[% lang.m01002 %]: </td>
-            <td valign="top" class="headerdetails">[% fr_device_name %]</td>
-          </tr>
-          <tr>
-            <td align="right" valign="top" class="headerdetails">[% lang.m01042 %]: </td>
-            <td valign="top" class="headerdetails">[% fr_workgroup %]</td>
-          </tr>
-          <tr>
-            <td align="right" valign="top" class="headerdetails">[% lang.m01003 %]:</td>
-            <td valign="top" class="headerdetails">[% fr_firmware %]</td>
-          </tr>
-        </table></td>
-      </tr>
-      <tr>
-        <td colspan="3" align="left" valign="top"><table width="100%" border="0" cellspacing="0" cellpadding="2">
-
-          <tr>
-            <td width="30" align="left" valign="top"><img src="/images/spacer.gif" width="30" height="20"></td>
-            <td width="746" align="left" valign="middle" class="timestampwht"><div id="fr_datetime">[% fr_datetime %]</div></td>
-            <td width="212" align="right" valign="middle" class="headeruserboldwht">[% IF fr_username %][% lang.m01005 %]: [% fr_username %][% END %]&nbsp;&nbsp; </td>
-          </tr>
-        </table></td>
-        </tr>
-
-    </table></td>
-  </tr>
+    </table>
+  </td>
+</tr>
   <tr>
-    <td align="left" valign="top"><table width="100%" border="0" cellspacing="0" cellpadding="0">
+    <td align="left" valign="top">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0">
       <tr>
         <td  colspan="2"  width="104" align="left" valign="top" bgcolor="#29478D">&nbsp;</td>
         <td colspan="2" valign="top" class="breadcrumb"><table width="100%" border="0" cellspacing="0" cellpadding="4">
