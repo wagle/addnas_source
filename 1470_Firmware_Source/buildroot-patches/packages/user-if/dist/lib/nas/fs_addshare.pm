@@ -179,7 +179,9 @@ sub stage4($$$) {
     $self->fatalError($config, $errcode, $errmessage);
     return;
   }	
-
+  
+  #
+  #  make sure the top level samba config file is r/w-able
   unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smb_conf )) {
     $self->fatalError($config, 'f00020');
     return;
@@ -292,8 +294,10 @@ sub stage6($$$) {
   $sharenameNospaces =~ s/ /_/g;
 
   my $volume = $cgi->param('volume');
- 
+
+  #
   # create the directory
+  #
   if ($sharewholedisk) {
     my $tinitdir = "external"."/".$volume;
     unless (sudo("$nbin/initWholediskRoot.sh $tinitdir")) {
@@ -308,12 +312,19 @@ sub stage6($$$) {
     }
   }
 
+  #
+  #  add section to tentative new samba config file
+  #
   $sharesInc->AddSection($sharename);
   if ($sharewholedisk) {
     $sharesInc->newval($sharename, 'path', "$sharesHome/external/$volume");
   } else {
     $sharesInc->newval($sharename, 'path', "$sharesHome/external/$volume/$sharenameNospaces");
   }
+
+  #
+  #  optimize shares on XFS partititions
+  #
   for (`cat /proc/mounts`) {
     chomp;
     my ($dev,$mpnt,$fstype) = split /\s+/, $_;
@@ -327,6 +338,9 @@ sub stage6($$$) {
 
   $sharesInc->newval($sharename, 'force user', 'www-data');
 
+  #
+  #  open up perms to 
+  #
   unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smb_conf )) {
     $self->fatalError($config, 'f00020');
     return;
@@ -337,9 +351,7 @@ sub stage6($$$) {
     $self->fatalError($config, 'f00005');
     return;
   }
-  #
-  # User/password prtected share
-  #
+
   my $full = '';
   my $read = '';
   my $allUsers = '';
