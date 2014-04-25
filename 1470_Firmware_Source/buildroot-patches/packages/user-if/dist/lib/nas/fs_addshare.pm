@@ -135,7 +135,6 @@ sub stage2($$$) {
 # }
 
 sub stage4($$$) {
-
   my ($self, $cgi, $config) = @_;
 
   my $vars = { tabon => 'fileshare' };
@@ -175,96 +174,67 @@ sub stage4($$$) {
   # Feed back the uppercased share name to the next form
   $vars->{frm}->{sharename} = $utf8name;
 
-  ###if ($cgi->param('cif')) {
-    my ($errcode,$errmessage) = checkForFilenameCaseBraindamage("/shares/external/".$vars->{frm}->{volume}."/".$vars->{frm}->{sharename});
-    if ( $errcode ) {
-      $self->fatalError($config, $errcode, $errmessage);
-      return;
-    }	
+  my ($errcode,$errmessage) = checkForFilenameCaseBraindamage("/shares/external/".$vars->{frm}->{volume}."/".$vars->{frm}->{sharename});
+  if ( $errcode ) {
+    $self->fatalError($config, $errcode, $errmessage);
+    return;
+  }	
 
-    unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smb_conf )) {
-      $self->fatalError($config, 'f00020');
-      return;
+  unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smb_conf )) {
+    $self->fatalError($config, 'f00020');
+    return;
+  }
+
+  my $smbConf = new Config::IniFiles( -file => nasCommon->smb_conf );
+  unless ($smbConf) {
+    $self->fatalError($config, 'f00005');
+    return;
+  }
+
+  # List all existing users
+  my $users = [];
+
+  unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smbpasswd )) {
+    $self->fatalError($config, 'f00020');
+    return;
+  }
+
+  unless (open(SPW, "<" . nasCommon->smbpasswd ) ) {
+    $self->fatalError($config, 'f00005');
+    return;
+  }
+
+  while (<SPW>) {
+    $_ =~ /^([^:]+):([^:]+).*$/;
+    my ($uname, $uid) = ($1, $2);
+    unless (($uname eq 'root') || ($uname eq $shareGuest) || ($uname =~ /^sh\d+$/) || ($uname eq 'guest')) {
+      push @$users, { name => $uname, id => $uid };
     }
+  }
+  close(SPW);
 
-    my $smbConf = new Config::IniFiles( -file => nasCommon->smb_conf );
-    unless ($smbConf) {
-      $self->fatalError($config, 'f00005');
-      return;
+  # Add the 'guest' user - this is used for 'public' accessing of this share
+  #
+  my $name2uid = mapNameToUid();
+
+  push @$users, {
+		 name => getMessage($config, 'm11020'),
+		 id => $name2uid->{$shareGuest} 
+		};
+
+  ### my @sorted = sort { $a->{name} cmp $b->{name} } @$users;
+  my @sorted = sort {
+    if ($a->{name} eq getMessage($config, 'm11020')) {
+      -1;
+    } elsif ($b->{name} eq getMessage($config, 'm11020')) {
+      1;
+    } else {
+      $a->{name} cmp $b->{name};
     }
+  } @$users;
+  $vars->{users} = \@sorted;
 
-    # my $accessType = undef;
-
-    # if ($smbConf->val('global', 'security') eq 'user') {
-    #   $accessType = 'user';
-    # } else {
-    #   $accessType = 'pw';
-    # }
-
-    # IMPORTANT !!!!!
-    #
-    # Access Type is to be HARDCODED to 'user' for the time being
-    #
-    my $accessType = 'user';
-
-    # Are we using user level security, or password/public?
-    #
-    if ($accessType eq 'user') {
-
-      # List all existing users
-      #
-      my $users = [];
-
-      unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smbpasswd )) {
-	$self->fatalError($config, 'f00020');
-	return;
-      }
-
-      unless (open(SPW, "<" . nasCommon->smbpasswd ) ) {
-	$self->fatalError($config, 'f00005');
-	return;
-      }
-
-      while (<SPW>) {
-	$_ =~ /^([^:]+):([^:]+).*$/;
-	my ($uname, $uid) = ($1, $2);
-	unless (($uname eq 'root') || ($uname eq $shareGuest) || ($uname =~ /^sh\d+$/) || ($uname eq 'guest')) {
-	  push @$users, { name => $uname, id => $uid };
-	}
-      }
-      close(SPW);
-
-      # Add the 'guest' user - this is used for 'public' accessing of this share
-      #
-      my $name2uid = mapNameToUid();
-
-      push @$users, {
-		     name => getMessage($config, 'm11020'),
-		     id => $name2uid->{$shareGuest} 
-		    };
-
-      ### my @sorted = sort { $a->{name} cmp $b->{name} } @$users;
-      my @sorted = sort {
-	if ($a->{name} eq getMessage($config, 'm11020')) {
-	  -1;
-	} elsif ($b->{name} eq getMessage($config, 'm11020')) {
-	  1;
-	} else {
-	  $a->{name} cmp $b->{name};
-	}
-      } @$users;
-      ###  
-      $vars->{users} = \@sorted;
-
-      $self->outputTemplate('fs_addshare4user.tpl', $vars);
-    }	 # else {
-    #   $self->outputTemplate('fs_addshare4password.tpl', $vars);
-    # }
-  ###} elsif ($cgi->param('nfs')) {
-  ###  $self->outputTemplate('fs_addshare4user.tpl', $vars);
-  ###} else {
-  ###  $self->outputTemplate('fs_addshare5.tpl', $vars);
-  ###}
+  $self->outputTemplate('fs_addshare4user.tpl', $vars);
 }
 
 # sub stage5($$$) {
@@ -321,21 +291,10 @@ sub stage6($$$) {
   my $sharenameNospaces = $sharename;
   $sharenameNospaces =~ s/ /_/g;
 
-  # Only need to make the directory if this share is on the internal drive(s). ie, it is
-  # volume 'main'.
-  #
   my $volume = $cgi->param('volume');
  
-  # if we're creating any internal share, replace spaces with underscores and
   # create the directory
   if ($cgi->param('cif') eq 'y') {
-    # if ($volume =~ /main/i) {
-    #   my $tcreatedir = "internal/".$sharenameNospaces;
-    #   unless (sudo("$nbin/makeSharedir.sh $tcreatedir")) {
-    #     $self->fatalError($config, 'f00019');
-    #     return;
-    #   }
-    # } else {
     if ($sharewholedisk) {
       my $tinitdir = "external"."/".$volume;
       unless (sudo("$nbin/initWholediskRoot.sh $tinitdir")) {
@@ -349,27 +308,11 @@ sub stage6($$$) {
         return;
       }
     }
-    # }
   }
 
-  # The parameters from the CGI will be some of :
-  #
-  #   pword: The password required for password based share
-  #   user_xxx_perm: xxx is the userid, and the value of this param will be 'r' or 'f' (read/full)
-  #   cif: set to 'y' if CIF required
-  #   ftp: set to 'y' if FTP required
-  #   nfs: set to 'y' if NFS required
-  #   http: set to 'y' if HTTP required (not supported currently)
-  #
   if ($cgi->param('cif') eq 'y') {
 
     $sharesInc->AddSection($sharename);
-    # internal and external directories have different top level dir...
-    #
-    # if ($volume =~ /main/i) {
-    #   $sharesInc->newval($sharename, 'path', "$sharesHome/internal/$sharenameNospaces");
-    #   $sharesInc->newval($sharename, 'preallocate', 'Yes');
-    # } else {
       if ($sharewholedisk) {
         $sharesInc->newval($sharename, 'path', "$sharesHome/external/$volume");
       } else {
@@ -385,12 +328,9 @@ sub stage6($$$) {
           last;
         }
       }
-    # }
 
     $sharesInc->newval($sharename, 'force user', 'www-data');
 
-    # If we are running in 'user' security mode, set permissions for each user required.
-    #
     unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smb_conf )) {
       $self->fatalError($config, 'f00020');
       return;
@@ -402,18 +342,6 @@ sub stage6($$$) {
       return;
     }
 
-    # my $accessType = undef;
-
-    # if ($smbConf->val('global', 'security') eq 'user') {
-    #   $accessType = 'user';
-    # } else {
-    #   $accessType = 'pw';
-    # }
-
-    # IMPORTANT !!!!!
-    #
-    # Access Type is to be HARDCODED to 'user' for the time being
-    #
     my $accessType = 'user';
 
     # Are we using user level security, or password/public?
