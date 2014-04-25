@@ -36,7 +36,7 @@ sub doQuery {
   print $con "errout:\n", $errout;
   print $con "exitcode:\n", $exitcode, "\n";
   close $con;
-  exit 1 if $exitcode != 0;
+  exit 2 if $exitcode != 0;
   chomp($output);
   return (split(/\n/,$output));
 }

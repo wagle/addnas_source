@@ -532,30 +532,33 @@ sub stage6($$$) {
       my $mpnt = $sharesInc->val($sharename, 'path');
       $mpnt =~ s,/$sharename$,,;
       if ($sharewholedisk) {
-	unless ("$nbin/ftpacl.pl create_wholedisk_share \"$mpnt\" \"$sharename\"") {
+	unless (ludo ("$nbin/ftpacl.pl create_wholedisk_share \"$mpnt\" \"$sharename\"")) {
 	  $self->fatalError($config, 'f00043');
 	  return;
 	}
       } else {
-	unless ("$nbin/ftpacl.pl create_normal_share \"$mpnt\" \"$sharename\"") {
+	unless (ludo ("$nbin/ftpacl.pl create_normal_share \"$mpnt\" \"$sharename\"")) {
 	  $self->fatalError($config, 'f00044');
 	  return;
 	}
       }
       for my $username (@ftp_fullUsers) {
-	unless ("$nbin/ftpacl.pl full \"$username\" \"$sharename\"") {
+	unless (ludo ("$nbin/ftpacl.pl full \"$username\" \"$sharename\"")) {
 	  $self->fatalError($config, 'f00045');
 	  return;
+	}
       }
       for my $username (@ftp_readUsers) {
-	unless ("$nbin/ftpacl.pl read \"$username\" \"$sharename\"") {
+	unless (ludo ("$nbin/ftpacl.pl read \"$username\" \"$sharename\"")) {
 	  $self->fatalError($config, 'f00045');
 	  return;
+	}
       }
       for my $username (@ftp_noneUsers) {
-	unless ("$nbin/ftpacl.pl none \"$username\" \"$sharename\"") {
+	unless (ludo ("$nbin/ftpacl.pl none \"$username\" \"$sharename\"")) {
 	  $self->fatalError($config, 'f00045');
 	  return;
+	}
       }
     }
     # else {
