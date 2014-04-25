@@ -313,21 +313,21 @@ sub stage6($$$) {
   if ($cgi->param('cif') eq 'y') {
 
     $sharesInc->AddSection($sharename);
-      if ($sharewholedisk) {
-        $sharesInc->newval($sharename, 'path', "$sharesHome/external/$volume");
-      } else {
-        $sharesInc->newval($sharename, 'path', "$sharesHome/external/$volume/$sharenameNospaces");
+    if ($sharewholedisk) {
+      $sharesInc->newval($sharename, 'path', "$sharesHome/external/$volume");
+    } else {
+      $sharesInc->newval($sharename, 'path', "$sharesHome/external/$volume/$sharenameNospaces");
+    }
+    for (`cat /proc/mounts`) {
+      chomp;
+      my ($dev,$mpnt,$fstype) = split /\s+/, $_;
+      if (($mpnt eq "$sharesHome/external/$volume") and ($fstype eq "xfs")) {
+	$sharesInc->newval($sharename, 'preallocate', 'yes');
+	$sharesInc->newval($sharename, 'incoherent', 'yes');
+	$sharesInc->newval($sharename, 'direct writes', '2');
+	last;
       }
-      for (`cat /proc/mounts`) {
-        chomp;
-        my ($dev,$mpnt,$fstype) = split /\s+/, $_;
-        if (($mpnt eq "$sharesHome/external/$volume") and ($fstype eq "xfs")) {
-          $sharesInc->newval($sharename, 'preallocate', 'yes');
-          $sharesInc->newval($sharename, 'incoherent', 'yes');
-          $sharesInc->newval($sharename, 'direct writes', '2');
-          last;
-        }
-      }
+    }
 
     $sharesInc->newval($sharename, 'force user', 'www-data');
 
