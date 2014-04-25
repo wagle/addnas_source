@@ -180,19 +180,6 @@ sub stage4($$$) {
     return;
   }	
   
-  #
-  #  make sure the top level samba config file is r/w-able
-  unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smb_conf )) {
-    $self->fatalError($config, 'f00020');
-    return;
-  }
-
-  my $smbConf = new Config::IniFiles( -file => nasCommon->smb_conf );
-  unless ($smbConf) {
-    $self->fatalError($config, 'f00005');
-    return;
-  }
-
   # List all existing users
   my $users = [];
 
@@ -337,20 +324,6 @@ sub stage6($$$) {
   }
 
   $sharesInc->newval($sharename, 'force user', 'www-data');
-
-  #
-  #  open up perms to 
-  #
-  unless (sudo("$nbin/chmod.sh 0666 " . nasCommon->smb_conf )) {
-    $self->fatalError($config, 'f00020');
-    return;
-  }
-
-  my $smbConf = new Config::IniFiles( -file => nasCommon->smb_conf );
-  unless ($smbConf) {
-    $self->fatalError($config, 'f00005');
-    return;
-  }
 
   my $full = '';
   my $read = '';
