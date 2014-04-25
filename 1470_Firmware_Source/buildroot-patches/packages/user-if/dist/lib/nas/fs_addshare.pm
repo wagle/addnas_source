@@ -429,8 +429,9 @@ sub stage6($$$) {
   } else {
     $sharesInc->delval($sharename, 'read list');
   }
+
   #
-  #  FTP
+  #  start munging FTP configuration database
   #
   my $mpnt = $sharesInc->val($sharename, 'path');
   $mpnt =~ s,/$sharename$,,;
@@ -464,7 +465,9 @@ sub stage6($$$) {
     }
   }
 
-
+  #
+  #  rewrite sambda shares level configuration file
+  #
   unless ($sharesInc->RewriteConfig) {
     $self->fatalError($config, 'f00013');
     return;
