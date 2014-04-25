@@ -19,7 +19,7 @@ DEVICE=`echo $DEVICE|sed -e's,/dev/,,'`
 
 if [ ! -b "/dev/$DEVICE" ] ; then                                                  
         echo "WARNING: $DEVICE is not a block device."                               
-        exit 1                                                                     
+        exit 2                                                                     
 fi                                                                                 
 
 touch /tmp/dm_progress

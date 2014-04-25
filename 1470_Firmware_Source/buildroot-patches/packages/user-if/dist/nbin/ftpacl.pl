@@ -599,7 +599,7 @@ if      (@ARGV == 1 && $ARGV[0] eq "init") {				ftpMakeSchema();
   print STDERR "$0 disable_partition <mpnt>\n";
   print STDERR "$0 reset_all_partitions\n";
   print STDERR "$0 show_share <share>\n";
-  exit 1;
+  exit 2;
 }
 exit 0;
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
