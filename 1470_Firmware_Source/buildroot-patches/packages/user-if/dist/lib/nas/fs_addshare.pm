@@ -294,19 +294,17 @@ sub stage6($$$) {
   my $volume = $cgi->param('volume');
  
   # create the directory
-  if ($cgi->param('cif') eq 'y') {
-    if ($sharewholedisk) {
-      my $tinitdir = "external"."/".$volume;
-      unless (sudo("$nbin/initWholediskRoot.sh $tinitdir")) {
-        $self->fatalError($config, 'f00019');
-        return;
-      }
-    } else {
-      my $tcreatedir = "external"."/".$volume."/".$sharenameNospaces;
-      unless (sudo("$nbin/makeSharedir.sh $tcreatedir")) {
-        $self->fatalError($config, 'f00019');
-        return;
-      }
+  if ($sharewholedisk) {
+    my $tinitdir = "external"."/".$volume;
+    unless (sudo("$nbin/initWholediskRoot.sh $tinitdir")) {
+      $self->fatalError($config, 'f00019');
+      return;
+    }
+  } else {
+    my $tcreatedir = "external"."/".$volume."/".$sharenameNospaces;
+    unless (sudo("$nbin/makeSharedir.sh $tcreatedir")) {
+      $self->fatalError($config, 'f00019');
+      return;
     }
   }
 
