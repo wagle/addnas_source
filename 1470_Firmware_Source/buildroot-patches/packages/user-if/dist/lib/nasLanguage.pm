@@ -570,6 +570,10 @@ WARNING:
 		f00040 => 'Couldn\'t reconfig FTP server.',
 		f00041 => 'Couldn\'t set FTP access options.',
 		f00042 => 'Failed to open ftp access database for reading',
+		f00043 => 'Can\'t add wholedisk share, are you using it for a regular share?',
+		f00044 => 'Can\'t add regular share, are you using it for a wholedisk share?',
+		f00045 => 'Can\'t change user perms, might be a corrupt database?',
+
 		eTooManyUsers => 'There are too many users. Please logout or wait.',
 		eWaitTime1 => 'Please try again in ',
 		eWaitTime2 => ' seconds.',
