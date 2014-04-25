@@ -283,23 +283,6 @@ sub stage6($$$) {
   my $volume = $cgi->param('volume');
 
   #
-  # create the directory
-  #
-  if ($sharewholedisk) {
-    my $tinitdir = "external"."/".$volume;
-    unless (sudo("$nbin/initWholediskRoot.sh $tinitdir")) {
-      $self->fatalError($config, 'f00019');
-      return;
-    }
-  } else {
-    my $tcreatedir = "external"."/".$volume."/".$sharenameNospaces;
-    unless (sudo("$nbin/makeSharedir.sh $tcreatedir")) {
-      $self->fatalError($config, 'f00019');
-      return;
-    }
-  }
-
-  #
   #  add section to tentative new samba config file
   #
   $sharesInc->AddSection($sharename);
@@ -471,6 +454,25 @@ sub stage6($$$) {
   unless ($sharesInc->RewriteConfig) {
     $self->fatalError($config, 'f00013');
     return;
+  }
+
+  #
+  # ACTUALLY create the directories AFTER we write the config files
+  # the mess seems less this way
+  # plus the FTP config can reject configuration by rules
+  #
+  if ($sharewholedisk) {
+    my $tinitdir = "external"."/".$volume;
+    unless (sudo("$nbin/initWholediskRoot.sh $tinitdir")) {
+      $self->fatalError($config, 'f00019');
+      return;
+    }
+  } else {
+    my $tcreatedir = "external"."/".$volume."/".$sharenameNospaces;
+    unless (sudo("$nbin/makeSharedir.sh $tcreatedir")) {
+      $self->fatalError($config, 'f00019');
+      return;
+    }
   }
 
   #    unless (sudo("$nbin/restartSamba.sh")) {
