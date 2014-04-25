@@ -336,7 +336,13 @@ sub stage6($$$) {
     #     return;
     #   }
     # } else {
-    if (! $sharewholedisk) {
+    if ($sharewholedisk) {
+      my $tinitdir = "external"."/".$volume;
+      unless (sudo("$nbin/initWholediskRoot.sh $tinitdir")) {
+        $self->fatalError($config, 'f00019');
+        return;
+      }
+    } else {
       my $tcreatedir = "external"."/".$volume."/".$sharenameNospaces;
       unless (sudo("$nbin/makeSharedir.sh $tcreatedir")) {
         $self->fatalError($config, 'f00019');

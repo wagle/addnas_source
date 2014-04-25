@@ -43,6 +43,7 @@ www-data	ALL=(root) NOPASSWD : /usr/bin/install,\
                 /usr/www/nbin/fs_chgPasswd.sh,\
                 /usr/www/nbin/fs_delUser.sh,\
                 /usr/www/nbin/makeSharedir.sh,\
+                /usr/www/nbin/initWholediskRoot.sh,\
                 /usr/www/nbin/renameShare.sh,\
                 /usr/www/nbin/restartSamba.sh,\
                 /usr/www/nbin/rereadFTPconfig.sh,\
