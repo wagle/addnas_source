@@ -142,7 +142,8 @@ for partition in ${partition_devices} ; do
        	changeown=false
 	mountmethod=fat
         uuid=`/lib/udev/vol_id --uuid /dev/${partition}`
-    elif echo "$0: $1 -- trying mount with ntfs-3g" > /dev/console ; ntfs-3g /dev/${partition} "$temp_mnt_dir" -o usermapping=/etc/ntfs-3g/UserMapping > /dev/console 2>&1 ; then
+###    elif echo "$0: $1 -- trying mount with ntfs-3g" > /dev/console ; ntfs-3g /dev/${partition} "$temp_mnt_dir" -o usermapping=/etc/ntfs-3g/UserMapping > /dev/console 2>&1 ; then
+    elif echo "$0: $1 -- trying mount with ntfs-3g" > /dev/console ; ntfs-3g /dev/${partition} "$temp_mnt_dir" -o uid=33,gid=33,umask=007 > /dev/console 2>&1 ; then
 	sleep 10
         mounted=true
         changeown=false
