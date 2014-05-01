@@ -101,14 +101,14 @@ sub ftpMakeSchema () {
 	CREATE TRIGGER sharename_uniqueness_1 BEFORE INSERT ON wdisklist FOR EACH ROW
 		BEGIN
 			SELECT CASE
-				WHEN ((SELECT path FROM sharelist WHERE sharelist.path == new.path) IS NOT NULL)
+				WHEN ((SELECT path FROM sharelist WHERE upper(sharelist.path) == upper(new.path)) IS NOT NULL)
 				THEN RAISE(ABORT, 'Cant add duplicate sharename to shared folders.')
 			END;
 		END; 
 	CREATE TRIGGER sharename_uniqueness_2 BEFORE INSERT ON sharelist FOR EACH ROW
 		BEGIN
 			SELECT CASE
-				WHEN ((SELECT path FROM wdisklist WHERE wdisklist.path == new.path) IS NOT NULL)
+				WHEN ((SELECT path FROM wdisklist WHERE upper(wdisklist.path) == upper(new.path)) IS NOT NULL)
 				THEN RAISE(ABORT, 'Cant add duplicate sharename to wholedisk shares.')
 			END;
 		END; 
