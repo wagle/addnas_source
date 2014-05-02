@@ -49,7 +49,8 @@ sub stage1() {
 	$vars->{shares} = $self->getShares($config);
 
         # Convert the new share name to uppercase UTF-8
-        my $utf8new_sharename = uc Encode::decode("utf8", $vars->{frm}->{new_sharename});
+###        my $utf8new_sharename = uc Encode::decode("utf8", $vars->{frm}->{new_sharename});
+        my $utf8new_sharename = Encode::decode("utf8", $vars->{frm}->{new_sharename});
 
 	# Check that the new share name is valid and not a duplicate
 	my $error = nasCommon::validateSharename($utf8new_sharename, $vars->{shares});
@@ -72,6 +73,12 @@ sub stage1() {
 
 	# Only do this if the share is shared by cifs
 	if ($smbConf->SectionExists($sharename)) {
+		# fail if the new name is in use, before it (tries) to get renamed on disk
+		unless (ludo ("$nbin/ftpacl.pl rename_share \"$sharename\" \"$new_sharename\"")) {
+		  	$self->fatalError($config, 'f00046');
+		  	return;
+		}
+
 		# Add the new share
 		$smbConf->AddSection($new_sharename);
 
@@ -106,8 +113,6 @@ sub stage1() {
 
 		# Delete the old share
 		$smbConf->DeleteSection($sharename);
-
-		ludo("$nbin/ftpacl.pl rename_share \"$sharename\" \"$new_sharename\"");
 
 		unless ($smbConf->RewriteConfig) {
 			$self->fatalError($config, 'f00013');

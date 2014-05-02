@@ -161,7 +161,8 @@ sub stage4($$$) {
   $vars->{frm}->{wholedisk} = ($vars->{frm}->{submit3} ne "");
 
   # Convert the share name to uppercase UTF-8
-  my $utf8name = uc Encode::decode("utf8", $vars->{frm}->{sharename});
+###  my $utf8name = uc Encode::decode("utf8", $vars->{frm}->{sharename});
+  my $utf8name = Encode::decode("utf8", $vars->{frm}->{sharename});
 
   # Check that the share name is allowed and not a duplicate
   my $error = nasCommon::validateSharename($utf8name, $self->getShares($config));
