@@ -44,16 +44,33 @@ sub stage1($$$) {
   my $vars = { tabon => 'fileshare' };
   my $error = 0;
   my $path;
+  my $delete_folder_on_disk;
 
   my $sharename = $cgi->param('sharename');
   my $confirm = $cgi->param('confirm');
 
-  if ($sharename eq '') {
+  copyFormVars($cgi, $vars);
+
+### open (my $con, "> /dev/console");
+### print $con "SUBMIT1! ", "" ne $vars->{frm}->{submit1}, " : ", $vars->{frm}->{sharename}, "\n";
+### print $con "SUBMIT2! ", "" ne $vars->{frm}->{submit2}, " : ", $vars->{frm}->{folder}, "\n";
+### close $con;
+
+  if ($vars->{frm}->{submit1} ne "") {
+    $delete_folder_on_disk = 1;
+  } elsif ($vars->{frm}->{submit2} ne "") {
+    $delete_folder_on_disk = 0;
+  } else {
+    nasCommon::setErrorMessage( $vars, $config, 'sharename', 'e13003' );
+    $error = 1;
+  }
+
+  if ((! $error) && ($sharename eq '')) {
     nasCommon::setErrorMessage( $vars, $config, 'sharename', 'e13002' );
     $error = 1;
   }
 
-  if ($confirm ne getMessage($config, 'm13005')) {
+  if ((! $error) && ($confirm ne getMessage($config, 'm13005'))) {
     nasCommon::setErrorMessage( $vars, $config, 'confirm', 'e13001' );
     $error = 1;
   }
@@ -101,11 +118,13 @@ sub stage1($$$) {
   #    if ($path =~ /^$sharesHome\/internal\/.+/) {
   # Take away the top dir prefix. Let the rmShareDir script sort out the full path
   #
-  my $dirName = $path;
-  $dirName =~ s/^$sharesHome\///;
-  unless (sudo("$nbin/rmShareDir.sh $dirName")) {
-    $self->fatalError($config, 'f00021');
-    return;
+  if ($delete_folder_on_disk) {
+    my $dirName = $path;
+    $dirName =~ s/^$sharesHome\///;
+    unless (sudo("$nbin/rmShareDir.sh $dirName")) {
+      $self->fatalError($config, 'f00021');
+      return;
+    }
   }
   #    }
 

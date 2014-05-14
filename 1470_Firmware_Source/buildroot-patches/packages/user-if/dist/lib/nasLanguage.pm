@@ -329,10 +329,12 @@ WARNING:
 
 		m13005 => 'yes',
 		m13006 => 'Select Shared Folder to delete',
-		m13007 => 'Delete Shared Folder Now',
+		m13007 => 'Delete The Share AND The Folder On Disk',
+		m13008 => 'Remove JUST The Share, and Leave The Folder On Disk',
 
 		e13001 => 'You must enter "yes" to perform the delete',
 		e13002 => 'You must chose a share to remove',
+		e13003 => 'You must chose a removal option (?)',
 
 		m14001 => 'Update Security Settings',
 		m14002 => 'Select a Shared Folder to update',
