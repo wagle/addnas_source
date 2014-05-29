@@ -28,10 +28,10 @@ function isValid(tf) {
 </select>
 <br />
 <p>[% lang.m13004 %]<input type="text" name="confirm" id="confirm" tabindex="1" size="3" maxlength="3" autocomplete="off" value="[% frm.confirm %]"></p>
-<input type="submit" name="submit1" tabindex="2" value="[% lang.m13007 %]" >
-<input type="submit" name="submit2" tabindex="3" value="[% lang.m13008 %]" >
+<input type="submit" name="submit2" tabindex="2" value="[% lang.m13008 %]" >
+<input type="submit" name="submit1" tabindex="3" value="[% lang.m13007 %]" >
 <input type="hidden" name="nextstage" value="1" >
-<input type="button" name="cancel" tabindex=4" value="[% lang.m01027 %]"  onClick="location='/auth/fileshare.pl'">
+<input type="button" name="cancel" tabindex="4" value="[% lang.m01027 %]"  onClick="location='/auth/fileshare.pl'">
 <script>
 document.getElementById( [% IF focusOn %] "[% focusOn %]" [% ELSE %] "confirm" [% END %] ).focus();
 </script>
