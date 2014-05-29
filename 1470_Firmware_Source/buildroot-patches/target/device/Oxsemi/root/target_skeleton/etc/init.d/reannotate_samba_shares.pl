@@ -45,7 +45,7 @@ for $share ( $sharesInc->Sections ) {
 	$tcreatedir =~ s,^/shares,,;
 	system "/usr/www/nbin/makeSharedir.sh $tcreatedir";  ### to chown and chmod
 	for my $mpnt ( keys %fstype ) {
-		if ( $path eq "$mpnt/$share" ) {
+		if (($path eq "$mpnt") || ($path eq "$mpnt/$share")) {  ### should detect whole disk shares
 			if ( $fstype{$mpnt} eq "xfs" ) {
 				$fstransport = $fstransport{$mpnt};
 				$xfs = 1;
