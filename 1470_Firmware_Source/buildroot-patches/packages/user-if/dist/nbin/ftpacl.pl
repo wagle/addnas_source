@@ -15,6 +15,9 @@ my $SQL = '/usr/bin/sqlite3';
 my $DBASE = '/var/oxsemi/proftpd.sqlite3';
 my $ALIASES = '/var/oxsemi/proftpd.vrootaliases';
 my $HIDDENS = '/var/oxsemi/proftpd.hiddens';
+###my $DBASE = '/tmp/proftpd.sqlite3';
+###my $ALIASES = '/tmp/proftpd.vrootaliases';
+###my $HIDDENS = '/tmp/proftpd.hiddens';
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 # sub dumpQuery {
 #   my ($output, $exitcode) = @_;
@@ -27,8 +30,8 @@ my $HIDDENS = '/var/oxsemi/proftpd.hiddens';
 #   return ($output, $exitcode);
 # }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub doQuery {
-  my $query = shift;
+sub doQuery ($) {
+  my ($query) = @_;
   my ($output, $errout, $exitcode) = filter($query, "$SQL $DBASE");
   open(my $con, "> /dev/console");
   print $con "query:\n", $query;
@@ -40,6 +43,101 @@ sub doQuery {
   chomp($output);
   return (split(/\n/,$output));
 }
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub doQuery2 ($$) {
+  my ($query, $dbase) = @_;
+  my ($output, $errout, $exitcode) = filter($query, "$SQL $dbase");
+  open(my $con, "> /dev/console");
+  print $con "dbase:\n", $dbase;
+  print $con "query:\n", $query;
+  print $con "output:\n", $output;
+  print $con "errout:\n", $errout;
+  print $con "exitcode:\n", $exitcode, "\n";
+  close $con;
+  exit 2 if $exitcode != 0;
+  chomp($output);
+  return (split(/\n/,$output));
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+#  epoch 1 and 2 schema
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+# CREATE TABLE ftpacl (
+#         mpnt TEXT,
+#         path TEXT NOT NULL,
+#         user TEXT NOT NULL,
+#         hidden TEXT NOT NULL,
+#         overall TEXT NOT NULL,
+#         read_acl TEXT NOT NULL,
+#         write_acl TEXT NOT NULL,
+#         delete_acl TEXT NOT NULL,
+#         create_acl TEXT NOT NULL,
+#         modify_acl TEXT NOT NULL,
+#         move_acl TEXT NOT NULL,
+#         view_acl TEXT NOT NULL,
+#         navigate_acl TEXT NOT NULL,
+#         UNIQUE(mpnt, path, user)
+#         );
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub is_partition_available ($$) {
+  my ($mpnt, $sharename) = @_;
+  print "is_partition_available ($mpnt, $sharename)\n";
+  my $sharesInc = new Config::IniFiles( -file => nasCommon->shares_inc );
+  return unless $sharesInc;
+  my $path = $sharesInc->val($sharename, 'path');
+  if (($path =~ m,^$mpnt/$sharename$,) && (-d $path)) { ### disk of folders
+    my $avail_flag = $sharesInc->val($sharename,'available');
+    $avail_flag = "yes" unless defined $avail_flag;
+    return ($avail_flag ne "no");
+  }
+  # ludo("$nbin/ftpacl.pl disable_partition \"$sharesHome/external/$uuid\"");
+  # ludo("$nbin/ftpacl.pl rebuild_configs");
+  # sudo("$nbin/reconfigSamba.sh");
+  # sudo("$nbin/rereadFTPconfig.sh");
+  return 0;
+}
+
+sub upgrade_from_epoch ($$) {
+  my ($eno, $tmp_dbase) = @_;  ### epochs 1 and 2 are the same
+  my $query = <<EOF;
+	SELECT * FROM ftpacl;
+EOF
+  my %partition_already_done;
+  my %share_already_done;
+  foreach (doQuery2($query, $tmp_dbase)) {
+    chomp;
+    my ($mpnt,$path,$user,$hidden,$overall,$read_acl,$write_acl,$delete_acl,$create_acl,$modify_acl,$move_acl,$view_acl,$navigate_acl) = split(/\|/);
+    print "LOOP ($mpnt,$path,$user,$hidden,$overall,$read_acl,$write_acl,$delete_acl,$create_acl,$modify_acl,$move_acl,$view_acl,$navigate_acl)\n";
+    $path =~ s,^/,,;
+    if ($mpnt eq "") {
+      ;
+    } elsif (exists $partition_already_done{$mpnt}) {
+      ;
+    } elsif (is_partition_available($mpnt, $path)) {
+      ftpEnablePartition($mpnt);
+      $partition_already_done{$mpnt} = 1;
+    } else {
+      ftpDisablePartition($mpnt);
+      $partition_already_done{$mpnt} = 1;
+    }
+    if ( $mpnt eq "") {
+      ftpAddUser ($user);
+    } elsif ($overall eq "f") {
+      ftpCreateNormalShare($mpnt, $path) unless exists $share_already_done{$path};
+      ftpUpsertUserToFULL($user, $path);
+      $share_already_done{$path} = 1;
+    } elsif ($overall eq "r") {
+      ftpCreateNormalShare($mpnt, $path) unless exists $share_already_done{$path};
+      ftpUpsertUserToREAD($user, $path);
+      $share_already_done{$path} = 1;
+    } elsif ($overall eq "n") {
+      ftpCreateNormalShare($mpnt, $path) unless exists $share_already_done{$path};
+      ftpUpsertUserToNONE($user, $path);
+      $share_already_done{$path} = 1;
+    }
+  }
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+# epoch 3 schema
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub ftpMakeSchema () {
   my $query = <<EOF;
@@ -553,8 +651,7 @@ sub ftpRepopulateDatabase () {
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 if      (@ARGV == 1 && $ARGV[0] eq "init") {				ftpMakeSchema();
-} elsif (@ARGV == 1 && $ARGV[0] eq "upgrade_to_v89") {			ftpConvert_pre_v89_Schema_to_v89();
-} elsif (@ARGV == 1 && $ARGV[0] eq "upgrade_from_v89_to_v91") {		ftpConvert_v89_Schema_to_v91();
+} elsif (@ARGV == 3 && $ARGV[0] eq "upgrade_from_epoch") {		upgrade_from_epoch($ARGV[1], $ARGV[2]);
 } elsif (@ARGV == 2 && $ARGV[0] eq "add_user") {			ftpAddUser($ARGV[1]);
 } elsif (@ARGV == 2 && $ARGV[0] eq "del_user") {			ftpDeleteUser($ARGV[1]);
 } elsif (@ARGV == 3 && $ARGV[0] eq "full") {				ftpUpsertUserToFULL($ARGV[1], $ARGV[2]);
@@ -581,8 +678,7 @@ if      (@ARGV == 1 && $ARGV[0] eq "init") {				ftpMakeSchema();
   }
   close $con;
   print STDERR "$0 init\n";
-  print STDERR "$0 upgrade_to_v89\n";
-  print STDERR "$0 upgrade_from_v89_to_v91\n";
+  print STDERR "$0 upgrade_from_epoch <epoch#> <tmp_dbase>\n";
   print STDERR "$0 add_user <user>\n";
   print STDERR "$0 del_user <user>\n";
   print STDERR "$0 full <user> <share>\n";

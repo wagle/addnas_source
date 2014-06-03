@@ -94,24 +94,31 @@ sub tsi_restore($$) {
   }
   my $current_version = `cut -f 1 -d " " /var/lib/current-version`;
   chomp ($current_version);
-  ### abstract this better later when I know what to do
-  my @epoch0 = qw(v58);
-  my @epoch1 = qw(v79a v87a);
-  my @epoch2 = qw(v88a);  ### the current version
-  if (grep { $previous_version eq $_ } @epoch0) {
-    ### ignore "var/lib/current-version";
-    rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
-    rename "/tmp/restores/var/oxsemi/mlpath", "/var/oxsemi/mlpath";
-    rename "/tmp/restores/var/oxsemi/network-settings", "/var/oxsemi/network-settings";
-    rename "/tmp/restores/var/oxsemi/shares.inc", "/var/oxsemi/shares.inc";
-    rename "/tmp/restores/var/private/smbpasswd", "/var/private/smbpasswd";
-    rename "/tmp/restores/var/private/lighttpd.htdigest.user", "/var/private/lighttpd.htdigest.user";
-    ### rename "/tmp/restores/etc/passwd", "/etc/passwd";
-    rename "/tmp/restores/etc/group", "/etc/group";
-    rename "/tmp/restores/etc/shadow", "/etc/shadow";
-    # begin special handling
+
+  ###
+  ### the following files haven't changed
+  ###
+  # ignore "var/lib/current-version";
+  rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
+  rename "/tmp/restores/var/oxsemi/mlpath", "/var/oxsemi/mlpath";
+  rename "/tmp/restores/var/oxsemi/network-settings", "/var/oxsemi/network-settings";
+  rename "/tmp/restores/var/oxsemi/shares.inc", "/var/oxsemi/shares.inc";
+  rename "/tmp/restores/var/private/smbpasswd", "/var/private/smbpasswd";
+  rename "/tmp/restores/var/private/lighttpd.htdigest.user", "/var/private/lighttpd.htdigest.user";
+  rename "/tmp/restores/etc/group", "/etc/group";
+  rename "/tmp/restores/etc/shadow", "/etc/shadow";
+  # "var/oxsemi/smb.header.conf"
+  # "etc/passwd"
+  # "etc/ntp.conf" (not backed up until v97awd)
+  # "top"
+  # "var/oxsemi/proftpd.sqlite3.dump"
+
+  ###################################################################################################################################################
+  ### epoch 0 -> epoch 3
+  ###################################################################################################################################################
+  if (grep { $previous_version eq $_ } qw(v58)) {
     system "egrep '^server string=|^workgroup=|^interfaces=' /etc/smb.conf > /tmp/restores/var/oxsemi/smb.header.conf";
-    rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
+    # ignore old /etc/smb.conf
     mkdir "/top";
     my @smbusers = qw();
     open(SPW, "< /var/private/smbpasswd");
@@ -139,22 +146,13 @@ sub tsi_restore($$) {
     system "sudo -u www-data /usr/www/nbin/ftpacl.pl init";
     system "sudo -u www-data /usr/www/nbin/ftpacl.pl add_user www-data";
     system "sudo -u www-data /usr/www/nbin/ftpacl.pl repopulate";
-  } elsif (grep { $previous_version eq $_ } @epoch1) {
-    ### ignore "var/lib/current-version";
-    rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
-    rename "/tmp/restores/var/oxsemi/mlpath", "/var/oxsemi/mlpath";
-    rename "/tmp/restores/var/oxsemi/network-settings", "/var/oxsemi/network-settings";
-    rename "/tmp/restores/var/oxsemi/shares.inc", "/var/oxsemi/shares.inc";
-    rename "/tmp/restores/var/private/smbpasswd", "/var/private/smbpasswd";
-    rename "/tmp/restores/var/private/lighttpd.htdigest.user", "/var/private/lighttpd.htdigest.user";
-    ### rename "/tmp/restores/etc/passwd", "/etc/passwd";
-    rename "/tmp/restores/etc/group", "/etc/group";
-    rename "/tmp/restores/etc/shadow", "/etc/shadow";
+  ###################################################################################################################################################
+  ### epoch 1 -> epoch 3
+  ###################################################################################################################################################
+  } elsif (grep { $previous_version eq $_ } qw(v79a v87a)) {
     rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
     system "rm -rf /top";
     rename "/tmp/restores/top", "/top";	### directory move is supposed to work on linux
-    system "rm /var/oxsemi/proftpd.sqlite3"; # required by the dept of redundancy dept
-    system "sudo -u www-data sqlite3 /var/oxsemi/proftpd.sqlite3 < /tmp/restores/var/oxsemi/proftpd.sqlite3.dump"; exit $? if $? != 0;
     my @smbusers = qw();
     open(SPW, "< /var/private/smbpasswd");
     while (<SPW>) {
@@ -176,25 +174,32 @@ sub tsi_restore($$) {
     }
     close(NPW);
     close(OPW);
-  } elsif (grep { $previous_version eq $_ } @epoch2) {
-    ### ignore "var/lib/current-version";
-    rename "/tmp/restores/var/oxsemi/nas.ini", "/var/oxsemi/nas.ini";
-    rename "/tmp/restores/var/oxsemi/mlpath", "/var/oxsemi/mlpath";
-    rename "/tmp/restores/var/oxsemi/network-settings", "/var/oxsemi/network-settings";
-    rename "/tmp/restores/var/oxsemi/shares.inc", "/var/oxsemi/shares.inc";
-    rename "/tmp/restores/var/private/smbpasswd", "/var/private/smbpasswd";
-    rename "/tmp/restores/var/private/lighttpd.htdigest.user", "/var/private/lighttpd.htdigest.user";
+    system "sudo -u www-data sqlite3 /tmp/restores/var/oxsemi/proftpd.sqlite3 < /tmp/restores/var/oxsemi/proftpd.sqlite3.dump";
+    system "sudo -u www-data /usr/www/nbin/ftpacl.pl upgrade_from_epoch 1 /tmp/restores/var/oxsemi/proftpd.sqlite3.dump";
+  ###################################################################################################################################################
+  ### epoch 2 -> epoch 3
+  ###################################################################################################################################################
+  } elsif (grep { $previous_version eq $_ } qw(v88a v88g)) {
     rename "/tmp/restores/etc/passwd", "/etc/passwd";
-    rename "/tmp/restores/etc/group", "/etc/group";
-    rename "/tmp/restores/etc/shadow", "/etc/shadow";
     rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
     system "rm -rf /top";
     rename "/tmp/restores/top", "/top";	### directory move is supposed to work on linux
-    system "rm /var/oxsemi/proftpd.sqlite3"; # required by the dept of redundancy dept
-    system "sudo -u www-data sqlite3 /var/oxsemi/proftpd.sqlite3 < /tmp/restores/var/oxsemi/proftpd.sqlite3.dump"; exit $? if $? != 0;
+    system "sudo -u www-data sqlite3 /tmp/restores/var/oxsemi/proftpd.sqlite3 < /tmp/restores/var/oxsemi/proftpd.sqlite3.dump";
+    system "sudo -u www-data /usr/www/nbin/ftpacl.pl upgrade_from_epoch 2 /tmp/restores/var/oxsemi/proftpd.sqlite3.dump";
+  ###################################################################################################################################################
+  ### epoch 3 -> epoch 3
+  ###################################################################################################################################################
+  } elsif (grep { $previous_version eq $_ } qw(v98a v98g)) {
+    rename "/tmp/restores/etc/ntp.conf", "/etc/ntp.conf";
+    rename "/tmp/restores/etc/passwd", "/etc/passwd";
+    rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
+    system "rm -rf /top";
+    rename "/tmp/restores/top", "/top";	### directory move is supposed to work on linux
+    system "sudo -u www-data sqlite3 /var/oxsemi/proftpd.sqlite3 /tmp/restores/var/oxsemi/proftpd.sqlite3.dump"; exit $? if $? != 0;
   }
-  #        system "/etc/init.d/network_servers.sh start";
-  #	system "reboot";
+  ### system "rm /tmp/restores";
+  ### system "/etc/init.d/network_servers.sh start";
+  ### system "reboot";
 }
 
 if (@ARGV == 2 && is_a_potential_archive_disk($ARGV[0]) && ! is_an_actual_archive_disk($ARGV[0]) && $ARGV[1] eq "init") {
