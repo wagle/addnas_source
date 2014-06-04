@@ -95,7 +95,63 @@ sub is_partition_available ($$) {
   # sudo("$nbin/rereadFTPconfig.sh");
   return 0;
 }
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+# populate new (post-upgrade) ftp acl database from /var/private/smbpasswd and /var/oxsemi/shares.inc
+# -- different error handling regime, so I couldn't DontRepeatYourself
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
+sub upgrade_from_epoch_0 () {
+  ###
+  ### Load a list of all known users (Samba passwd file)
+  ###
+  my $allUsers = {};
+  return unless (sudo("$nbin/chmod.sh 0644 " . nasCommon->smbpasswd ));
+  return unless (open(SPW, "<" . nasCommon->smbpasswd));
+  while (<SPW>) {
+    $_ =~ /^([^:]+):([\d]+):.+$/;
+    my ($uname, $uid) = ($1, $2);
+    unless (($uname eq 'root') || ($uname =~ /^sh\d+$/) || ($uname eq 'guest')) {
+      ftpAddUser($uname);
+      $allUsers->{$uname} = $uid;
+    }
+  }
+  close(SPW);
 
+  ###
+  ### open smb share include file, and walk thrugh shares
+  ###
+  my $sharesInc = new Config::IniFiles( -file => nasCommon->shares_inc );
+  return unless $sharesInc;
+
+  my %partition_already_done;
+
+  foreach my $sharename ($sharesInc->Sections()) {
+    my $mpnt = $sharesInc->val($sharename,'path');
+    my $share_whole_disk = !($mpnt =~ m,/shares/external/[^/]*/$sharename$,);
+    if ($share_whole_disk) {
+      ;
+    } else {
+      $mpnt =~ s,/$sharename$,,;
+    }
+    if (exists $partition_already_done{$mpnt}) {
+      ;
+    } elsif (is_partition_available($mpnt, $path)) {
+      ftpEnablePartition($mpnt);
+      $partition_already_done{$mpnt} = 1;
+    } else {
+      ftpDisablePartition($mpnt);
+      $partition_already_done{$mpnt} = 1;
+    }
+    ftpCreateNormalShare($mpnt, $sharename);
+
+    foreach my $uname (keys %$allUsers) {
+      ftpUpsertUserToNONE($uname, $sharename);
+    }
+  }
+
+  ftpRebuildConfigs();
+  sudo("$nbin/rereadFTPconfig.sh");
+}
+#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 sub upgrade_from_epoch ($$) {
   my ($eno, $tmp_dbase) = @_;  ### epochs 1 and 2 are the same
   my $query = <<EOF;
@@ -135,6 +191,8 @@ EOF
       $share_already_done{$path} = 1;
     }
   }
+  ftpRebuildConfigs();
+  sudo("$nbin/rereadFTPconfig.sh");
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
 # epoch 3 schema
@@ -609,56 +667,15 @@ sub ftpRebuildConfigs () {
   close $file2;
 }
 #-------------------------------------------------------------------------------------------------------------------------------------------------------#
-# populate new (post-upgrade) ftp acl database from /var/private/smbpasswd and /var/oxsemi/shares.inc
-# -- different error handling regime, so I couldn't DontRepeatYourself
-#-------------------------------------------------------------------------------------------------------------------------------------------------------#
-sub ftpRepopulateDatabase () {
-  ###
-  ### Load a list of all known users (Samba passwd file)
-  ###
-  my $allUsers = {};
-  return unless (sudo("$nbin/chmod.sh 0644 " . nasCommon->smbpasswd ));
-  return unless (open(SPW, "<" . nasCommon->smbpasswd));
-  while (<SPW>) {
-    $_ =~ /^([^:]+):([\d]+):.+$/;
-    my ($uname, $uid) = ($1, $2);
-    unless (($uname eq 'root') || ($uname =~ /^sh\d+$/) || ($uname eq 'guest')) {
-      ftpInsertUser($uname);
-      $allUsers->{$uname} = $uid;
-    }
-  }
-  close(SPW);
-
-  ###
-  ### open smb share include file, and walk thrugh shares
-  ###
-  my $sharesInc = new Config::IniFiles( -file => nasCommon->shares_inc );
-  return unless $sharesInc;
-
-  foreach my $sharename ($sharesInc->Sections()) {
-    chomp $sharename;
-    my $mpnt = $sharesInc->val($sharename,'path');
-    my $sharewholedisk = !($mpnt =~ m,/$sharename$,);
-    $mpnt =~ s,/$sharename$,,;
-
-    foreach my $uname (keys %$allUsers) {
-      ftpUpsertUserToNONE($uname, $sharename);
-    }
-  }
-
-  ftpRebuildConfigs();
-  return unless (sudo("$nbin/rereadFTPconfig.sh"));
-}
-#-------------------------------------------------------------------------------------------------------------------------------------------------------#
 if      (@ARGV == 1 && $ARGV[0] eq "init") {				ftpMakeSchema();
-} elsif (@ARGV == 3 && $ARGV[0] eq "upgrade_from_epoch") {		upgrade_from_epoch($ARGV[1], $ARGV[2]);
 } elsif (@ARGV == 2 && $ARGV[0] eq "add_user") {			ftpAddUser($ARGV[1]);
 } elsif (@ARGV == 2 && $ARGV[0] eq "del_user") {			ftpDeleteUser($ARGV[1]);
 } elsif (@ARGV == 3 && $ARGV[0] eq "full") {				ftpUpsertUserToFULL($ARGV[1], $ARGV[2]);
 } elsif (@ARGV == 3 && $ARGV[0] eq "read") {				ftpUpsertUserToREAD($ARGV[1], $ARGV[2]);
 } elsif (@ARGV == 3 && $ARGV[0] eq "none") {				ftpUpsertUserToNONE($ARGV[1] ,$ARGV[2]);
 } elsif (@ARGV == 1 && $ARGV[0] eq "rebuild_configs") {			ftpRebuildConfigs();
-} elsif (@ARGV == 1 && $ARGV[0] eq "repopulate") {			ftpRepopulateDatabase();
+} elsif (@ARGV == 1 && $ARGV[0] eq "upgrade_from_epoch_0") {		upgrade_from_epoch_0();
+} elsif (@ARGV == 3 && $ARGV[0] eq "upgrade_from_epoch") {		upgrade_from_epoch($ARGV[1], $ARGV[2]);
 } elsif (@ARGV == 3 && $ARGV[0] eq "create_normal_share") {		ftpCreateNormalShare($ARGV[1], $ARGV[2]);
 } elsif (@ARGV == 3 && $ARGV[0] eq "create_wholedisk_share") {		ftpCreateWholeDiskShare($ARGV[1], $ARGV[2]);
 } elsif (@ARGV == 3 && $ARGV[0] eq "rename_share") {			ftpRenameShare($ARGV[1], $ARGV[2]);
