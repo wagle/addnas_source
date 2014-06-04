@@ -88,6 +88,7 @@ sub tsi_restore($$) {
   system "mkdir /tmp/restores";
   system "tar x -C /tmp/restores -f $disk/opt/backups/$id.tar.gz";
   my $previous_version = `cut -f 1 -d " " /tmp/restores/var/lib/current-version`;
+  $previous_version =~ s/\.[^.]*$//;  ### strip off minor version to reveal frozen config file formats
   chomp ($previous_version);
   if ($previous_version eq "") {
     $previous_version = "v58";
