@@ -146,7 +146,7 @@ sub tsi_restore($$) {
     system "chown www-data /var/oxsemi/proftpd.*"; 
     system "sudo -u www-data /usr/www/nbin/ftpacl.pl init";
     system "sudo -u www-data /usr/www/nbin/ftpacl.pl add_user www-data";
-    system "sudo -u www-data /usr/www/nbin/ftpacl.pl repopulate";
+    system "sudo -u www-data /usr/www/nbin/ftpacl.pl upgrade_from_epoch_0";
   ###################################################################################################################################################
   ### epoch 1 -> epoch 3
   ###################################################################################################################################################
