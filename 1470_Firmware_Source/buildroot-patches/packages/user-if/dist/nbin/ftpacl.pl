@@ -40,6 +40,7 @@ sub doQuery ($) {
   print $con "exitcode:\n", $exitcode, "\n";
   close $con;
   exit 2 if $exitcode != 0;
+###  return "" if $exitcode != 0;
   chomp($output);
   return (split(/\n/,$output));
 }
@@ -55,6 +56,7 @@ sub doQuery2 ($$) {
   print $con "exitcode:\n", $exitcode, "\n";
   close $con;
   exit 2 if $exitcode != 0;
+###  return "" if $exitcode != 0;
   chomp($output);
   return (split(/\n/,$output));
 }
@@ -134,7 +136,7 @@ sub upgrade_from_epoch_0 () {
     }
     if (exists $partition_already_done{$mpnt}) {
       ;
-    } elsif (is_partition_available($mpnt, $path)) {
+    } elsif (is_partition_available($mpnt, $sharename)) {
       ftpEnablePartition($mpnt);
       $partition_already_done{$mpnt} = 1;
     } else {

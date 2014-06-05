@@ -175,10 +175,10 @@ sub tsi_restore($$) {
     }
     close(NPW);
     close(OPW);
-    system "rm -rf /var/oxsemi/proftpd-old.sqlite3 /var/oxsemi/proftpd.sqlite3";
-    system "sudo -u www-data sqlite3 /tmp/restores/var/oxsemi/proftpd-old.sqlite3 < /tmp/restores/var/oxsemi/proftpd.sqlite3.dump";
+    system "rm -rf /tmp/proftpd-old.sqlite3 /var/oxsemi/proftpd.sqlite3";
+    system "sudo -u www-data sqlite3 /tmp/proftpd-old.sqlite3 < /tmp/restores/var/oxsemi/proftpd.sqlite3.dump";
     system "sudo -u www-data /usr/www/nbin/ftpacl.pl init";
-    system "sudo -u www-data /usr/www/nbin/ftpacl.pl upgrade_from_epoch 1 /tmp/restores/var/oxsemi/proftpd-old.sqlite3";
+    system "sudo -u www-data /usr/www/nbin/ftpacl.pl upgrade_from_epoch 1 /tmp/proftpd-old.sqlite3";
   ###################################################################################################################################################
   ### epoch 2 -> epoch 3
   ###################################################################################################################################################
@@ -187,10 +187,10 @@ sub tsi_restore($$) {
     rename "/tmp/restores/var/oxsemi/smb.header.conf", "/var/oxsemi/smb.header.conf";
     system "rm -rf /top";
     rename "/tmp/restores/top", "/top";	### directory move is supposed to work on linux
-    system "rm -rf /var/oxsemi/proftpd-old.sqlite3 /var/oxsemi/proftpd.sqlite3";
-    system "sudo -u www-data sqlite3 /tmp/restores/var/oxsemi/proftpd2-old.sqlite3 < /tmp/restores/var/oxsemi/proftpd.sqlite3.dump";
+    system "rm -rf /tmp/proftpd-old.sqlite3 /var/oxsemi/proftpd.sqlite3";
+    system "sudo -u www-data sqlite3 /tmp/proftpd-old.sqlite3 < /tmp/restores/var/oxsemi/proftpd.sqlite3.dump";
     system "sudo -u www-data /usr/www/nbin/ftpacl.pl init";
-    system "sudo -u www-data /usr/www/nbin/ftpacl.pl upgrade_from_epoch 2 /tmp/restores/var/oxsemi/proftpd-old.sqlite3";
+    system "sudo -u www-data /usr/www/nbin/ftpacl.pl upgrade_from_epoch 1 /tmp/proftpd-old.sqlite3";
   ###################################################################################################################################################
   ### epoch 3 -> epoch 3
   ###################################################################################################################################################
