@@ -10,11 +10,12 @@
 [% END %]
 </select>
 <select name="pttype">
-  <option value="gpt">GPT - > 2TB</option>
-  <option value="msdos">MBR - 2TB Max</option>
+  <option value="gpt">GPT</option> 
+  <!-- <option value="gpt">GPT - > 2TB</option> --> 
+  <!-- <option value="msdos">MBR - 2TB Max</option> -->
 </select>
 <select name="fstype">
-  <option value="ext3">Linux EXT3</option>
+  <!-- <option value="ext3">Linux EXT3</option> -->
   <option value="xfs">Linux XFS</option>
 </select>
 <input type="submit" name="b_format" tabindex="1" value="[% lang.m16009 %]" >
