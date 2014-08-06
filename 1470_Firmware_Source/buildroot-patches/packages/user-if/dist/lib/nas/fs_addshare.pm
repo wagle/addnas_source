@@ -86,6 +86,12 @@ sub stage1($$$) {
     $self->fatalError($config, 'f00026');
     return;
   }
+
+  if ((scalar @vols) == 0) {
+    $self->fatalError($config, 'f00047');
+    return;
+  }
+
   $vars->{extvols} = \@vols;
 
   # Display the next form
