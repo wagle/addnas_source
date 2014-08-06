@@ -576,6 +576,7 @@ WARNING:
 		f00044 => 'Can\'t add regular share, are you using it for a wholedisk share?',
 		f00045 => 'Can\'t change user perms, might be a corrupt database?',
 		f00046 => 'Can\'t add rename share, you are using the new name elsewhere?',
+		f00047 => 'There are no external disks.',
 
 		eTooManyUsers => 'There are too many users. Please logout or wait.',
 		eWaitTime1 => 'Please try again in ',
